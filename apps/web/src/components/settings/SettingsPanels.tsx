@@ -56,6 +56,7 @@ import { Switch } from "../ui/switch";
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { AddProviderInstanceDialog } from "./AddProviderInstanceDialog";
+import { DiffFontPicker } from "./DiffFontPicker";
 import { ProviderInstanceCard } from "./ProviderInstanceCard";
 import { DRIVER_OPTIONS, getDriverOption } from "./providerDriverMeta";
 import { buildProviderInstanceUpdatePatch } from "./SettingsPanels.logic";
@@ -389,6 +390,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       ...(settings.diffIgnoreWhitespace !== DEFAULT_UNIFIED_SETTINGS.diffIgnoreWhitespace
         ? ["Diff whitespace changes"]
         : []),
+      ...(settings.diffFontFamily !== DEFAULT_UNIFIED_SETTINGS.diffFontFamily ? ["Diff font"] : []),
       ...(settings.autoOpenPlanSidebar !== DEFAULT_UNIFIED_SETTINGS.autoOpenPlanSidebar
         ? ["Auto-open task panel"]
         : []),
@@ -418,6 +420,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       settings.confirmThreadDelete,
       settings.addProjectBaseDirectory,
       settings.defaultThreadEnvMode,
+      settings.diffFontFamily,
       settings.diffIgnoreWhitespace,
       settings.diffWordWrap,
       settings.enableAssistantStreaming,
@@ -915,6 +918,28 @@ export function GeneralSettingsPanel() {
                 updateSettings({ diffIgnoreWhitespace: Boolean(checked) })
               }
               aria-label="Hide whitespace changes by default"
+            />
+          }
+        />
+
+        <SettingsRow
+          title="Diff font"
+          description="Choose the font used in the code diff view."
+          resetAction={
+            settings.diffFontFamily !== DEFAULT_UNIFIED_SETTINGS.diffFontFamily ? (
+              <SettingResetButton
+                label="diff font"
+                onClick={() =>
+                  updateSettings({ diffFontFamily: DEFAULT_UNIFIED_SETTINGS.diffFontFamily })
+                }
+              />
+            ) : null
+          }
+          control={
+            <DiffFontPicker
+              value={settings.diffFontFamily}
+              onValueChange={(next) => updateSettings({ diffFontFamily: next })}
+              className="w-full sm:w-64"
             />
           }
         />
