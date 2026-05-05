@@ -44,6 +44,7 @@ import {
   resolveThreadBranchUpdate,
 } from "./GitActionsControl.logic";
 import { AnimatedHeight } from "./AnimatedHeight";
+import { useSettings } from "../hooks/useSettings";
 import { Button } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
 import {
@@ -1136,10 +1137,17 @@ export default function GitActionsControl({
     () => buildMenuItems(gitStatusForActions, isGitActionRunning, hasPrimaryRemote),
     [gitStatusForActions, hasPrimaryRemote, isGitActionRunning],
   );
+  const autoCreatePrOnPush = useSettings((s) => s.autoCreatePrOnPush);
   const quickAction = useMemo(
     () =>
-      resolveQuickAction(gitStatusForActions, isGitActionRunning, isDefaultRef, hasPrimaryRemote),
-    [gitStatusForActions, hasPrimaryRemote, isDefaultRef, isGitActionRunning],
+      resolveQuickAction(
+        gitStatusForActions,
+        isGitActionRunning,
+        isDefaultRef,
+        hasPrimaryRemote,
+        autoCreatePrOnPush,
+      ),
+    [autoCreatePrOnPush, gitStatusForActions, hasPrimaryRemote, isDefaultRef, isGitActionRunning],
   );
   const quickActionDisabledReason = quickAction.disabled
     ? (quickAction.hint ?? "This action is currently unavailable.")
