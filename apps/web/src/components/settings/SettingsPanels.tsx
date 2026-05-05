@@ -56,7 +56,7 @@ import { Switch } from "../ui/switch";
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { AddProviderInstanceDialog } from "./AddProviderInstanceDialog";
-import { DiffFontPicker } from "./DiffFontPicker";
+import { FontPicker } from "./FontPicker";
 import { ProviderInstanceCard } from "./ProviderInstanceCard";
 import { DRIVER_OPTIONS, getDriverOption } from "./providerDriverMeta";
 import { buildProviderInstanceUpdatePatch } from "./SettingsPanels.logic";
@@ -936,9 +936,31 @@ export function GeneralSettingsPanel() {
             ) : null
           }
           control={
-            <DiffFontPicker
+            <FontPicker
               value={settings.diffFontFamily}
               onValueChange={(next) => updateSettings({ diffFontFamily: next })}
+              className="w-full sm:w-64"
+            />
+          }
+        />
+
+        <SettingsRow
+          title="Terminal font"
+          description="Choose the font used in the terminal."
+          resetAction={
+            settings.terminalFontFamily !== DEFAULT_UNIFIED_SETTINGS.terminalFontFamily ? (
+              <SettingResetButton
+                label="terminal font"
+                onClick={() =>
+                  updateSettings({ terminalFontFamily: DEFAULT_UNIFIED_SETTINGS.terminalFontFamily })
+                }
+              />
+            ) : null
+          }
+          control={
+            <FontPicker
+              value={settings.terminalFontFamily}
+              onValueChange={(next) => updateSettings({ terminalFontFamily: next })}
               className="w-full sm:w-64"
             />
           }

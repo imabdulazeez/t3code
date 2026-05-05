@@ -25,7 +25,7 @@ const FONT_PICKER_TRIGGER_ICON_CLASS_NAME =
 const SYSTEM_DEFAULT_VALUE = "__system_default__";
 const SYSTEM_DEFAULT_LABEL = "System default";
 
-interface DiffFontPickerProps {
+interface FontPickerProps {
   readonly value: string;
   readonly onValueChange: (next: string) => void;
   readonly className?: string;
@@ -69,7 +69,7 @@ function buildItems(fonts: ReadonlyArray<SystemFont>, currentValue: string): Pic
   return items;
 }
 
-export function DiffFontPicker({ value, onValueChange, className }: DiffFontPickerProps) {
+export function FontPicker({ value, onValueChange, className }: FontPickerProps) {
   const [open, setOpen] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [fonts, setFonts] = useState<ReadonlyArray<SystemFont>>([]);
@@ -90,7 +90,7 @@ export function DiffFontPicker({ value, onValueChange, className }: DiffFontPick
       })
       .catch((error) => {
         if (cancelled) return;
-        console.warn("[DiffFontPicker] failed to load system fonts", error);
+        console.warn("[FontPicker] failed to load system fonts", error);
         setHasLoaded(true);
       });
     return () => {
