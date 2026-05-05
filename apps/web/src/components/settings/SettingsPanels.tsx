@@ -973,6 +973,32 @@ export function GeneralSettingsPanel() {
         />
 
         <SettingsRow
+          title="Auto-create PR on push"
+          description="When pushing a feature branch with no open PR, also create a pull request automatically."
+          resetAction={
+            settings.autoCreatePrOnPush !== DEFAULT_UNIFIED_SETTINGS.autoCreatePrOnPush ? (
+              <SettingResetButton
+                label="auto-create PR on push"
+                onClick={() =>
+                  updateSettings({
+                    autoCreatePrOnPush: DEFAULT_UNIFIED_SETTINGS.autoCreatePrOnPush,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <Switch
+              checked={settings.autoCreatePrOnPush}
+              onCheckedChange={(checked) =>
+                updateSettings({ autoCreatePrOnPush: Boolean(checked) })
+              }
+              aria-label="Auto-create PR on push"
+            />
+          }
+        />
+
+        <SettingsRow
           title="New threads"
           description="Pick the default workspace mode for newly created draft threads."
           resetAction={

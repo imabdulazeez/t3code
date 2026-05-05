@@ -1131,3 +1131,79 @@ describe("resolveAutoFeatureBranchName", () => {
     assert.equal(ref, "feature/update");
   });
 });
+
+describe("when: autoCreatePr is disabled", () => {
+  it("downgrades feature-branch commit+push from PR to plain commit & push", () => {
+    const quick = resolveQuickAction(
+      status({ hasWorkingTreeChanges: true }),
+      false,
+      false,
+      true,
+      false,
+    );
+    assert.deepInclude(quick, {
+      kind: "run_action",
+      action: "commit_push",
+      label: "Commit & push",
+      disabled: false,
+    });
+  });
+
+  it("downgrades feature-branch ahead-with-upstream from create PR to plain push", () => {
+    const quick = resolveQuickAction(
+      status({ aheadCount: 2 }),
+      false,
+      false,
+      true,
+      false,
+    );
+    assert.deepInclude(quick, {
+      kind: "run_action",
+      action: "push",
+      label: "Push",
+      disabled: false,
+    });
+  });
+
+  it("downgrades feature-branch ahead-without-upstream from create PR to plain push", () => {
+    const quick = resolveQuickAction(
+      status({ aheadCount: 1, hasUpstream: false }),
+      false,
+      false,
+      true,
+      false,
+    );
+    assert.deepInclude(quick, {
+      kind: "run_action",
+      action: "push",
+      label: "Push",
+      disabled: false,
+    });
+  });
+
+  it("preserves Commit, push & PR when autoCreatePr is true (default)", () => {
+    const quick = resolveQuickAction(
+      status({ hasWorkingTreeChanges: true }),
+      false,
+      false,
+      true,
+      true,
+    );
+    assert.deepInclude(quick, {
+      kind: "run_action",
+      action: "commit_push_pr",
+      label: "Commit, push & PR",
+      disabled: false,
+    });
+  });
+
+  it("preserves Push & create PR when autoCreatePr is true (default)", () => {
+    const quick = resolveQuickAction(status({ aheadCount: 2 }), false, false, true, true);
+    assert.deepInclude(quick, {
+      kind: "run_action",
+      action: "create_pr",
+      label: "Push & create PR",
+      disabled: false,
+    });
+  });
+});
