@@ -48,10 +48,13 @@ import {
 import { readEnvironmentApi } from "~/environmentApi";
 import { readLocalApi } from "~/localApi";
 import { selectTerminalEventEntries, useTerminalStateStore } from "../terminalStateStore";
+import { useSettings } from "../hooks/useSettings";
 
 const MIN_DRAWER_HEIGHT = 180;
 const MAX_DRAWER_HEIGHT_RATIO = 0.75;
 const MULTI_CLICK_SELECTION_ACTION_DELAY_MS = 260;
+const DEFAULT_TERMINAL_FONT_FAMILY =
+  '"SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace';
 
 function maxDrawerHeight(): number {
   if (typeof window === "undefined") return DEFAULT_THREAD_TERMINAL_HEIGHT;
@@ -280,6 +283,11 @@ export function TerminalViewport({
   drawerHeight,
   keybindings,
 }: TerminalViewportProps) {
+  const settings = useSettings();
+  const customTerminalFont = settings.terminalFontFamily?.trim() ?? "";
+  const terminalFontFamily = customTerminalFont
+    ? `"${customTerminalFont}", ${DEFAULT_TERMINAL_FONT_FAMILY}`
+    : DEFAULT_TERMINAL_FONT_FAMILY;
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -320,7 +328,7 @@ export function TerminalViewport({
       lineHeight: 1.2,
       fontSize: 12,
       scrollback: 5_000,
-      fontFamily: '"SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace',
+      fontFamily: terminalFontFamily,
       theme: terminalThemeFromApp(mount),
     });
     terminal.loadAddon(fitAddon);
@@ -753,6 +761,13 @@ export function TerminalViewport({
     // it is only read at mount time and must not trigger terminal teardown/recreation.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cwd, environmentId, runtimeEnv, terminalId, threadId]);
+
+  useEffect(() => {
+    const terminal = terminalRef.current;
+    if (!terminal) return;
+    terminal.options.fontFamily = terminalFontFamily;
+    fitAddonRef.current?.fit();
+  }, [terminalFontFamily]);
 
   useEffect(() => {
     if (!autoFocus) return;
