@@ -796,7 +796,7 @@ export function GeneralSettingsPanel() {
 
   return (
     <SettingsPageContainer>
-      <SettingsSection title="General">
+      <SettingsSection title="Appearance">
         <SettingsRow
           title="Theme"
           description="Choose how T3 Code looks across the app."
@@ -873,6 +873,50 @@ export function GeneralSettingsPanel() {
         />
 
         <SettingsRow
+          title="Diff font"
+          description="Choose the font used in the code diff view."
+          resetAction={
+            settings.diffFontFamily !== DEFAULT_UNIFIED_SETTINGS.diffFontFamily ? (
+              <SettingResetButton
+                label="diff font"
+                onClick={() =>
+                  updateSettings({ diffFontFamily: DEFAULT_UNIFIED_SETTINGS.diffFontFamily })
+                }
+              />
+            ) : null
+          }
+          control={
+            <FontPicker
+              value={settings.diffFontFamily}
+              onValueChange={(next) => updateSettings({ diffFontFamily: next })}
+              className="w-full sm:w-64"
+            />
+          }
+        />
+
+        <SettingsRow
+          title="Terminal font"
+          description="Choose the font used in the terminal."
+          resetAction={
+            settings.terminalFontFamily !== DEFAULT_UNIFIED_SETTINGS.terminalFontFamily ? (
+              <SettingResetButton
+                label="terminal font"
+                onClick={() =>
+                  updateSettings({ terminalFontFamily: DEFAULT_UNIFIED_SETTINGS.terminalFontFamily })
+                }
+              />
+            ) : null
+          }
+          control={
+            <FontPicker
+              value={settings.terminalFontFamily}
+              onValueChange={(next) => updateSettings({ terminalFontFamily: next })}
+              className="w-full sm:w-64"
+            />
+          }
+        />
+
+        <SettingsRow
           title="Diff line wrapping"
           description="Set the default wrap state when the diff panel opens."
           resetAction={
@@ -921,130 +965,9 @@ export function GeneralSettingsPanel() {
             />
           }
         />
+      </SettingsSection>
 
-        <SettingsRow
-          title="Diff font"
-          description="Choose the font used in the code diff view."
-          resetAction={
-            settings.diffFontFamily !== DEFAULT_UNIFIED_SETTINGS.diffFontFamily ? (
-              <SettingResetButton
-                label="diff font"
-                onClick={() =>
-                  updateSettings({ diffFontFamily: DEFAULT_UNIFIED_SETTINGS.diffFontFamily })
-                }
-              />
-            ) : null
-          }
-          control={
-            <FontPicker
-              value={settings.diffFontFamily}
-              onValueChange={(next) => updateSettings({ diffFontFamily: next })}
-              className="w-full sm:w-64"
-            />
-          }
-        />
-
-        <SettingsRow
-          title="Terminal font"
-          description="Choose the font used in the terminal."
-          resetAction={
-            settings.terminalFontFamily !== DEFAULT_UNIFIED_SETTINGS.terminalFontFamily ? (
-              <SettingResetButton
-                label="terminal font"
-                onClick={() =>
-                  updateSettings({ terminalFontFamily: DEFAULT_UNIFIED_SETTINGS.terminalFontFamily })
-                }
-              />
-            ) : null
-          }
-          control={
-            <FontPicker
-              value={settings.terminalFontFamily}
-              onValueChange={(next) => updateSettings({ terminalFontFamily: next })}
-              className="w-full sm:w-64"
-            />
-          }
-        />
-
-        <SettingsRow
-          title="Assistant output"
-          description="Show token-by-token output while a response is in progress."
-          resetAction={
-            settings.enableAssistantStreaming !==
-            DEFAULT_UNIFIED_SETTINGS.enableAssistantStreaming ? (
-              <SettingResetButton
-                label="assistant output"
-                onClick={() =>
-                  updateSettings({
-                    enableAssistantStreaming: DEFAULT_UNIFIED_SETTINGS.enableAssistantStreaming,
-                  })
-                }
-              />
-            ) : null
-          }
-          control={
-            <Switch
-              checked={settings.enableAssistantStreaming}
-              onCheckedChange={(checked) =>
-                updateSettings({ enableAssistantStreaming: Boolean(checked) })
-              }
-              aria-label="Stream assistant messages"
-            />
-          }
-        />
-
-        <SettingsRow
-          title="Auto-open task panel"
-          description="Open the right-side plan and task panel automatically when steps appear."
-          resetAction={
-            settings.autoOpenPlanSidebar !== DEFAULT_UNIFIED_SETTINGS.autoOpenPlanSidebar ? (
-              <SettingResetButton
-                label="auto-open task panel"
-                onClick={() =>
-                  updateSettings({
-                    autoOpenPlanSidebar: DEFAULT_UNIFIED_SETTINGS.autoOpenPlanSidebar,
-                  })
-                }
-              />
-            ) : null
-          }
-          control={
-            <Switch
-              checked={settings.autoOpenPlanSidebar}
-              onCheckedChange={(checked) =>
-                updateSettings({ autoOpenPlanSidebar: Boolean(checked) })
-              }
-              aria-label="Open the task panel automatically"
-            />
-          }
-        />
-
-        <SettingsRow
-          title="Auto-create PR on push"
-          description="When pushing a feature branch with no open PR, also create a pull request automatically."
-          resetAction={
-            settings.autoCreatePrOnPush !== DEFAULT_UNIFIED_SETTINGS.autoCreatePrOnPush ? (
-              <SettingResetButton
-                label="auto-create PR on push"
-                onClick={() =>
-                  updateSettings({
-                    autoCreatePrOnPush: DEFAULT_UNIFIED_SETTINGS.autoCreatePrOnPush,
-                  })
-                }
-              />
-            ) : null
-          }
-          control={
-            <Switch
-              checked={settings.autoCreatePrOnPush}
-              onCheckedChange={(checked) =>
-                updateSettings({ autoCreatePrOnPush: Boolean(checked) })
-              }
-              aria-label="Auto-create PR on push"
-            />
-          }
-        />
-
+      <SettingsSection title="Threads & tasks">
         <SettingsRow
           title="New threads"
           description="Pick the default workspace mode for newly created draft threads."
@@ -1087,29 +1010,54 @@ export function GeneralSettingsPanel() {
         />
 
         <SettingsRow
-          title="Add project starts in"
-          description='Leave empty to use "~/" when the Add Project browser opens.'
+          title="Auto-open task panel"
+          description="Open the right-side plan and task panel automatically when steps appear."
           resetAction={
-            settings.addProjectBaseDirectory !==
-            DEFAULT_UNIFIED_SETTINGS.addProjectBaseDirectory ? (
+            settings.autoOpenPlanSidebar !== DEFAULT_UNIFIED_SETTINGS.autoOpenPlanSidebar ? (
               <SettingResetButton
-                label="add project base directory"
+                label="auto-open task panel"
                 onClick={() =>
                   updateSettings({
-                    addProjectBaseDirectory: DEFAULT_UNIFIED_SETTINGS.addProjectBaseDirectory,
+                    autoOpenPlanSidebar: DEFAULT_UNIFIED_SETTINGS.autoOpenPlanSidebar,
                   })
                 }
               />
             ) : null
           }
           control={
-            <DraftInput
-              className="w-full sm:w-72"
-              value={settings.addProjectBaseDirectory}
-              onCommit={(next) => updateSettings({ addProjectBaseDirectory: next })}
-              placeholder="~/"
-              spellCheck={false}
-              aria-label="Add project base directory"
+            <Switch
+              checked={settings.autoOpenPlanSidebar}
+              onCheckedChange={(checked) =>
+                updateSettings({ autoOpenPlanSidebar: Boolean(checked) })
+              }
+              aria-label="Open the task panel automatically"
+            />
+          }
+        />
+
+        <SettingsRow
+          title="Assistant output"
+          description="Show token-by-token output while a response is in progress."
+          resetAction={
+            settings.enableAssistantStreaming !==
+            DEFAULT_UNIFIED_SETTINGS.enableAssistantStreaming ? (
+              <SettingResetButton
+                label="assistant output"
+                onClick={() =>
+                  updateSettings({
+                    enableAssistantStreaming: DEFAULT_UNIFIED_SETTINGS.enableAssistantStreaming,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <Switch
+              checked={settings.enableAssistantStreaming}
+              onCheckedChange={(checked) =>
+                updateSettings({ enableAssistantStreaming: Boolean(checked) })
+              }
+              aria-label="Stream assistant messages"
             />
           }
         />
@@ -1162,6 +1110,64 @@ export function GeneralSettingsPanel() {
                 updateSettings({ confirmThreadDelete: Boolean(checked) })
               }
               aria-label="Confirm thread deletion"
+            />
+          }
+        />
+      </SettingsSection>
+
+      <SettingsSection title="Projects">
+        <SettingsRow
+          title="Add project starts in"
+          description='Leave empty to use "~/" when the Add Project browser opens.'
+          resetAction={
+            settings.addProjectBaseDirectory !==
+            DEFAULT_UNIFIED_SETTINGS.addProjectBaseDirectory ? (
+              <SettingResetButton
+                label="add project base directory"
+                onClick={() =>
+                  updateSettings({
+                    addProjectBaseDirectory: DEFAULT_UNIFIED_SETTINGS.addProjectBaseDirectory,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <DraftInput
+              className="w-full sm:w-72"
+              value={settings.addProjectBaseDirectory}
+              onCommit={(next) => updateSettings({ addProjectBaseDirectory: next })}
+              placeholder="~/"
+              spellCheck={false}
+              aria-label="Add project base directory"
+            />
+          }
+        />
+      </SettingsSection>
+
+      <SettingsSection title="Version control">
+        <SettingsRow
+          title="Auto-create PR on push"
+          description="When pushing a feature branch with no open PR, also create a pull request automatically."
+          resetAction={
+            settings.autoCreatePrOnPush !== DEFAULT_UNIFIED_SETTINGS.autoCreatePrOnPush ? (
+              <SettingResetButton
+                label="auto-create PR on push"
+                onClick={() =>
+                  updateSettings({
+                    autoCreatePrOnPush: DEFAULT_UNIFIED_SETTINGS.autoCreatePrOnPush,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <Switch
+              checked={settings.autoCreatePrOnPush}
+              onCheckedChange={(checked) =>
+                updateSettings({ autoCreatePrOnPush: Boolean(checked) })
+              }
+              aria-label="Auto-create PR on push"
             />
           }
         />
