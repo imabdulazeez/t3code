@@ -14,6 +14,7 @@ import {
   TextWrapIcon,
 } from "lucide-react";
 import {
+  type CSSProperties,
   type WheelEvent as ReactWheelEvent,
   useCallback,
   useEffect,
@@ -107,6 +108,15 @@ const DIFF_PANEL_UNSAFE_CSS = `
 }
 `;
 
+const DIFF_PANEL_FONT_FAMILY_CSS = `
+[data-diff],
+[data-diff] *,
+[data-file],
+[data-file] * {
+  font-family: var(--diff-font-family) !important;
+}
+`;
+
 type RenderablePatch =
   | {
       kind: "files";
@@ -187,6 +197,14 @@ export default function DiffPanel({ mode = "inline" }: DiffPanelProps) {
   const navigate = useNavigate();
   const { resolvedTheme } = useTheme();
   const settings = useSettings();
+  const diffFontFamily = settings.diffFontFamily?.trim() ?? "";
+  const diffFontFamilyValue = diffFontFamily ? `"${diffFontFamily}"` : null;
+  const diffPanelUnsafeCss = diffFontFamilyValue
+    ? `${DIFF_PANEL_UNSAFE_CSS}${DIFF_PANEL_FONT_FAMILY_CSS}`
+    : DIFF_PANEL_UNSAFE_CSS;
+  const diffSurfaceStyle = diffFontFamilyValue
+    ? ({ "--diff-font-family": diffFontFamilyValue } as CSSProperties)
+    : undefined;
   const [diffRenderMode, setDiffRenderMode] = useState<DiffRenderMode>("stacked");
   const [diffWordWrap, setDiffWordWrap] = useState(settings.diffWordWrap);
   const [diffIgnoreWhitespace, setDiffIgnoreWhitespace] = useState(settings.diffIgnoreWhitespace);
@@ -654,6 +672,7 @@ export default function DiffPanel({ mode = "inline" }: DiffPanelProps) {
             ) : renderablePatch.kind === "files" ? (
               <Virtualizer
                 className="diff-render-surface h-full min-h-0 overflow-auto px-2 pb-2"
+                style={diffSurfaceStyle}
                 config={{
                   overscrollSize: 600,
                   intersectionObserverMargin: 1200,
@@ -711,7 +730,7 @@ export default function DiffPanel({ mode = "inline" }: DiffPanelProps) {
                           overflow: diffWordWrap ? "wrap" : "scroll",
                           theme: resolveDiffThemeName(resolvedTheme),
                           themeType: resolvedTheme as DiffThemeType,
-                          unsafeCSS: DIFF_PANEL_UNSAFE_CSS,
+                          unsafeCSS: diffPanelUnsafeCss,
                         }}
                       />
                     </div>
@@ -729,6 +748,9 @@ export default function DiffPanel({ mode = "inline" }: DiffPanelProps) {
                         ? "overflow-auto whitespace-pre-wrap wrap-break-word"
                         : "overflow-auto",
                     )}
+                    style={
+                      diffFontFamilyValue ? { fontFamily: diffFontFamilyValue } : undefined
+                    }
                   >
                     {renderablePatch.text}
                   </pre>

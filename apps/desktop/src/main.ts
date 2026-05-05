@@ -16,6 +16,7 @@ import {
   nativeTheme,
   protocol,
   safeStorage,
+  session,
   shell,
 } from "electron";
 import type { MenuItemConstructorOptions, OpenDialogOptions } from "electron";
@@ -2239,6 +2240,13 @@ app
   .then(() => {
     writeDesktopLogHeader("app ready");
     configureAppIdentity();
+    session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
+      if (permission === "local-fonts") {
+        callback(true);
+        return;
+      }
+      callback(false);
+    });
     configureApplicationMenu();
     registerDesktopProtocol();
     configureAutoUpdater();
