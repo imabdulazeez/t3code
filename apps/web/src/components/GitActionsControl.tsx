@@ -1796,9 +1796,7 @@ export default function GitActionsControl({
                     {gitStatusForActions?.refName ?? "(detached HEAD)"}
                   </span>
                   {isDefaultRef && (
-                    <span className="text-right text-warning text-xs">
-                      Warning: default branch
-                    </span>
+                    <span className="text-right text-warning text-xs">Warning: default branch</span>
                   )}
                 </span>
               </div>
