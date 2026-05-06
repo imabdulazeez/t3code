@@ -36,6 +36,9 @@ export const ClientSettingsSchema = Schema.Struct({
   diffFontFamily: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
   diffIgnoreWhitespace: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
   diffWordWrap: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
+  dismissedProviderUpdateNotificationKeys: Schema.Array(TrimmedNonEmptyString).pipe(
+    Schema.withDecodingDefault(Effect.succeed([])),
+  ),
   terminalFontFamily: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
   // Model favorites. Historically keyed by provider kind, now
   // widened to `ProviderInstanceId` so users can favorite a specific model

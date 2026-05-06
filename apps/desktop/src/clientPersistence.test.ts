@@ -56,6 +56,7 @@ const clientSettings: ClientSettings = {
   diffFontFamily: "",
   diffIgnoreWhitespace: true,
   diffWordWrap: true,
+  dismissedProviderUpdateNotificationKeys: [],
   favorites: [],
   providerModelPreferences: {},
   sidebarProjectGroupingMode: "repository_path",
