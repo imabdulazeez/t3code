@@ -2241,7 +2241,11 @@ app
     writeDesktopLogHeader("app ready");
     configureAppIdentity();
     session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
-      if (permission === "local-fonts") {
+      if (
+        permission === "local-fonts" ||
+        permission === "clipboard-sanitized-write" ||
+        permission === "clipboard-read"
+      ) {
         callback(true);
         return;
       }

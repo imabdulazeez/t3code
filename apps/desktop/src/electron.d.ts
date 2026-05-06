@@ -4,7 +4,7 @@ declare namespace Electron {
       handler:
         | ((
             webContents: WebContents,
-            permission: "local-fonts",
+            permission: "local-fonts" | "clipboard-sanitized-write" | "clipboard-read",
             callback: (permissionGranted: boolean) => void,
             details: PermissionRequest,
           ) => void)
