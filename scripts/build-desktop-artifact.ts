@@ -150,6 +150,16 @@ const resolveGitCommitHash = Effect.fn("resolveGitCommitHash")(function* (repoRo
   return hash.toLowerCase();
 });
 
+export const formatBuildTimestamp = (date: Date): string => {
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  const yyyy = date.getUTCFullYear();
+  const mm = pad(date.getUTCMonth() + 1);
+  const dd = pad(date.getUTCDate());
+  const hh = pad(date.getUTCHours());
+  const mi = pad(date.getUTCMinutes());
+  return `${yyyy}${mm}${dd}-${hh}${mi}`;
+};
+
 const resolvePythonForNodeGyp = Effect.fn("resolvePythonForNodeGyp")(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -565,11 +575,12 @@ const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   signed: boolean,
   mockUpdates: boolean,
   mockUpdateServerPort: number | undefined,
+  buildTimestamp: string,
 ) {
   const buildConfig: Record<string, unknown> = {
     appId: "com.t3tools.t3code",
     productName: resolveDesktopProductName(version),
-    artifactName: "T3-Code-${version}-${arch}.${ext}",
+    artifactName: `T3-Code-\${version}-\${arch}-${buildTimestamp}.\${ext}`,
     directories: {
       buildResources: "apps/desktop/resources",
     },
@@ -777,6 +788,8 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
   // electron-builder is filtering out stageResourcesDir directory in the AppImage for production
   yield* fs.copy(stageResourcesDir, path.join(stageAppDir, "apps/desktop/prod-resources"));
 
+  const buildTimestamp = formatBuildTimestamp(new Date());
+
   const stagePackageJson: StagePackageJson = {
     name: "t3code",
     version: appVersion,
@@ -793,6 +806,7 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
       options.signed,
       options.mockUpdates,
       options.mockUpdateServerPort,
+      buildTimestamp,
     ),
     dependencies: {
       ...resolvedServerDependencies,
@@ -845,7 +859,7 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
   }
 
   yield* Effect.log(
-    `[desktop-artifact] Building ${options.platform}/${options.target} (arch=${options.arch}, version=${appVersion})...`,
+    `[desktop-artifact] Building ${options.platform}/${options.target} (arch=${options.arch}, version=${appVersion}, timestamp=${buildTimestamp})...`,
   );
   yield* runCommand(
     ChildProcess.make({

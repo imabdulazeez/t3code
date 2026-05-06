@@ -3,6 +3,7 @@ import { assert, it } from "@effect/vitest";
 import { ConfigProvider, Effect, Option } from "effect";
 
 import {
+  formatBuildTimestamp,
   resolveBuildOptions,
   resolveDesktopBuildIconAssets,
   resolveDesktopProductName,
@@ -35,6 +36,13 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       linuxIconPng: BRAND_ASSET_PATHS.nightlyLinuxIconPng,
       windowsIconIco: BRAND_ASSET_PATHS.nightlyWindowsIconIco,
     });
+  });
+
+  it("formats build timestamps as zero-padded UTC YYYYMMDD-HHMM", () => {
+    assert.equal(formatBuildTimestamp(new Date(Date.UTC(2026, 4, 6, 14, 30))), "20260506-1430");
+    assert.equal(formatBuildTimestamp(new Date(Date.UTC(2026, 0, 1, 0, 0))), "20260101-0000");
+    assert.equal(formatBuildTimestamp(new Date(Date.UTC(2026, 11, 31, 23, 59))), "20261231-2359");
+    assert.match(formatBuildTimestamp(new Date()), /^\d{8}-\d{4}$/);
   });
 
   it("falls back to the default mock update port when the configured port is blank", () => {
