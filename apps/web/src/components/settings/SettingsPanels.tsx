@@ -902,7 +902,9 @@ export function GeneralSettingsPanel() {
               <SettingResetButton
                 label="terminal font"
                 onClick={() =>
-                  updateSettings({ terminalFontFamily: DEFAULT_UNIFIED_SETTINGS.terminalFontFamily })
+                  updateSettings({
+                    terminalFontFamily: DEFAULT_UNIFIED_SETTINGS.terminalFontFamily,
+                  })
                 }
               />
             ) : null

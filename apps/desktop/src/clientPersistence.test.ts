@@ -53,6 +53,7 @@ const clientSettings: ClientSettings = {
   autoOpenPlanSidebar: false,
   confirmThreadArchive: true,
   confirmThreadDelete: false,
+  diffFontFamily: "",
   diffIgnoreWhitespace: true,
   diffWordWrap: true,
   favorites: [],
@@ -63,6 +64,7 @@ const clientSettings: ClientSettings = {
   },
   sidebarProjectSortOrder: "manual",
   sidebarThreadSortOrder: "created_at",
+  terminalFontFamily: "",
   timestampFormat: "24-hour",
 };
 

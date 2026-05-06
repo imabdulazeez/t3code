@@ -748,9 +748,7 @@ export default function DiffPanel({ mode = "inline" }: DiffPanelProps) {
                         ? "overflow-auto whitespace-pre-wrap wrap-break-word"
                         : "overflow-auto",
                     )}
-                    style={
-                      diffFontFamilyValue ? { fontFamily: diffFontFamilyValue } : undefined
-                    }
+                    style={diffFontFamilyValue ? { fontFamily: diffFontFamilyValue } : undefined}
                   >
                     {renderablePatch.text}
                   </pre>

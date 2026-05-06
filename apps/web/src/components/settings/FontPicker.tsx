@@ -146,10 +146,7 @@ export function FontPicker({ value, onValueChange, className }: FontPickerProps)
       onOpenChange={handleOpenChange}
     >
       <ComboboxTrigger className={cn(FONT_PICKER_TRIGGER_CLASS_NAME, className)}>
-        <span
-          className="flex-1 truncate"
-          style={value ? { fontFamily: `"${value}"` } : undefined}
-        >
+        <span className="flex-1 truncate" style={value ? { fontFamily: `"${value}"` } : undefined}>
           {triggerLabel}
         </span>
         <ChevronsUpDownIcon className={FONT_PICKER_TRIGGER_ICON_CLASS_NAME} />
@@ -179,19 +176,10 @@ export function FontPicker({ value, onValueChange, className }: FontPickerProps)
         <ComboboxEmpty>No fonts found.</ComboboxEmpty>
         <ComboboxList className="max-h-64">
           {filteredItems.map((item, index) => (
-            <ComboboxItem
-              key={item.value}
-              index={index}
-              value={item.value}
-              hideIndicator
-            >
+            <ComboboxItem key={item.value} index={index} value={item.value} hideIndicator>
               <span
                 className="truncate"
-                style={
-                  item.fontFamily
-                    ? { fontFamily: `"${item.fontFamily}"` }
-                    : undefined
-                }
+                style={item.fontFamily ? { fontFamily: `"${item.fontFamily}"` } : undefined}
               >
                 {item.label}
               </span>
