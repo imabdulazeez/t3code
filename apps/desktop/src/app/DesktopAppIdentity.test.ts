@@ -23,6 +23,7 @@ const defaultEnvironmentInput = {
   isPackaged: true,
   resourcesPath: "/Applications/T3 Code.app/Contents/Resources",
   runningUnderArm64Translation: false,
+  buildTimestamp: "20260508-1430",
 } satisfies DesktopEnvironment.MakeDesktopEnvironmentInput;
 
 type TestEnvironmentInput = Partial<DesktopEnvironment.MakeDesktopEnvironmentInput> & {
@@ -156,9 +157,9 @@ describe("DesktopAppIdentity", () => {
         const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
         yield* identity.configure;
 
-        assert.deepEqual(calls.setName, ["T3 Code (Alpha)"]);
-        assert.equal(calls.setAboutPanelOptions[0]?.applicationName, "T3 Code (Alpha)");
-        assert.equal(calls.setAboutPanelOptions[0]?.applicationVersion, "1.2.3");
+        assert.deepEqual(calls.setName, ["T3 Code (A3)"]);
+        assert.equal(calls.setAboutPanelOptions[0]?.applicationName, "T3 Code (A3)");
+        assert.equal(calls.setAboutPanelOptions[0]?.applicationVersion, "1.2.3-a3-20260508-1430");
         assert.equal(calls.setAboutPanelOptions[0]?.version, "0123456789ab");
         assert.deepEqual(calls.setDockIcon, ["/icon.png"]);
       }),

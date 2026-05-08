@@ -124,6 +124,7 @@ function makeHarness(options: UpdatesHarnessOptions = {}) {
     isPackaged: true,
     resourcesPath: "/missing/resources",
     runningUnderArm64Translation: false,
+    buildTimestamp: "20260508-1430",
   }).pipe(
     Layer.provide(
       Layer.mergeAll(

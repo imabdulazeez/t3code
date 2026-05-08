@@ -17,6 +17,7 @@ import {
 } from "../settings/DesktopAppSettings.ts";
 import * as DesktopConfig from "./DesktopConfig.ts";
 import { isNightlyDesktopVersion } from "../updates/updateChannels.ts";
+import { FORK_STAGE_LABEL, formatForkDisplayVersion } from "./forkBranding.ts";
 
 export interface MakeDesktopEnvironmentInput {
   readonly dirname: string;
@@ -28,6 +29,7 @@ export interface MakeDesktopEnvironmentInput {
   readonly isPackaged: boolean;
   readonly resourcesPath: string;
   readonly runningUnderArm64Translation: boolean;
+  readonly buildTimestamp: string;
 }
 
 export interface DesktopEnvironmentShape {
@@ -73,6 +75,7 @@ export interface DesktopEnvironmentShape {
   readonly resolvePickFolderDefaultPath: (rawOptions: unknown) => Option.Option<string>;
   readonly resolveResourcePathCandidates: (fileName: string) => readonly string[];
   readonly developmentDockIconPath: string;
+  readonly displayVersion: string;
 }
 
 export class DesktopEnvironment extends Context.Service<
@@ -90,18 +93,21 @@ function resolveDesktopAppStageLabel(input: {
     return "Dev";
   }
 
-  return isNightlyDesktopVersion(input.appVersion) ? "Nightly" : "Alpha";
+  return isNightlyDesktopVersion(input.appVersion) ? "Nightly" : FORK_STAGE_LABEL;
 }
 
 function resolveDesktopAppBranding(input: {
   readonly isDevelopment: boolean;
   readonly appVersion: string;
+  readonly displayVersion: string;
 }): DesktopAppBranding {
   const stageLabel = resolveDesktopAppStageLabel(input);
   return {
     baseName: APP_BASE_NAME,
     stageLabel,
     displayName: `${APP_BASE_NAME} (${stageLabel})`,
+    displayVersion: input.displayVersion,
+    appVersion: input.appVersion,
   };
 }
 
@@ -154,9 +160,11 @@ const makeDesktopEnvironment = Effect.fn("desktop.environment.make")(function* (
   const baseDir = Option.getOrElse(config.t3Home, () => path.join(homeDirectory, ".t3"));
   const rootDir = path.resolve(input.dirname, "../../..");
   const appRoot = input.isPackaged ? input.appPath : rootDir;
+  const displayVersion = formatForkDisplayVersion(input.appVersion, input.buildTimestamp);
   const branding = resolveDesktopAppBranding({
     isDevelopment,
     appVersion: input.appVersion,
+    displayVersion,
   });
   const displayName = branding.displayName;
   const stateDir = path.join(baseDir, isDevelopment ? "dev" : "userdata");
@@ -242,6 +250,7 @@ const makeDesktopEnvironment = Effect.fn("desktop.environment.make")(function* (
       path.join(resourcesPath, fileName),
     ],
     developmentDockIconPath: path.join(rootDir, "assets", "dev", "blueprint-macos-1024.png"),
+    displayVersion,
   });
 });
 

@@ -15,6 +15,7 @@ const COMMIT_HASH_DISPLAY_LENGTH = 12;
 
 const AppPackageMetadata = Schema.Struct({
   t3codeCommitHash: Schema.optional(Schema.String),
+  t3codeBuildTimestamp: Schema.optional(Schema.String),
 });
 
 export interface DesktopAppIdentityShape {
@@ -97,7 +98,7 @@ const make = Effect.gen(function* () {
     yield* electronApp.setName(environment.displayName);
     yield* electronApp.setAboutPanelOptions({
       applicationName: environment.displayName,
-      applicationVersion: environment.appVersion,
+      applicationVersion: environment.displayVersion,
       version: Option.getOrElse(commitHash, () => "unknown"),
     });
 

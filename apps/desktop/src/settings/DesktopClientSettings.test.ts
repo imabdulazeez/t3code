@@ -49,6 +49,7 @@ function makeLayer(baseDir: string) {
     isPackaged: true,
     resourcesPath: "/missing/resources",
     runningUnderArm64Translation: false,
+    buildTimestamp: "20260508-1430",
   }).pipe(
     Layer.provide(
       Layer.mergeAll(NodeServices.layer, DesktopConfig.layerTest({ T3CODE_HOME: baseDir })),

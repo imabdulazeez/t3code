@@ -17,6 +17,7 @@ const defaultInput = {
   isPackaged: false,
   resourcesPath: "/Applications/T3 Code.app/Contents/Resources",
   runningUnderArm64Translation: false,
+  buildTimestamp: "20260508-1430",
 } satisfies DesktopEnvironment.MakeDesktopEnvironmentInput;
 
 const makeEnvironmentLayer = (

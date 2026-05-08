@@ -3,10 +3,13 @@ import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as NodeOS from "node:os";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Path from "effect/Path";
 
 import * as Electron from "electron";
+import { formatBuildTimestamp } from "@t3tools/shared/buildTimestamp";
 
 import * as NetService from "@t3tools/shared/Net";
 import { resolveRemoteT3CliPackageSpec } from "@t3tools/ssh/command";
@@ -47,14 +50,30 @@ import * as DesktopWindow from "./window/DesktopWindow.ts";
 
 const desktopEnvironmentLayer = Layer.unwrap(
   Effect.gen(function* () {
-    const metadata = yield* Effect.service(ElectronApp.ElectronApp).pipe(
-      Effect.flatMap((app) => app.metadata),
-    );
+    const electronApp = yield* Effect.service(ElectronApp.ElectronApp);
+    const metadata = yield* electronApp.metadata;
+    let buildTimestamp = process.env.T3CODE_BUILD_TIMESTAMP;
+    if (!buildTimestamp && metadata.isPackaged) {
+      const path = yield* Path.Path;
+      const fs = yield* FileSystem.FileSystem;
+      const packagePath = path.join(metadata.appPath, "package.json");
+      const fileContent = yield* fs.readFileString(packagePath).pipe(Effect.option);
+      if (Option.isSome(fileContent)) {
+        try {
+          const packageJson = JSON.parse(fileContent.value);
+          if (typeof packageJson?.t3codeBuildTimestamp === "string") {
+            buildTimestamp = packageJson.t3codeBuildTimestamp;
+          }
+        } catch {}
+      }
+    }
+    buildTimestamp = buildTimestamp || formatBuildTimestamp(new Date());
     return DesktopEnvironment.layer({
       dirname: __dirname,
       homeDirectory: NodeOS.homedir(),
       platform: process.platform,
       processArch: process.arch,
+      buildTimestamp,
       ...metadata,
     });
   }),

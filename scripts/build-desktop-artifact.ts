@@ -7,6 +7,7 @@ import serverPackageJson from "../apps/server/package.json" with { type: "json" 
 import { BRAND_ASSET_PATHS } from "./lib/brand-assets.ts";
 import { getDefaultBuildArch } from "./lib/build-target-arch.ts";
 import { resolveCatalogDependencies } from "./lib/resolve-catalog.ts";
+import { formatBuildTimestamp } from "@t3tools/shared/buildTimestamp";
 
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -149,16 +150,6 @@ const resolveGitCommitHash = Effect.fn("resolveGitCommitHash")(function* (repoRo
   }
   return hash.toLowerCase();
 });
-
-export const formatBuildTimestamp = (date: Date): string => {
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  const yyyy = date.getUTCFullYear();
-  const mm = pad(date.getUTCMonth() + 1);
-  const dd = pad(date.getUTCDate());
-  const hh = pad(date.getUTCHours());
-  const mi = pad(date.getUTCMinutes());
-  return `${yyyy}${mm}${dd}-${hh}${mi}`;
-};
 
 const resolvePythonForNodeGyp = Effect.fn("resolvePythonForNodeGyp")(function* () {
   const fs = yield* FileSystem.FileSystem;
@@ -583,6 +574,9 @@ const createBuildConfig = Effect.fn("createBuildConfig")(function* (
     artifactName: `T3-Code-\${version}-\${arch}-${buildTimestamp}.\${ext}`,
     directories: {
       buildResources: "apps/desktop/resources",
+    },
+    extraMetadata: {
+      t3codeBuildTimestamp: buildTimestamp,
     },
   };
   const updateChannel = resolveDesktopUpdateChannel(version);

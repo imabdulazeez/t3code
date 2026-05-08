@@ -13,9 +13,11 @@ const ALLOWED_PERMISSIONS = new Set<string>([
 
 const install = Effect.acquireRelease(
   Effect.sync(() => {
-    Electron.session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
-      callback(ALLOWED_PERMISSIONS.has(permission));
-    });
+    Electron.session.defaultSession.setPermissionRequestHandler(
+      (_webContents, permission, callback) => {
+        callback(ALLOWED_PERMISSIONS.has(permission));
+      },
+    );
   }),
   () =>
     Effect.sync(() => {

@@ -23,6 +23,8 @@ describe("branding", () => {
             baseName: "T3 Code",
             stageLabel: "Nightly",
             displayName: "T3 Code (Nightly)",
+            displayVersion: "1.2.3-a3-20260508-1430",
+            appVersion: "1.2.3",
           }),
         },
       },
