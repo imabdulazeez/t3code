@@ -174,6 +174,7 @@ interface ClaudeSessionContext {
   lastKnownTokenUsage: ThreadTokenUsageSnapshot | undefined;
   lastAssistantUuid: string | undefined;
   lastThreadStartedId: string | undefined;
+  currentInteractionMode: "plan" | "default";
   stopped: boolean;
 }
 
@@ -1600,8 +1601,10 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
       let lastNonEmptyBlock: AssistantTextBlockState | undefined;
       for (let i = turnState.assistantTextBlockOrder.length - 1; i >= 0; i--) {
         const block = turnState.assistantTextBlockOrder[i];
-        const blockText = block.fallbackText.trim();
-        if (blockText.length > 0) {
+        if (!block) {
+          continue;
+        }
+        if (block.fallbackText.trim().length > 0) {
           lastNonEmptyBlock = block;
           break;
         }
@@ -2030,6 +2033,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         assistantTextBlocks: new Map(),
         assistantTextBlockOrder: [],
         capturedProposedPlanKeys: new Set(),
+        interactionMode: "default",
         nextSyntheticAssistantBlockIndex: -1,
       };
       context.session = {
@@ -3047,6 +3051,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         lastKnownTokenUsage: undefined,
         lastAssistantUuid: resumeState?.resumeSessionAt,
         lastThreadStartedId: undefined,
+        currentInteractionMode: permissionMode === "plan" ? "plan" : "default",
         stopped: false,
       };
       yield* Ref.set(contextRef, context);
@@ -3159,16 +3164,17 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         try: () => context.query.setPermissionMode("plan"),
         catch: (cause) => toRequestError(input.threadId, "turn/setPermissionMode", cause),
       });
+      context.currentInteractionMode = "plan";
     } else if (input.interactionMode === "default") {
       yield* Effect.tryPromise({
         try: () => context.query.setPermissionMode(context.basePermissionMode ?? "default"),
         catch: (cause) => toRequestError(input.threadId, "turn/setPermissionMode", cause),
       });
+      context.currentInteractionMode = "default";
     }
 
     const turnId = TurnId.make(yield* Random.nextUUIDv4);
-    const resolvedInteractionMode =
-      input.interactionMode ?? context.session.interactionMode ?? "default";
+    const resolvedInteractionMode = context.currentInteractionMode;
     const turnState: ClaudeTurnState = {
       turnId,
       startedAt: yield* nowIso,
