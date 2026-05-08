@@ -117,6 +117,7 @@ interface ClaudeTurnState {
   readonly assistantTextBlocks: Map<number, AssistantTextBlockState>;
   readonly assistantTextBlockOrder: Array<AssistantTextBlockState>;
   readonly capturedProposedPlanKeys: Set<string>;
+  readonly interactionMode: "plan" | "default";
   nextSyntheticAssistantBlockIndex: number;
 }
 
@@ -785,6 +786,49 @@ function extractExitPlanModePlan(value: unknown): string | undefined {
     : undefined;
 }
 
+function looksLikePlan(text: string): boolean {
+  const trimmed = text.trim();
+
+  if (trimmed.length < 200) {
+    return false;
+  }
+
+  const headingMatch = /^#{1,4} \S/m.test(trimmed);
+  const orderedListMatch = /^\s*\d+\.\s+\S/m.test(trimmed);
+  const bulletedListMatch = /^\s*[-*]\s+\S/m.test(trimmed);
+
+  if (!headingMatch && !orderedListMatch && !bulletedListMatch) {
+    return false;
+  }
+
+  const firstLineChars = trimmed.substring(0, 120).replace(/^#+\s*/, "");
+  const refusalStems = [
+    /^i can't/i,
+    /^i cannot/i,
+    /^i'm not able/i,
+    /^i am unable/i,
+    /^i don't have enough/i,
+    /^could you clarify/i,
+    /^can you clarify/i,
+    /^before i /i,
+    /^to help you, i need/i,
+  ];
+
+  if (refusalStems.some((stem) => stem.test(firstLineChars))) {
+    return false;
+  }
+
+  const orderedListCount = (trimmed.match(/^\s*\d+\.\s+\S/gm) || []).length;
+  const bulletedListCount = (trimmed.match(/^\s*[-*]\s+\S/gm) || []).length;
+  const totalListItems = orderedListCount + bulletedListCount;
+
+  const planHeadingMatch = /^#{1,4} [^\n]*(?:plan|approach|steps?|implementation|proposal)/i.test(
+    trimmed,
+  );
+
+  return totalListItems >= 3 || planHeadingMatch;
+}
+
 function exitPlanCaptureKey(input: {
   readonly toolUseId?: string | undefined;
   readonly planMarkdown: string;
@@ -1359,7 +1403,10 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
     input: {
       readonly planMarkdown: string;
       readonly toolUseId?: string | undefined;
-      readonly rawSource: "claude.sdk.message" | "claude.sdk.permission";
+      readonly rawSource:
+        | "claude.sdk.message"
+        | "claude.sdk.permission"
+        | "claude.sdk.text-fallback";
       readonly rawMethod: string;
       readonly rawPayload: unknown;
     },
@@ -1541,6 +1588,33 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         },
         providerRefs: nativeProviderRefs(context),
       });
+    }
+
+    if (
+      turnState.interactionMode === "plan" &&
+      turnState.capturedProposedPlanKeys.size === 0 &&
+      context.pendingUserInputs.size === 0 &&
+      status === "completed" &&
+      result?.subtype === "success"
+    ) {
+      let lastNonEmptyBlock: AssistantTextBlockState | undefined;
+      for (let i = turnState.assistantTextBlockOrder.length - 1; i >= 0; i--) {
+        const block = turnState.assistantTextBlockOrder[i];
+        const blockText = block.fallbackText.trim();
+        if (blockText.length > 0) {
+          lastNonEmptyBlock = block;
+          break;
+        }
+      }
+
+      if (lastNonEmptyBlock && looksLikePlan(lastNonEmptyBlock.fallbackText)) {
+        yield* emitProposedPlanCompleted(context, {
+          planMarkdown: lastNonEmptyBlock.fallbackText,
+          rawSource: "claude.sdk.text-fallback",
+          rawMethod: "claude/text-fallback",
+          rawPayload: result,
+        });
+      }
     }
 
     const stamp = yield* makeEventStamp();
@@ -3093,6 +3167,8 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
     }
 
     const turnId = TurnId.make(yield* Random.nextUUIDv4);
+    const resolvedInteractionMode =
+      input.interactionMode ?? context.session.interactionMode ?? "default";
     const turnState: ClaudeTurnState = {
       turnId,
       startedAt: yield* nowIso,
@@ -3100,6 +3176,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
       assistantTextBlocks: new Map(),
       assistantTextBlockOrder: [],
       capturedProposedPlanKeys: new Set(),
+      interactionMode: resolvedInteractionMode,
       nextSyntheticAssistantBlockIndex: -1,
     };
 
