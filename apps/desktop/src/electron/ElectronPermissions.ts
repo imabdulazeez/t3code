@@ -23,7 +23,7 @@ const install = Effect.acquireRelease(
     }),
 );
 
-export const layer = Layer.scopedDiscard(
+export const layer = Layer.effectDiscard(
   Effect.gen(function* () {
     const app = yield* ElectronApp.ElectronApp;
     yield* app.whenReady;
