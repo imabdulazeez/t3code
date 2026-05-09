@@ -1361,10 +1361,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
     input: {
       readonly planMarkdown: string;
       readonly toolUseId?: string | undefined;
-      readonly rawSource:
-        | "claude.sdk.message"
-        | "claude.sdk.permission"
-        | "client.user-promoted";
+      readonly rawSource: "claude.sdk.message" | "claude.sdk.permission" | "client.user-promoted";
       readonly rawMethod: string;
       readonly rawPayload: unknown;
     },
