@@ -13,7 +13,7 @@ const hostedAppChannel = import.meta.env.VITE_HOSTED_APP_CHANNEL?.trim().toLower
 
 export const APP_BASE_NAME = injectedDesktopAppBranding?.baseName ?? "T3 Code";
 export const APP_STAGE_LABEL =
-  injectedDesktopAppBranding?.stageLabel ?? (import.meta.env.DEV ? "Dev" : "AA");
+  injectedDesktopAppBranding?.stageLabel ?? (import.meta.env.DEV ? "Dev" : "A3");
 export const APP_DISPLAY_NAME =
   injectedDesktopAppBranding?.displayName ?? `${APP_BASE_NAME} (${APP_STAGE_LABEL})`;
 export const APP_VERSION =

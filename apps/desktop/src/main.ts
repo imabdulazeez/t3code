@@ -60,7 +60,9 @@ const desktopEnvironmentLayer = Layer.unwrap(
       const packagePath = path.join(metadata.appPath, "package.json");
       const fileContent = yield* fs.readFileString(packagePath).pipe(Effect.option);
       if (Option.isSome(fileContent)) {
+        // @effect-diagnostics-next-line tryCatchInEffectGen:off
         try {
+          // @effect-diagnostics-next-line preferSchemaOverJson:off
           const packageJson = JSON.parse(fileContent.value);
           if (typeof packageJson?.t3codeBuildTimestamp === "string") {
             buildTimestamp = packageJson.t3codeBuildTimestamp;
@@ -68,6 +70,7 @@ const desktopEnvironmentLayer = Layer.unwrap(
         } catch {}
       }
     }
+    // @effect-diagnostics-next-line globalDateInEffect:off
     buildTimestamp = buildTimestamp || formatBuildTimestamp(new Date());
     return DesktopEnvironment.layer({
       dirname: __dirname,

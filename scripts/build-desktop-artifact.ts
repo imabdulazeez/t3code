@@ -780,6 +780,7 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
   // electron-builder is filtering out stageResourcesDir directory in the AppImage for production
   yield* fs.copy(stageResourcesDir, path.join(stageAppDir, "apps/desktop/prod-resources"));
 
+  // @effect-diagnostics-next-line globalDateInEffect:off
   const buildTimestamp = formatBuildTimestamp(new Date());
 
   const stagePackageJson: StagePackageJson = {
