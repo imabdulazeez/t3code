@@ -60,6 +60,7 @@ export interface ProposedPlan {
   planMarkdown: string;
   implementedAt: string | null;
   implementationThreadId: ThreadId | null;
+  revertedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -987,6 +987,7 @@ const make = Effect.gen(function* () {
       createdAt: string;
       implementedAt: string | null;
       implementationThreadId: ThreadId | null;
+      revertedAt?: string | null;
     }>;
     planId: string;
     turnId?: TurnId;
@@ -1011,6 +1012,7 @@ const make = Effect.gen(function* () {
           planMarkdown,
           implementedAt: existingPlan?.implementedAt ?? null,
           implementationThreadId: existingPlan?.implementationThreadId ?? null,
+          revertedAt: existingPlan?.revertedAt ?? null,
           createdAt: existingPlan?.createdAt ?? input.createdAt,
           updatedAt: input.updatedAt,
         },

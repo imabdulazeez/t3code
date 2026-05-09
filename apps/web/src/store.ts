@@ -192,6 +192,7 @@ function mapProposedPlan(proposedPlan: OrchestrationProposedPlan): ProposedPlan 
     planMarkdown: proposedPlan.planMarkdown,
     implementedAt: proposedPlan.implementedAt,
     implementationThreadId: proposedPlan.implementationThreadId,
+    revertedAt: proposedPlan.revertedAt,
     createdAt: proposedPlan.createdAt,
     updatedAt: proposedPlan.updatedAt,
   };

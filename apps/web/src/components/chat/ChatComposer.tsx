@@ -352,7 +352,7 @@ const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryActions(
         onPreviousPendingQuestion={props.onPreviousPendingQuestion}
         onInterrupt={props.onInterrupt}
         onImplementPlanInNewThread={props.onImplementPlanInNewThread}
-        onRevertPlan={props.onRevertPlan}
+        {...(props.onRevertPlan !== undefined && { onRevertPlan: props.onRevertPlan })}
       />
     </>
   );

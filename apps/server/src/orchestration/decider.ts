@@ -660,27 +660,51 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
         command,
         threadId: command.threadId,
       });
-      const message = thread.messages.find((entry) => entry.id === command.messageId);
+
+      const latestRevertedPlan = [...thread.proposedPlans]
+        .filter((entry) => entry.revertedAt !== null)
+        .toSorted(
+          (left, right) =>
+            (left.revertedAt ?? "").localeCompare(right.revertedAt ?? "") ||
+            left.id.localeCompare(right.id),
+        )
+        .at(-1);
+      if (latestRevertedPlan) {
+        return {
+          ...withEventBase({
+            aggregateKind: "thread",
+            aggregateId: command.threadId,
+            occurredAt: command.createdAt,
+            commandId: command.commandId,
+          }),
+          type: "thread.proposed-plan-upserted",
+          payload: {
+            threadId: command.threadId,
+            proposedPlan: {
+              ...latestRevertedPlan,
+              revertedAt: null,
+              updatedAt: command.createdAt,
+            },
+          },
+        };
+      }
+
+      let message: (typeof thread.messages)[number] | undefined;
+      for (let i = thread.messages.length - 1; i >= 0; i -= 1) {
+        const entry = thread.messages[i];
+        if (entry?.role === "assistant" && entry.text.trim().length > 0) {
+          message = entry;
+          break;
+        }
+      }
       if (!message) {
         return yield* new OrchestrationCommandInvariantError({
           commandType: command.type,
-          detail: `Message '${command.messageId}' not found in thread '${command.threadId}'.`,
-        });
-      }
-      if (message.role !== "assistant") {
-        return yield* new OrchestrationCommandInvariantError({
-          commandType: command.type,
-          detail: `Message '${command.messageId}' is not an assistant message.`,
+          detail: `No assistant message available to promote in thread '${command.threadId}'.`,
         });
       }
       const planMarkdown = message.text.trim();
-      if (planMarkdown.length === 0) {
-        return yield* new OrchestrationCommandInvariantError({
-          commandType: command.type,
-          detail: `Message '${command.messageId}' has no text to promote.`,
-        });
-      }
-      const planId = `plan:${command.threadId}:promoted:${command.messageId}`;
+      const planId = `plan:${command.threadId}:promoted:${message.id}`;
       const existingPlan = thread.proposedPlans.find((entry) => entry.id === planId);
       return {
         ...withEventBase({
@@ -698,6 +722,7 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
             planMarkdown,
             implementedAt: existingPlan?.implementedAt ?? null,
             implementationThreadId: existingPlan?.implementationThreadId ?? null,
+            revertedAt: null,
             createdAt: existingPlan?.createdAt ?? command.createdAt,
             updatedAt: command.createdAt,
           },
@@ -725,10 +750,14 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
           occurredAt: command.createdAt,
           commandId: command.commandId,
         }),
-        type: "thread.proposed-plan-removed",
+        type: "thread.proposed-plan-upserted",
         payload: {
           threadId: command.threadId,
-          planId: command.planId,
+          proposedPlan: {
+            ...existingPlan,
+            revertedAt: command.createdAt,
+            updatedAt: command.createdAt,
+          },
         },
       };
     }

@@ -326,6 +326,7 @@ projectionSnapshotLayer("ProjectionSnapshotQuery", (it) => {
               planMarkdown: "# Ship it",
               implementedAt: "2026-02-24T00:00:05.500Z",
               implementationThreadId: ThreadId.make("thread-2"),
+              revertedAt: null,
               createdAt: "2026-02-24T00:00:05.000Z",
               updatedAt: "2026-02-24T00:00:05.500Z",
             },
@@ -1159,6 +1160,7 @@ projectionSnapshotLayer("ProjectionSnapshotQuery", (it) => {
 
       yield* sql`DELETE FROM projection_projects`;
       yield* sql`DELETE FROM projection_threads`;
+      yield* sql`DELETE FROM projection_thread_messages`;
       yield* sql`DELETE FROM projection_turns`;
       yield* sql`DELETE FROM projection_state`;
 
@@ -1279,6 +1281,31 @@ projectionSnapshotLayer("ProjectionSnapshotQuery", (it) => {
       `;
 
       yield* sql`
+        INSERT INTO projection_thread_messages (
+          message_id,
+          thread_id,
+          turn_id,
+          role,
+          text,
+          is_streaming,
+          created_at,
+          updated_at,
+          attachments_json
+        )
+        VALUES (
+          'message-assistant-1',
+          'thread-1',
+          'turn-completed',
+          'assistant',
+          'persisted assistant answer',
+          0,
+          '2026-04-03T00:00:20.000Z',
+          '2026-04-03T00:00:20.000Z',
+          NULL
+        )
+      `;
+
+      yield* sql`
         INSERT INTO projection_state (projector, last_applied_sequence, updated_at)
         VALUES
           (${ORCHESTRATION_PROJECTOR_NAMES.projects}, 3, '2026-04-03T00:00:40.000Z'),
@@ -1293,6 +1320,11 @@ projectionSnapshotLayer("ProjectionSnapshotQuery", (it) => {
       const commandReadModel = yield* snapshotQuery.getCommandReadModel();
       assert.equal(commandReadModel.threads[0]?.latestTurn?.turnId, asTurnId("turn-running"));
       assert.equal(commandReadModel.threads[0]?.latestTurn?.state, "running");
+      assert.equal(
+        commandReadModel.threads[0]?.messages[0]?.id,
+        asMessageId("message-assistant-1"),
+      );
+      assert.equal(commandReadModel.threads[0]?.messages[0]?.text, "persisted assistant answer");
 
       const shellSnapshot = yield* snapshotQuery.getShellSnapshot();
       assert.equal(shellSnapshot.threads[0]?.latestTurn?.turnId, asTurnId("turn-running"));
