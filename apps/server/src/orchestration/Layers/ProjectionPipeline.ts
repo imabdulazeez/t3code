@@ -165,11 +165,11 @@ function deriveHasActionableProposedPlan(input: {
     }
   }
   if (latestForTurn !== null) {
-    return latestForTurn.implementedAt === null;
+    return latestForTurn.implementedAt === null && latestForTurn.revertedAt === null;
   }
 
   const latestPlan = sorted.at(-1) ?? null;
-  return latestPlan !== null && latestPlan.implementedAt === null;
+  return latestPlan !== null && latestPlan.implementedAt === null && latestPlan.revertedAt === null;
 }
 
 function retainProjectionMessagesAfterRevert(
@@ -867,6 +867,7 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
             planMarkdown: event.payload.proposedPlan.planMarkdown,
             implementedAt: event.payload.proposedPlan.implementedAt,
             implementationThreadId: event.payload.proposedPlan.implementationThreadId,
+            revertedAt: event.payload.proposedPlan.revertedAt,
             createdAt: event.payload.proposedPlan.createdAt,
             updatedAt: event.payload.proposedPlan.updatedAt,
           });

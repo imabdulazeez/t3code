@@ -235,6 +235,7 @@ export const OrchestrationProposedPlan = Schema.Struct({
   implementationThreadId: Schema.NullOr(ThreadId).pipe(
     Schema.withDecodingDefault(Effect.succeed(null)),
   ),
+  revertedAt: Schema.NullOr(IsoDateTime).pipe(Schema.withDecodingDefault(Effect.succeed(null))),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 });
@@ -648,7 +649,6 @@ const ThreadProposedPlanPromoteCommand = Schema.Struct({
   type: Schema.Literal("thread.proposed-plan.promote"),
   commandId: CommandId,
   threadId: ThreadId,
-  messageId: MessageId,
   createdAt: IsoDateTime,
 });
 

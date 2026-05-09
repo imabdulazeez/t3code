@@ -3378,17 +3378,22 @@ export default function ChatView(props: ChatViewProps) {
     return undefined;
   }, [activeThread?.messages]);
 
+  const hasRevertedPromotablePlan = useMemo(
+    () => (activeThread?.proposedPlans ?? []).some((entry) => entry.revertedAt !== null),
+    [activeThread?.proposedPlans],
+  );
+
   const canPromoteToPlan =
     interactionMode === "plan" &&
     activeProposedPlan === null &&
-    latestPromotableAssistantMessageId !== undefined &&
+    (latestPromotableAssistantMessageId !== undefined || hasRevertedPromotablePlan) &&
     isServerThread &&
     !isSendBusy &&
     !isConnecting &&
     !activeEnvironmentUnavailable;
 
   const onPromoteToPlan = useCallback(() => {
-    if (!activeThread || !latestPromotableAssistantMessageId) return;
+    if (!activeThread) return;
     const api = readEnvironmentApi(activeThread.environmentId);
     if (!api) return;
     void api.orchestration
@@ -3396,7 +3401,6 @@ export default function ChatView(props: ChatViewProps) {
         type: "thread.proposed-plan.promote",
         commandId: newCommandId(),
         threadId: activeThread.id,
-        messageId: latestPromotableAssistantMessageId,
         createdAt: new Date().toISOString(),
       })
       .catch((err: unknown) => {
@@ -3409,7 +3413,7 @@ export default function ChatView(props: ChatViewProps) {
           }),
         );
       });
-  }, [activeThread, latestPromotableAssistantMessageId]);
+  }, [activeThread]);
 
   const canRevertPlan =
     activeProposedPlan !== null &&

@@ -98,6 +98,7 @@ export interface LatestProposedPlanState {
   planMarkdown: string;
   implementedAt: string | null;
   implementationThreadId: ThreadId | null;
+  revertedAt: string | null;
 }
 
 export type TimelineEntry =
@@ -424,8 +425,9 @@ export function findLatestProposedPlan(
   proposedPlans: ReadonlyArray<ProposedPlan>,
   latestTurnId: TurnId | string | null | undefined,
 ): LatestProposedPlanState | null {
+  const activePlans = proposedPlans.filter((entry) => entry.revertedAt === null);
   if (latestTurnId) {
-    const matchingTurnPlan = [...proposedPlans]
+    const matchingTurnPlan = [...activePlans]
       .filter((proposedPlan) => proposedPlan.turnId === latestTurnId)
       .toSorted(
         (left, right) =>
@@ -437,7 +439,7 @@ export function findLatestProposedPlan(
     }
   }
 
-  const latestPlan = [...proposedPlans]
+  const latestPlan = [...activePlans]
     .toSorted(
       (left, right) =>
         left.updatedAt.localeCompare(right.updatedAt) || left.id.localeCompare(right.id),
@@ -475,9 +477,11 @@ export function findSidebarProposedPlan(input: {
 }
 
 export function hasActionableProposedPlan(
-  proposedPlan: LatestProposedPlanState | Pick<ProposedPlan, "implementedAt"> | null,
+  proposedPlan: LatestProposedPlanState | Pick<ProposedPlan, "implementedAt" | "revertedAt"> | null,
 ): boolean {
-  return proposedPlan !== null && proposedPlan.implementedAt === null;
+  return (
+    proposedPlan !== null && proposedPlan.implementedAt === null && proposedPlan.revertedAt === null
+  );
 }
 
 export function deriveWorkLogEntries(
@@ -693,6 +697,7 @@ function toLatestProposedPlanState(proposedPlan: ProposedPlan): LatestProposedPl
     planMarkdown: proposedPlan.planMarkdown,
     implementedAt: proposedPlan.implementedAt,
     implementationThreadId: proposedPlan.implementationThreadId,
+    revertedAt: proposedPlan.revertedAt,
   };
 }
 
@@ -1163,8 +1168,9 @@ export function deriveTimelineEntries(
 ): TimelineEntry[] {
   const promotedSourceMessageIds = new Set<string>();
   for (const proposedPlan of proposedPlans) {
+    if (proposedPlan.revertedAt !== null) continue;
     const match = /:promoted:(.+)$/.exec(proposedPlan.id);
-    if (match) {
+    if (match && match[1]) {
       promotedSourceMessageIds.add(match[1]);
     }
   }
@@ -1176,12 +1182,14 @@ export function deriveTimelineEntries(
       createdAt: message.createdAt,
       message,
     }));
-  const proposedPlanRows: TimelineEntry[] = proposedPlans.map((proposedPlan) => ({
-    id: proposedPlan.id,
-    kind: "proposed-plan",
-    createdAt: proposedPlan.createdAt,
-    proposedPlan,
-  }));
+  const proposedPlanRows: TimelineEntry[] = proposedPlans
+    .filter((proposedPlan) => proposedPlan.revertedAt === null)
+    .map((proposedPlan) => ({
+      id: proposedPlan.id,
+      kind: "proposed-plan",
+      createdAt: proposedPlan.createdAt,
+      proposedPlan,
+    }));
   const workRows: TimelineEntry[] = workEntries.map((entry) => ({
     id: entry.id,
     kind: "work",
