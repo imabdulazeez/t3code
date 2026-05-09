@@ -1513,6 +1513,21 @@ function applyEnvironmentOrchestrationEvent(
         };
       });
 
+    case "thread.proposed-plan-removed":
+      return updateThreadState(state, event.payload.threadId, (thread) => {
+        const proposedPlans = thread.proposedPlans.filter(
+          (entry) => entry.id !== event.payload.planId,
+        );
+        if (proposedPlans.length === thread.proposedPlans.length) {
+          return thread;
+        }
+        return {
+          ...thread,
+          proposedPlans,
+          updatedAt: event.occurredAt,
+        };
+      });
+
     case "thread.turn-diff-completed":
       return updateThreadState(state, event.payload.threadId, (thread) => {
         const checkpoint = mapTurnDiffSummary({

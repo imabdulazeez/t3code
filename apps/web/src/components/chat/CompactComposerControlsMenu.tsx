@@ -1,6 +1,6 @@
 import { ProviderInteractionMode, RuntimeMode } from "@t3tools/contracts";
 import { memo, type ReactNode } from "react";
-import { EllipsisIcon, ListTodoIcon } from "lucide-react";
+import { CornerRightUpIcon, EllipsisIcon, ListTodoIcon } from "lucide-react";
 import { Button } from "../ui/button";
 import {
   Menu,
@@ -20,6 +20,8 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
   runtimeMode: RuntimeMode;
   showInteractionModeToggle: boolean;
   traitsMenuContent?: ReactNode;
+  canPromoteToPlan: boolean;
+  onPromoteToPlan: () => void;
   onToggleInteractionMode: () => void;
   onTogglePlanSidebar: () => void;
   onRuntimeModeChange: (mode: RuntimeMode) => void;
@@ -73,6 +75,15 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
           <MenuRadioItem value="auto-accept-edits">Auto-accept edits</MenuRadioItem>
           <MenuRadioItem value="full-access">Full access</MenuRadioItem>
         </MenuRadioGroup>
+        {props.interactionMode === "plan" && props.canPromoteToPlan ? (
+          <>
+            <MenuDivider />
+            <MenuItem onClick={props.onPromoteToPlan}>
+              <CornerRightUpIcon className="size-4 shrink-0" />
+              Promote to plan
+            </MenuItem>
+          </>
+        ) : null}
         {props.activePlan ? (
           <>
             <MenuDivider />

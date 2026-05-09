@@ -88,6 +88,7 @@ import { toastManager } from "../ui/toast";
 import {
   BotIcon,
   CircleAlertIcon,
+  CornerRightUpIcon,
   ListTodoIcon,
   type LucideIcon,
   LockIcon,
@@ -186,6 +187,8 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
   showPlanToggle: boolean;
   planSidebarLabel: string;
   planSidebarOpen: boolean;
+  canPromoteToPlan: boolean;
+  onPromoteToPlan: () => void;
   onToggleInteractionMode: () => void;
   onRuntimeModeChange: (mode: RuntimeMode) => void;
   onTogglePlanSidebar: () => void;
@@ -256,6 +259,23 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
         </SelectPopup>
       </Select>
 
+      {props.interactionMode === "plan" && props.canPromoteToPlan ? (
+        <>
+          <Separator orientation="vertical" className="mx-0.5 hidden h-4 sm:block" />
+          <Button
+            variant="ghost"
+            className="shrink-0 whitespace-nowrap px-2 text-muted-foreground/70 hover:text-foreground/80 sm:px-3"
+            size="sm"
+            type="button"
+            onClick={props.onPromoteToPlan}
+            title="Promote the latest assistant reply to a proposed plan"
+          >
+            <CornerRightUpIcon />
+            <span className="sr-only sm:not-sr-only">Promote to plan</span>
+          </Button>
+        </>
+      ) : null}
+
       {props.showPlanToggle ? (
         <>
           <Separator orientation="vertical" className="mx-0.5 hidden h-4 sm:block" />
@@ -304,9 +324,11 @@ const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryActions(
   isEnvironmentUnavailable: boolean;
   hasSendableContent: boolean;
   preserveComposerFocusOnPointerDown?: boolean;
+  canRevertPlan?: boolean;
   onPreviousPendingQuestion: () => void;
   onInterrupt: () => void;
   onImplementPlanInNewThread: () => void;
+  onRevertPlan?: () => void;
 }) {
   return (
     <>
@@ -326,9 +348,11 @@ const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryActions(
         isPreparingWorktree={props.isPreparingWorktree}
         hasSendableContent={props.hasSendableContent}
         preserveComposerFocusOnPointerDown={props.preserveComposerFocusOnPointerDown ?? false}
+        canRevertPlan={props.canRevertPlan ?? false}
         onPreviousPendingQuestion={props.onPreviousPendingQuestion}
         onInterrupt={props.onInterrupt}
         onImplementPlanInNewThread={props.onImplementPlanInNewThread}
+        onRevertPlan={props.onRevertPlan}
       />
     </>
   );
@@ -454,6 +478,12 @@ export interface ChatComposerProps {
   shouldAutoScrollRef: React.MutableRefObject<boolean>;
   scheduleStickToBottom: () => void;
 
+  // Promote-to-plan
+  canPromoteToPlan: boolean;
+  onPromoteToPlan: () => void;
+  canRevertPlan: boolean;
+  onRevertPlan: () => void;
+
   // Callbacks
   onSend: (e?: { preventDefault: () => void }) => void;
   onInterrupt: () => void;
@@ -539,6 +569,10 @@ export const ChatComposer = memo(
       composerTerminalContextsRef,
       shouldAutoScrollRef,
       scheduleStickToBottom,
+      canPromoteToPlan,
+      onPromoteToPlan,
+      canRevertPlan,
+      onRevertPlan,
       onSend,
       onInterrupt,
       onImplementPlanInNewThread,
@@ -2353,6 +2387,8 @@ export const ChatComposer = memo(
                       runtimeMode={runtimeMode}
                       showInteractionModeToggle={composerProviderControls.showInteractionModeToggle}
                       traitsMenuContent={providerTraitsMenuContent}
+                      canPromoteToPlan={canPromoteToPlan}
+                      onPromoteToPlan={onPromoteToPlan}
                       onToggleInteractionMode={toggleInteractionMode}
                       onTogglePlanSidebar={togglePlanSidebar}
                       onRuntimeModeChange={handleRuntimeModeChange}
@@ -2377,6 +2413,8 @@ export const ChatComposer = memo(
                         showPlanToggle={showPlanSidebarToggle}
                         planSidebarLabel={planSidebarLabel}
                         planSidebarOpen={planSidebarOpen}
+                        canPromoteToPlan={canPromoteToPlan}
+                        onPromoteToPlan={onPromoteToPlan}
                         onToggleInteractionMode={toggleInteractionMode}
                         onRuntimeModeChange={handleRuntimeModeChange}
                         onTogglePlanSidebar={togglePlanSidebar}
@@ -2408,9 +2446,11 @@ export const ChatComposer = memo(
                     isPreparingWorktree={isPreparingWorktree}
                     hasSendableContent={composerSendState.hasSendableContent}
                     preserveComposerFocusOnPointerDown={isMobileViewport}
+                    canRevertPlan={canRevertPlan}
                     onPreviousPendingQuestion={onPreviousActivePendingUserInputQuestion}
                     onInterrupt={handleInterruptPrimaryAction}
                     onImplementPlanInNewThread={handleImplementPlanInNewThreadPrimaryAction}
+                    onRevertPlan={onRevertPlan}
                   />
                 </div>
               </div>

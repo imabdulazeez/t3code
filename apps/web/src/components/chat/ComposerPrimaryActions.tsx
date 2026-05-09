@@ -24,9 +24,11 @@ interface ComposerPrimaryActionsProps {
   isPreparingWorktree: boolean;
   hasSendableContent: boolean;
   preserveComposerFocusOnPointerDown?: boolean;
+  canRevertPlan?: boolean;
   onPreviousPendingQuestion: () => void;
   onInterrupt: () => void;
   onImplementPlanInNewThread: () => void;
+  onRevertPlan?: () => void;
 }
 
 export const formatPendingPrimaryActionLabel = (input: {
@@ -63,9 +65,11 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
   isPreparingWorktree,
   hasSendableContent,
   preserveComposerFocusOnPointerDown = false,
+  canRevertPlan = false,
   onPreviousPendingQuestion,
   onInterrupt,
   onImplementPlanInNewThread,
+  onRevertPlan,
 }: ComposerPrimaryActionsProps) {
   const pointerFocusProps = preserveComposerFocusOnPointerDown
     ? { onPointerDown: preventPointerFocus }
@@ -186,6 +190,14 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
             >
               Implement in a new thread
             </MenuItem>
+            {canRevertPlan && onRevertPlan ? (
+              <MenuItem
+                disabled={isSendBusy || isConnecting || isEnvironmentUnavailable}
+                onClick={() => void onRevertPlan()}
+              >
+                Revert plan to message
+              </MenuItem>
+            ) : null}
           </MenuPopup>
         </Menu>
       </div>

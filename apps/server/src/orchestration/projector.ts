@@ -21,6 +21,7 @@ import {
   ThreadInteractionModeSetPayload,
   ThreadMetaUpdatedPayload,
   ThreadProposedPlanUpsertedPayload,
+  ThreadProposedPlanRemovedPayload,
   ThreadRuntimeModeSetPayload,
   ThreadUnarchivedPayload,
   ThreadRevertedPayload,
@@ -490,6 +491,31 @@ export function projectEvent(
           )
           .slice(-200);
 
+        return {
+          ...nextBase,
+          threads: updateThread(nextBase.threads, payload.threadId, {
+            proposedPlans,
+            updatedAt: event.occurredAt,
+          }),
+        };
+      });
+
+    case "thread.proposed-plan-removed":
+      return Effect.gen(function* () {
+        const payload = yield* decodeForEvent(
+          ThreadProposedPlanRemovedPayload,
+          event.payload,
+          event.type,
+          "payload",
+        );
+        const thread = nextBase.threads.find((entry) => entry.id === payload.threadId);
+        if (!thread) {
+          return nextBase;
+        }
+        const proposedPlans = thread.proposedPlans.filter((entry) => entry.id !== payload.planId);
+        if (proposedPlans.length === thread.proposedPlans.length) {
+          return nextBase;
+        }
         return {
           ...nextBase,
           threads: updateThread(nextBase.threads, payload.threadId, {

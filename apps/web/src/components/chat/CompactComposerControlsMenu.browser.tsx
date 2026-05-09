@@ -152,6 +152,8 @@ async function mountMenu(props?: { modelSelection?: ModelSelection; prompt?: str
           onPromptChange={onPromptChange}
         />
       }
+      canPromoteToPlan={false}
+      onPromoteToPlan={vi.fn()}
       onToggleInteractionMode={vi.fn()}
       onTogglePlanSidebar={vi.fn()}
       onRuntimeModeChange={vi.fn()}
@@ -303,6 +305,8 @@ describe("CompactComposerControlsMenu", () => {
         planSidebarOpen={false}
         runtimeMode="approval-required"
         showInteractionModeToggle={false}
+        canPromoteToPlan={false}
+        onPromoteToPlan={vi.fn()}
         onToggleInteractionMode={vi.fn()}
         onTogglePlanSidebar={vi.fn()}
         onRuntimeModeChange={vi.fn()}

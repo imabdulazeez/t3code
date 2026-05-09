@@ -3407,6 +3407,83 @@ export default function ChatView(props: ChatViewProps) {
     environmentId,
   ]);
 
+  const latestPromotableAssistantMessageId = useMemo(() => {
+    const messages = activeThread?.messages;
+    if (!messages || messages.length === 0) return undefined;
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      const message = messages[i];
+      if (message?.role === "assistant" && message.text.trim().length > 0) {
+        return message.id;
+      }
+    }
+    return undefined;
+  }, [activeThread?.messages]);
+
+  const canPromoteToPlan =
+    interactionMode === "plan" &&
+    activeProposedPlan === null &&
+    latestPromotableAssistantMessageId !== undefined &&
+    isServerThread &&
+    !isSendBusy &&
+    !isConnecting &&
+    !activeEnvironmentUnavailable;
+
+  const onPromoteToPlan = useCallback(() => {
+    if (!activeThread || !latestPromotableAssistantMessageId) return;
+    const api = readEnvironmentApi(activeThread.environmentId);
+    if (!api) return;
+    void api.orchestration
+      .dispatchCommand({
+        type: "thread.proposed-plan.promote",
+        commandId: newCommandId(),
+        threadId: activeThread.id,
+        messageId: latestPromotableAssistantMessageId,
+        createdAt: new Date().toISOString(),
+      })
+      .catch((err: unknown) => {
+        toastManager.add(
+          stackedThreadToast({
+            type: "error",
+            title: "Could not promote message to plan",
+            description:
+              err instanceof Error ? err.message : "An error occurred while promoting the message.",
+          }),
+        );
+      });
+  }, [activeThread, latestPromotableAssistantMessageId]);
+
+  const canRevertPlan =
+    activeProposedPlan !== null &&
+    /:promoted:/.test(activeProposedPlan.id) &&
+    isServerThread &&
+    !isSendBusy &&
+    !isConnecting &&
+    !activeEnvironmentUnavailable;
+
+  const onRevertPlan = useCallback(() => {
+    if (!activeThread || !activeProposedPlan) return;
+    const api = readEnvironmentApi(activeThread.environmentId);
+    if (!api) return;
+    void api.orchestration
+      .dispatchCommand({
+        type: "thread.proposed-plan.revert",
+        commandId: newCommandId(),
+        threadId: activeThread.id,
+        planId: activeProposedPlan.id,
+        createdAt: new Date().toISOString(),
+      })
+      .catch((err: unknown) => {
+        toastManager.add(
+          stackedThreadToast({
+            type: "error",
+            title: "Could not revert plan",
+            description:
+              err instanceof Error ? err.message : "An error occurred while reverting the plan.",
+          }),
+        );
+      });
+  }, [activeThread, activeProposedPlan]);
+
   const onProviderModelSelect = useCallback(
     (instanceId: ProviderInstanceId, model: string) => {
       if (!activeThread) return;
@@ -3719,6 +3796,10 @@ export default function ChatView(props: ChatViewProps) {
                   composerTerminalContextsRef={composerTerminalContextsRef}
                   shouldAutoScrollRef={isAtEndRef}
                   scheduleStickToBottom={scrollToEnd}
+                  canPromoteToPlan={canPromoteToPlan}
+                  onPromoteToPlan={onPromoteToPlan}
+                  canRevertPlan={canRevertPlan}
+                  onRevertPlan={onRevertPlan}
                   onSend={onSend}
                   onInterrupt={onInterrupt}
                   onImplementPlanInNewThread={onImplementPlanInNewThread}

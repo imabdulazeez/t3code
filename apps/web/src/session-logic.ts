@@ -1161,12 +1161,21 @@ export function deriveTimelineEntries(
   proposedPlans: ProposedPlan[],
   workEntries: WorkLogEntry[],
 ): TimelineEntry[] {
-  const messageRows: TimelineEntry[] = messages.map((message) => ({
-    id: message.id,
-    kind: "message",
-    createdAt: message.createdAt,
-    message,
-  }));
+  const promotedSourceMessageIds = new Set<string>();
+  for (const proposedPlan of proposedPlans) {
+    const match = /:promoted:(.+)$/.exec(proposedPlan.id);
+    if (match) {
+      promotedSourceMessageIds.add(match[1]);
+    }
+  }
+  const messageRows: TimelineEntry[] = messages
+    .filter((message) => !promotedSourceMessageIds.has(message.id))
+    .map((message) => ({
+      id: message.id,
+      kind: "message",
+      createdAt: message.createdAt,
+      message,
+    }));
   const proposedPlanRows: TimelineEntry[] = proposedPlans.map((proposedPlan) => ({
     id: proposedPlan.id,
     kind: "proposed-plan",

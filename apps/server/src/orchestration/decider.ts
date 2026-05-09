@@ -654,6 +654,85 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
       };
     }
 
+    case "thread.proposed-plan.promote": {
+      const thread = yield* requireThread({
+        readModel,
+        command,
+        threadId: command.threadId,
+      });
+      const message = thread.messages.find((entry) => entry.id === command.messageId);
+      if (!message) {
+        return yield* new OrchestrationCommandInvariantError({
+          commandType: command.type,
+          detail: `Message '${command.messageId}' not found in thread '${command.threadId}'.`,
+        });
+      }
+      if (message.role !== "assistant") {
+        return yield* new OrchestrationCommandInvariantError({
+          commandType: command.type,
+          detail: `Message '${command.messageId}' is not an assistant message.`,
+        });
+      }
+      const planMarkdown = message.text.trim();
+      if (planMarkdown.length === 0) {
+        return yield* new OrchestrationCommandInvariantError({
+          commandType: command.type,
+          detail: `Message '${command.messageId}' has no text to promote.`,
+        });
+      }
+      const planId = `plan:${command.threadId}:promoted:${command.messageId}`;
+      const existingPlan = thread.proposedPlans.find((entry) => entry.id === planId);
+      return {
+        ...withEventBase({
+          aggregateKind: "thread",
+          aggregateId: command.threadId,
+          occurredAt: command.createdAt,
+          commandId: command.commandId,
+        }),
+        type: "thread.proposed-plan-upserted",
+        payload: {
+          threadId: command.threadId,
+          proposedPlan: {
+            id: planId,
+            turnId: message.turnId ?? null,
+            planMarkdown,
+            implementedAt: existingPlan?.implementedAt ?? null,
+            implementationThreadId: existingPlan?.implementationThreadId ?? null,
+            createdAt: existingPlan?.createdAt ?? command.createdAt,
+            updatedAt: command.createdAt,
+          },
+        },
+      };
+    }
+
+    case "thread.proposed-plan.revert": {
+      const thread = yield* requireThread({
+        readModel,
+        command,
+        threadId: command.threadId,
+      });
+      const existingPlan = thread.proposedPlans.find((entry) => entry.id === command.planId);
+      if (!existingPlan) {
+        return yield* new OrchestrationCommandInvariantError({
+          commandType: command.type,
+          detail: `Proposed plan '${command.planId}' not found in thread '${command.threadId}'.`,
+        });
+      }
+      return {
+        ...withEventBase({
+          aggregateKind: "thread",
+          aggregateId: command.threadId,
+          occurredAt: command.createdAt,
+          commandId: command.commandId,
+        }),
+        type: "thread.proposed-plan-removed",
+        payload: {
+          threadId: command.threadId,
+          planId: command.planId,
+        },
+      };
+    }
+
     case "thread.turn.diff.complete": {
       yield* requireThread({
         readModel,
