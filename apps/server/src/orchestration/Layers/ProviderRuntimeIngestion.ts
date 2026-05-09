@@ -121,14 +121,12 @@ function findMessageById(
   return undefined;
 }
 
-function findProposedPlanById(
-  proposedPlans: ReadonlyArray<
-    Pick<OrchestrationProposedPlan, "id" | "createdAt" | "implementedAt" | "implementationThreadId">
-  >,
-  planId: string,
-):
-  | Pick<OrchestrationProposedPlan, "id" | "createdAt" | "implementedAt" | "implementationThreadId">
-  | undefined {
+function findProposedPlanById<
+  T extends Pick<
+    OrchestrationProposedPlan,
+    "id" | "createdAt" | "implementedAt" | "implementationThreadId"
+  > & { revertedAt?: string | null },
+>(proposedPlans: ReadonlyArray<T>, planId: string): T | undefined {
   for (let index = 0; index < proposedPlans.length; index += 1) {
     const proposedPlan = proposedPlans[index];
     if (proposedPlan?.id === planId) {
@@ -1028,6 +1026,7 @@ const make = Effect.gen(function* () {
       createdAt: string;
       implementedAt: string | null;
       implementationThreadId: ThreadId | null;
+      revertedAt?: string | null;
     }>;
     planId: string;
     turnId?: TurnId;
