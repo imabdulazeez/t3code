@@ -1,3 +1,4 @@
+// @effect-diagnostics nodeBuiltinImport:off
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 

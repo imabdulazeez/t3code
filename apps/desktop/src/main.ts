@@ -14,6 +14,7 @@ import { formatBuildTimestamp } from "@t3tools/shared/buildTimestamp";
 import * as NetService from "@t3tools/shared/Net";
 import { resolveRemoteT3CliPackageSpec } from "@t3tools/ssh/command";
 import type { RemoteT3RunnerOptions } from "@t3tools/ssh/tunnel";
+import serverPackageJson from "../../server/package.json" with { type: "json" };
 
 import type { DesktopSettings as DesktopSettingsValue } from "./settings/DesktopAppSettings.ts";
 import * as DesktopIpc from "./ipc/DesktopIpc.ts";
@@ -85,7 +86,10 @@ const resolveDesktopSshCliRunner = (
 ): RemoteT3RunnerOptions => {
   const devRemoteEntryPath = Option.getOrUndefined(environment.devRemoteT3ServerEntryPath);
   if (environment.isDevelopment && devRemoteEntryPath !== undefined) {
-    return { nodeScriptPath: devRemoteEntryPath };
+    return {
+      nodeScriptPath: devRemoteEntryPath,
+      nodeEngineRange: serverPackageJson.engines.node,
+    };
   }
   return {
     packageSpec: resolveRemoteT3CliPackageSpec({
@@ -93,6 +97,7 @@ const resolveDesktopSshCliRunner = (
       updateChannel: settings.updateChannel,
       isDevelopment: environment.isDevelopment,
     }),
+    nodeEngineRange: serverPackageJson.engines.node,
   };
 };
 
