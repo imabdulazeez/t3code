@@ -40,13 +40,13 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     });
   });
 
-  it("formats build timestamps as zero-padded UTC YYYYMMDD-HHMM", () => {
+  it("formats build timestamps as zero-padded local YYYYMMDD-HHMM", () => {
     // @effect-diagnostics-next-line globalDate:off
-    assert.equal(formatBuildTimestamp(new Date(Date.UTC(2026, 4, 6, 14, 30))), "20260506-1430");
+    assert.equal(formatBuildTimestamp(new Date(2026, 4, 6, 14, 30)), "20260506-1430");
     // @effect-diagnostics-next-line globalDate:off
-    assert.equal(formatBuildTimestamp(new Date(Date.UTC(2026, 0, 1, 0, 0))), "20260101-0000");
+    assert.equal(formatBuildTimestamp(new Date(2026, 0, 1, 0, 0)), "20260101-0000");
     // @effect-diagnostics-next-line globalDate:off
-    assert.equal(formatBuildTimestamp(new Date(Date.UTC(2026, 11, 31, 23, 59))), "20261231-2359");
+    assert.equal(formatBuildTimestamp(new Date(2026, 11, 31, 23, 59)), "20261231-2359");
     // @effect-diagnostics-next-line globalDate:off
     assert.match(formatBuildTimestamp(new Date()), /^\d{8}-\d{4}$/);
   });
