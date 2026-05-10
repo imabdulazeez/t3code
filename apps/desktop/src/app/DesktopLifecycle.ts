@@ -6,6 +6,10 @@ import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
 import * as Scope from "effect/Scope";
 
+// @effect-diagnostics nodeBuiltinImport:off globalTimers:off
+import * as NodeTimers from "node:timers";
+
+import { app as electronAppModule, type Event as ElectronEvent } from "electron";
 import type * as Electron from "electron";
 
 import * as DesktopEnvironment from "./DesktopEnvironment.ts";
@@ -97,40 +101,49 @@ const requestDesktopShutdownAndWait = Effect.fn("desktop.lifecycle.requestShutdo
   },
 );
 
+const SHUTDOWN_EXIT_TIMEOUT_MS = 5000;
+
 function handleBeforeQuit(
-  event: Electron.Event,
+  event: ElectronEvent,
   runEffect: <A, E>(effect: Effect.Effect<A, E, DesktopLifecycleRuntimeServices>) => Promise<A>,
-  allowQuit: () => boolean,
-  markQuitAllowed: () => void,
+  getShutdownPromise: () => Promise<void> | null,
+  setShutdownPromise: (promise: Promise<void>) => void,
 ): void {
-  if (allowQuit()) {
-    void runEffect(
-      Effect.gen(function* () {
-        const state = yield* DesktopState.DesktopState;
-        yield* Ref.set(state.quitting, true);
-        yield* logLifecycleInfo("before-quit received");
-      }).pipe(Effect.withSpan("desktop.lifecycle.beforeQuit")),
-    );
+  if (getShutdownPromise() !== null) {
+    event.preventDefault();
     return;
   }
 
   event.preventDefault();
-  void runEffect(
+
+  const shutdownEffect = runEffect(
     Effect.gen(function* () {
       const state = yield* DesktopState.DesktopState;
       yield* Ref.set(state.quitting, true);
       yield* logLifecycleInfo("before-quit received");
       yield* requestDesktopShutdownAndWait();
     }).pipe(Effect.withSpan("desktop.lifecycle.beforeQuit")),
-  ).finally(() => {
-    markQuitAllowed();
-    void runEffect(
-      Effect.gen(function* () {
-        const electronApp = yield* ElectronApp.ElectronApp;
-        yield* electronApp.exit(0);
-      }).pipe(Effect.withSpan("desktop.lifecycle.quitAfterShutdown")),
-    );
+  );
+
+  let timeoutHandle: ReturnType<typeof NodeTimers.setTimeout> | null = null;
+  const timeoutPromise = new Promise<void>((resolve) => {
+    timeoutHandle = NodeTimers.setTimeout(resolve, SHUTDOWN_EXIT_TIMEOUT_MS);
   });
+
+  const racePromise = Promise.race([
+    shutdownEffect.then(
+      () => undefined,
+      () => undefined,
+    ),
+    timeoutPromise,
+  ]).finally(() => {
+    if (timeoutHandle !== null) {
+      NodeTimers.clearTimeout(timeoutHandle);
+    }
+    electronAppModule.exit(0);
+  });
+
+  setShutdownPromise(racePromise);
 }
 
 function quitFromSignal(
@@ -189,7 +202,7 @@ export const layer = Layer.succeed(
       const environment = yield* DesktopEnvironment.DesktopEnvironment;
       const context = yield* Effect.context<DesktopLifecycleRuntimeServices>();
       const runEffect = Effect.runPromiseWith(context);
-      let quitAllowed = false;
+      let shutdownPromise: Promise<void> | null = null;
       yield* electronTheme.onUpdated(() => {
         void runEffect(
           desktopWindow.syncAppearance.pipe(Effect.withSpan("desktop.lifecycle.themeUpdated")),
@@ -199,9 +212,9 @@ export const layer = Layer.succeed(
         handleBeforeQuit(
           event,
           runEffect,
-          () => quitAllowed,
-          () => {
-            quitAllowed = true;
+          () => shutdownPromise,
+          (promise) => {
+            shutdownPromise = promise;
           },
         );
       });
