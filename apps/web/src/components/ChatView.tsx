@@ -3383,6 +3383,7 @@ export default function ChatView(props: ChatViewProps) {
   const canPromoteToPlan =
     interactionMode === "plan" &&
     activeProposedPlan === null &&
+    pendingUserInputs.length === 0 &&
     (latestPromotableAssistantMessageId !== undefined || hasRevertedPromotablePlan) &&
     isServerThread &&
     !isSendBusy &&
