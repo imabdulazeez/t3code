@@ -127,7 +127,7 @@ function handleBeforeQuit(
     void runEffect(
       Effect.gen(function* () {
         const electronApp = yield* ElectronApp.ElectronApp;
-        yield* electronApp.quit;
+        yield* electronApp.exit(0);
       }).pipe(Effect.withSpan("desktop.lifecycle.quitAfterShutdown")),
     );
   });
