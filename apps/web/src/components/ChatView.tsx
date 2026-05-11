@@ -97,6 +97,7 @@ import {
 } from "../types";
 import { useTheme } from "../hooks/useTheme";
 import { useTurnDiffSummaries } from "../hooks/useTurnDiffSummaries";
+import { useStartImplementationDraftFromPlan } from "../hooks/useHandleNewThread";
 import { useCommandPaletteStore } from "../commandPaletteStore";
 import { buildTemporaryWorktreeBranchName } from "@t3tools/shared/git";
 import { useMediaQuery } from "../hooks/useMediaQuery";
@@ -2907,6 +2908,9 @@ export default function ChatView(props: ChatViewProps) {
         runtimeMode,
         interactionMode,
         ...(bootstrap ? { bootstrap } : {}),
+        ...(isLocalDraftThread && draftThread?.pendingSourceProposedPlan
+          ? { sourceProposedPlan: draftThread.pendingSourceProposedPlan }
+          : {}),
         createdAt: messageCreatedAt,
       });
       turnStartSucceeded = true;
@@ -3486,6 +3490,53 @@ export default function ChatView(props: ChatViewProps) {
       });
   }, [activeThread, activeProposedPlan]);
 
+  const startImplementationDraftFromPlan = useStartImplementationDraftFromPlan();
+  const onImplementPlanInNewThreadDraft = useCallback(async () => {
+    if (
+      !activeThread ||
+      !activeProject ||
+      !activeProposedPlan ||
+      !isServerThread ||
+      isSendBusy ||
+      isConnecting ||
+      activeEnvironmentUnavailable ||
+      sendInFlightRef.current
+    ) {
+      return;
+    }
+    const sendCtx = composerRef.current?.getSendContext();
+    if (!sendCtx) {
+      return;
+    }
+    const { selectedModelSelection: ctxSelectedModelSelection } = sendCtx;
+    const implementationPrompt = buildPlanImplementationPrompt(activeProposedPlan.planMarkdown);
+    const logicalProjectKey = deriveLogicalProjectKeyFromSettings(
+      activeProject,
+      projectGroupingSettings,
+    );
+    await startImplementationDraftFromPlan({
+      projectRef: scopeProjectRef(activeProject.environmentId, activeProject.id),
+      logicalProjectKey,
+      prompt: implementationPrompt,
+      modelSelection: ctxSelectedModelSelection,
+      sourceThreadId: activeThread.id,
+      sourcePlanId: activeProposedPlan.id,
+      branch: activeThreadBranch,
+      worktreePath: activeThread.worktreePath,
+    });
+  }, [
+    activeEnvironmentUnavailable,
+    activeProject,
+    activeProposedPlan,
+    activeThread,
+    activeThreadBranch,
+    isConnecting,
+    isSendBusy,
+    isServerThread,
+    projectGroupingSettings,
+    startImplementationDraftFromPlan,
+  ]);
+
   const onProviderModelSelect = useCallback(
     (instanceId: ProviderInstanceId, model: string) => {
       if (!activeThread) return;
@@ -3805,6 +3856,7 @@ export default function ChatView(props: ChatViewProps) {
                   onSend={onSend}
                   onInterrupt={onInterrupt}
                   onImplementPlanInNewThread={onImplementPlanInNewThread}
+                  onImplementPlanInNewThreadDraft={onImplementPlanInNewThreadDraft}
                   onRespondToApproval={onRespondToApproval}
                   onSelectActivePendingUserInputOption={onSelectActivePendingUserInputOption}
                   onAdvanceActivePendingUserInput={onAdvanceActivePendingUserInput}

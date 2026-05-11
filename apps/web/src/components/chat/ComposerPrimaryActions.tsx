@@ -28,6 +28,7 @@ interface ComposerPrimaryActionsProps {
   onPreviousPendingQuestion: () => void;
   onInterrupt: () => void;
   onImplementPlanInNewThread: () => void;
+  onImplementPlanInNewThreadDraft: () => void;
   onRevertPlan?: () => void;
 }
 
@@ -69,6 +70,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
   onPreviousPendingQuestion,
   onInterrupt,
   onImplementPlanInNewThread,
+  onImplementPlanInNewThreadDraft,
   onRevertPlan,
 }: ComposerPrimaryActionsProps) {
   const pointerFocusProps = preserveComposerFocusOnPointerDown
@@ -189,6 +191,12 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
               onClick={() => void onImplementPlanInNewThread()}
             >
               Implement in a new thread
+            </MenuItem>
+            <MenuItem
+              disabled={isSendBusy || isConnecting || isEnvironmentUnavailable}
+              onClick={() => void onImplementPlanInNewThreadDraft()}
+            >
+              Implement in a new thread (don&apos;t send)
             </MenuItem>
             {canRevertPlan && onRevertPlan ? (
               <MenuItem

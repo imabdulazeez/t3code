@@ -328,6 +328,7 @@ const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryActions(
   onPreviousPendingQuestion: () => void;
   onInterrupt: () => void;
   onImplementPlanInNewThread: () => void;
+  onImplementPlanInNewThreadDraft: () => void;
   onRevertPlan?: () => void;
 }) {
   return (
@@ -352,6 +353,7 @@ const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryActions(
         onPreviousPendingQuestion={props.onPreviousPendingQuestion}
         onInterrupt={props.onInterrupt}
         onImplementPlanInNewThread={props.onImplementPlanInNewThread}
+        onImplementPlanInNewThreadDraft={props.onImplementPlanInNewThreadDraft}
         {...(props.onRevertPlan !== undefined && { onRevertPlan: props.onRevertPlan })}
       />
     </>
@@ -488,6 +490,7 @@ export interface ChatComposerProps {
   onSend: (e?: { preventDefault: () => void }) => void;
   onInterrupt: () => void;
   onImplementPlanInNewThread: () => void;
+  onImplementPlanInNewThreadDraft: () => void;
   onRespondToApproval: (
     requestId: ApprovalRequestId,
     decision: ProviderApprovalDecision,
@@ -576,6 +579,7 @@ export const ChatComposer = memo(
       onSend,
       onInterrupt,
       onImplementPlanInNewThread,
+      onImplementPlanInNewThreadDraft,
       onRespondToApproval,
       onSelectActivePendingUserInputOption,
       onAdvanceActivePendingUserInput,
@@ -1823,6 +1827,9 @@ export const ChatComposer = memo(
     const handleImplementPlanInNewThreadPrimaryAction = useCallback(() => {
       void onImplementPlanInNewThread();
     }, [onImplementPlanInNewThread]);
+    const handleImplementPlanInNewThreadDraftPrimaryAction = useCallback(() => {
+      void onImplementPlanInNewThreadDraft();
+    }, [onImplementPlanInNewThreadDraft]);
     const scheduleComposerCollapseCheck = useCallback(() => {
       if (!isMobileViewport) {
         return;
@@ -2119,6 +2126,9 @@ export const ChatComposer = memo(
                         onPreviousPendingQuestion={onPreviousActivePendingUserInputQuestion}
                         onInterrupt={handleInterruptPrimaryAction}
                         onImplementPlanInNewThread={handleImplementPlanInNewThreadPrimaryAction}
+                        onImplementPlanInNewThreadDraft={
+                          handleImplementPlanInNewThreadDraftPrimaryAction
+                        }
                       />
                     ) : null}
                   </div>
@@ -2329,6 +2339,9 @@ export const ChatComposer = memo(
                       onPreviousPendingQuestion={onPreviousActivePendingUserInputQuestion}
                       onInterrupt={handleInterruptPrimaryAction}
                       onImplementPlanInNewThread={handleImplementPlanInNewThreadPrimaryAction}
+                      onImplementPlanInNewThreadDraft={
+                        handleImplementPlanInNewThreadDraftPrimaryAction
+                      }
                     />
                   </div>
                 ) : null}
@@ -2450,6 +2463,9 @@ export const ChatComposer = memo(
                     onPreviousPendingQuestion={onPreviousActivePendingUserInputQuestion}
                     onInterrupt={handleInterruptPrimaryAction}
                     onImplementPlanInNewThread={handleImplementPlanInNewThreadPrimaryAction}
+                    onImplementPlanInNewThreadDraft={
+                      handleImplementPlanInNewThreadDraftPrimaryAction
+                    }
                     onRevertPlan={onRevertPlan}
                   />
                 </div>
