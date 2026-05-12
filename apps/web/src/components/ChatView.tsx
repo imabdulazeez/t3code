@@ -59,7 +59,7 @@ import {
   findSidebarProposedPlan,
   findLatestProposedPlan,
   deriveWorkLogEntries,
-  hasActionableProposedPlan,
+  hasReimplementableProposedPlan,
   hasToolActivityForTurn,
   isLatestTurnSettled,
   formatElapsed,
@@ -1368,7 +1368,9 @@ export default function ChatView(props: ChatViewProps) {
     pendingUserInputs.length === 0 &&
     interactionMode === "plan" &&
     phase !== "running" &&
-    hasActionableProposedPlan(activeProposedPlan);
+    hasReimplementableProposedPlan(activeProposedPlan);
+  const isPlanReimplementation =
+    activeProposedPlan !== null && activeProposedPlan.implementedAt !== null;
   const activePendingApproval = pendingApprovals[0] ?? null;
   const {
     beginLocalDispatch,
@@ -3827,6 +3829,7 @@ export default function ChatView(props: ChatViewProps) {
                   activePendingQuestionIndex={activePendingQuestionIndex}
                   respondingRequestIds={respondingRequestIds}
                   showPlanFollowUpPrompt={showPlanFollowUpPrompt}
+                  isPlanReimplementation={isPlanReimplementation}
                   activeProposedPlan={activeProposedPlan}
                   activePlan={activePlan as { turnId?: TurnId } | null}
                   sidebarProposedPlan={sidebarProposedPlan as { turnId?: TurnId } | null}

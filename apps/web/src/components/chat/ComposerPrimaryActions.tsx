@@ -17,6 +17,7 @@ interface ComposerPrimaryActionsProps {
   pendingAction: PendingActionState | null;
   isRunning: boolean;
   showPlanFollowUpPrompt: boolean;
+  isPlanReimplementation: boolean;
   promptHasText: boolean;
   isSendBusy: boolean;
   isConnecting: boolean;
@@ -59,6 +60,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
   pendingAction,
   isRunning,
   showPlanFollowUpPrompt,
+  isPlanReimplementation,
   promptHasText,
   isSendBusy,
   isConnecting,
@@ -168,7 +170,13 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
           {...pointerFocusProps}
           disabled={isSendBusy || isConnecting || isEnvironmentUnavailable}
         >
-          {isConnecting || isSendBusy ? "Sending..." : "Implement"}
+          {isConnecting || isSendBusy
+            ? isPlanReimplementation
+              ? "Reimplementing..."
+              : "Sending..."
+            : isPlanReimplementation
+              ? "Reimplement"
+              : "Implement"}
         </Button>
         <Menu>
           <MenuTrigger
@@ -190,13 +198,15 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
               disabled={isSendBusy || isConnecting || isEnvironmentUnavailable}
               onClick={() => void onImplementPlanInNewThread()}
             >
-              Implement in a new thread
+              {isPlanReimplementation ? "Reimplement in a new thread" : "Implement in a new thread"}
             </MenuItem>
             <MenuItem
               disabled={isSendBusy || isConnecting || isEnvironmentUnavailable}
               onClick={() => void onImplementPlanInNewThreadDraft()}
             >
-              Implement in a new thread (don&apos;t send)
+              {isPlanReimplementation
+                ? "Reimplement in a new thread (don't send)"
+                : "Implement in a new thread (don't send)"}
             </MenuItem>
             {canRevertPlan && onRevertPlan ? (
               <MenuItem

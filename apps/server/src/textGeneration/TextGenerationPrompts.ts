@@ -95,6 +95,8 @@ export function buildPrContentPrompt(input: PrContentPromptInput) {
     "Rules:",
     "- title should be concise and specific",
     "- body must be markdown and include headings '## Summary' and '## Testing'",
+    "- body must be plain markdown text only — do NOT wrap it in JSON, code fences, or repeat the title/body keys inside the body",
+    "- do NOT serialize the response as a string inside a field; the title and body fields receive their literal values directly",
     "- under Summary, provide short bullet points",
     "- under Testing, include bullet points with concrete checks or 'Not run' where appropriate",
     ...policyInstruction(input.policy?.changeRequestInstructions),

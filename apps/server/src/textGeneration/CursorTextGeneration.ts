@@ -18,6 +18,7 @@ import {
 } from "./TextGenerationPrompts.ts";
 import {
   sanitizeCommitSubject,
+  sanitizePrBody,
   sanitizePrTitle,
   sanitizeThreadTitle,
 } from "./TextGenerationUtils.ts";
@@ -223,7 +224,7 @@ export const makeCursorTextGeneration = Effect.fn("makeCursorTextGeneration")(fu
 
     return {
       title: sanitizePrTitle(generated.title),
-      body: generated.body.trim(),
+      body: sanitizePrBody(generated.body),
     };
   });
 

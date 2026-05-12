@@ -27,6 +27,7 @@ import {
 import {
   normalizeCliError,
   sanitizeCommitSubject,
+  sanitizePrBody,
   sanitizePrTitle,
   sanitizeThreadTitle,
   toJsonSchemaObject,
@@ -306,7 +307,7 @@ export const makeClaudeTextGeneration = Effect.fn("makeClaudeTextGeneration")(fu
 
     return {
       title: sanitizePrTitle(generated.title),
-      body: generated.body.trim(),
+      body: sanitizePrBody(generated.body),
     };
   });
 

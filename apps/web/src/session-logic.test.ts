@@ -18,6 +18,7 @@ import {
   findLatestProposedPlan,
   findSidebarProposedPlan,
   hasActionableProposedPlan,
+  hasReimplementableProposedPlan,
   hasToolActivityForTurn,
   isLatestTurnSettled,
 } from "./session-logic";
@@ -478,6 +479,57 @@ describe("hasActionableProposedPlan", () => {
         updatedAt: "2026-02-23T00:00:02.000Z",
       }),
     ).toBe(false);
+  });
+});
+
+describe("hasReimplementableProposedPlan", () => {
+  it("returns true for an unimplemented proposed plan", () => {
+    expect(
+      hasReimplementableProposedPlan({
+        id: "plan-1",
+        turnId: TurnId.make("turn-1"),
+        planMarkdown: "# Plan",
+        implementedAt: null,
+        implementationThreadId: null,
+        revertedAt: null,
+        createdAt: "2026-02-23T00:00:00.000Z",
+        updatedAt: "2026-02-23T00:00:01.000Z",
+      }),
+    ).toBe(true);
+  });
+
+  it("returns true for an already-implemented plan that has not been reverted", () => {
+    expect(
+      hasReimplementableProposedPlan({
+        id: "plan-1",
+        turnId: TurnId.make("turn-1"),
+        planMarkdown: "# Plan",
+        implementedAt: "2026-02-23T00:00:02.000Z",
+        implementationThreadId: ThreadId.make("thread-implement"),
+        revertedAt: null,
+        createdAt: "2026-02-23T00:00:00.000Z",
+        updatedAt: "2026-02-23T00:00:02.000Z",
+      }),
+    ).toBe(true);
+  });
+
+  it("returns false for a reverted plan", () => {
+    expect(
+      hasReimplementableProposedPlan({
+        id: "plan-1",
+        turnId: TurnId.make("turn-1"),
+        planMarkdown: "# Plan",
+        implementedAt: "2026-02-23T00:00:02.000Z",
+        implementationThreadId: ThreadId.make("thread-implement"),
+        revertedAt: "2026-02-23T00:00:05.000Z",
+        createdAt: "2026-02-23T00:00:00.000Z",
+        updatedAt: "2026-02-23T00:00:05.000Z",
+      }),
+    ).toBe(false);
+  });
+
+  it("returns false for null", () => {
+    expect(hasReimplementableProposedPlan(null)).toBe(false);
   });
 });
 

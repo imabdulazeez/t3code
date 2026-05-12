@@ -484,6 +484,12 @@ export function hasActionableProposedPlan(
   );
 }
 
+export function hasReimplementableProposedPlan(
+  proposedPlan: LatestProposedPlanState | Pick<ProposedPlan, "implementedAt" | "revertedAt"> | null,
+): boolean {
+  return proposedPlan !== null && proposedPlan.revertedAt === null;
+}
+
 export function deriveWorkLogEntries(
   activities: ReadonlyArray<OrchestrationThreadActivity>,
   latestTurnId: TurnId | undefined,

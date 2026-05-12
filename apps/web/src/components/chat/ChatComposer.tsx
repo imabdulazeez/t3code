@@ -318,6 +318,7 @@ const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryActions(
   } | null;
   isRunning: boolean;
   showPlanFollowUpPrompt: boolean;
+  isPlanReimplementation: boolean;
   promptHasText: boolean;
   isSendBusy: boolean;
   isConnecting: boolean;
@@ -342,6 +343,7 @@ const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryActions(
         pendingAction={props.pendingAction}
         isRunning={props.isRunning}
         showPlanFollowUpPrompt={props.showPlanFollowUpPrompt}
+        isPlanReimplementation={props.isPlanReimplementation}
         promptHasText={props.promptHasText}
         isSendBusy={props.isSendBusy}
         isConnecting={props.isConnecting}
@@ -445,6 +447,7 @@ export interface ChatComposerProps {
 
   // Plan
   showPlanFollowUpPrompt: boolean;
+  isPlanReimplementation: boolean;
   activeProposedPlan: Thread["proposedPlans"][number] | null;
   activePlan: { turnId?: TurnId } | null;
   sidebarProposedPlan: { turnId?: TurnId } | null;
@@ -550,6 +553,7 @@ export const ChatComposer = memo(
       activePendingQuestionIndex,
       respondingRequestIds,
       showPlanFollowUpPrompt,
+      isPlanReimplementation,
       activeProposedPlan,
       activePlan,
       sidebarProposedPlan,
@@ -2053,6 +2057,7 @@ export const ChatComposer = memo(
                   <ComposerPlanFollowUpBanner
                     key={activeProposedPlan.id}
                     planTitle={proposedPlanTitle(activeProposedPlan.planMarkdown) ?? null}
+                    isReimplementation={isPlanReimplementation}
                   />
                 </div>
               ) : null)}
@@ -2116,6 +2121,7 @@ export const ChatComposer = memo(
                         pendingAction={pendingPrimaryAction}
                         isRunning={false}
                         showPlanFollowUpPrompt={false}
+                        isPlanReimplementation={false}
                         promptHasText={false}
                         isSendBusy={isSendBusy}
                         isConnecting={isConnecting}
@@ -2302,7 +2308,9 @@ export const ChatComposer = memo(
                       : activePendingProgress
                         ? "Type your own answer, or leave this blank to use the selected option"
                         : showPlanFollowUpPrompt && activeProposedPlan
-                          ? "Add feedback to refine the plan, or leave this blank to implement it"
+                          ? isPlanReimplementation
+                            ? "Add feedback to refine the plan, or leave this blank to reimplement it"
+                            : "Add feedback to refine the plan, or leave this blank to implement it"
                           : environmentUnavailable
                             ? `${environmentUnavailable.label} is ${
                                 environmentUnavailable.connectionState === "connecting"
@@ -2329,6 +2337,7 @@ export const ChatComposer = memo(
                       pendingAction={pendingPrimaryAction}
                       isRunning={false}
                       showPlanFollowUpPrompt={false}
+                      isPlanReimplementation={false}
                       promptHasText={false}
                       isSendBusy={isSendBusy}
                       isConnecting={isConnecting}
@@ -2452,6 +2461,7 @@ export const ChatComposer = memo(
                     showPlanFollowUpPrompt={
                       pendingUserInputs.length === 0 && showPlanFollowUpPrompt
                     }
+                    isPlanReimplementation={isPlanReimplementation}
                     promptHasText={prompt.trim().length > 0}
                     isSendBusy={isSendBusy}
                     isConnecting={isConnecting}

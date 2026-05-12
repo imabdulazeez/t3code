@@ -26,6 +26,7 @@ import {
 import { type TextGenerationShape } from "./TextGeneration.ts";
 import {
   sanitizeCommitSubject,
+  sanitizePrBody,
   sanitizePrTitle,
   sanitizeThreadTitle,
 } from "./TextGenerationUtils.ts";
@@ -412,7 +413,7 @@ export const makeOpenCodeTextGeneration = Effect.fn("makeOpenCodeTextGeneration"
 
     return {
       title: sanitizePrTitle(generated.title),
-      body: generated.body.trim(),
+      body: sanitizePrBody(generated.body),
     };
   });
 

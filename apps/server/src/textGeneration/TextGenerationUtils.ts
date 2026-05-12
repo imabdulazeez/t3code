@@ -42,6 +42,34 @@ export function sanitizePrTitle(raw: string): string {
   return "Update project changes";
 }
 
+export function sanitizePrBody(raw: string): string {
+  const trimmed = raw.trim();
+  return unwrapPrBodyEnvelope(trimmed, 3);
+}
+
+function unwrapPrBodyEnvelope(value: string, depth: number): string {
+  if (depth <= 0) return value;
+  if (!(value.startsWith("{") && value.endsWith("}"))) return value;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return value;
+  }
+  if (
+    parsed !== null &&
+    typeof parsed === "object" &&
+    "body" in parsed &&
+    typeof (parsed as { body: unknown }).body === "string" &&
+    "title" in parsed &&
+    typeof (parsed as { title: unknown }).title === "string"
+  ) {
+    const inner = (parsed as { body: string }).body.trim();
+    return unwrapPrBodyEnvelope(inner, depth - 1);
+  }
+  return value;
+}
+
 /** Normalise a raw thread title to a compact single-line sidebar-safe label. */
 export function sanitizeThreadTitle(raw: string): string {
   const normalized = raw
