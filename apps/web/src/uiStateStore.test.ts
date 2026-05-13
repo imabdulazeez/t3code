@@ -416,32 +416,70 @@ describe("uiStateStore pure functions", () => {
     expect(next.threadChangedFilesExpandedById).toEqual({});
   });
 
-  it("setThreadChangedFilesExpanded stores collapsed turns per thread", () => {
+  it("setThreadChangedFilesExpanded stores overrides that differ from the default", () => {
     const thread1 = ThreadId.make("thread-1");
     const initialState = makeUiState();
 
-    const next = setThreadChangedFilesExpanded(initialState, thread1, "turn-1", false);
-
-    expect(next.threadChangedFilesExpandedById).toEqual({
+    const collapsedOverride = setThreadChangedFilesExpanded(
+      initialState,
+      thread1,
+      "turn-1",
+      false,
+      true,
+    );
+    expect(collapsedOverride.threadChangedFilesExpandedById).toEqual({
       [thread1]: {
         "turn-1": false,
       },
     });
+
+    const expandedOverride = setThreadChangedFilesExpanded(
+      initialState,
+      thread1,
+      "turn-1",
+      true,
+      false,
+    );
+    expect(expandedOverride.threadChangedFilesExpandedById).toEqual({
+      [thread1]: {
+        "turn-1": true,
+      },
+    });
   });
 
-  it("setThreadChangedFilesExpanded removes thread overrides when expanded again", () => {
+  it("setThreadChangedFilesExpanded removes thread overrides when matching the default", () => {
     const thread1 = ThreadId.make("thread-1");
-    const initialState = makeUiState({
+    const collapsedDefaultExpanded = makeUiState({
       threadChangedFilesExpandedById: {
         [thread1]: {
           "turn-1": false,
         },
       },
     });
+    const restoredFromCollapsed = setThreadChangedFilesExpanded(
+      collapsedDefaultExpanded,
+      thread1,
+      "turn-1",
+      true,
+      true,
+    );
+    expect(restoredFromCollapsed.threadChangedFilesExpandedById).toEqual({});
 
-    const next = setThreadChangedFilesExpanded(initialState, thread1, "turn-1", true);
-
-    expect(next.threadChangedFilesExpandedById).toEqual({});
+    const expandedDefaultCollapsed = makeUiState({
+      threadChangedFilesExpandedById: {
+        [thread1]: {
+          "turn-1": true,
+        },
+      },
+    });
+    const restoredFromExpanded = setThreadChangedFilesExpanded(
+      expandedDefaultCollapsed,
+      thread1,
+      "turn-1",
+      false,
+      false,
+    );
+    expect(restoredFromExpanded.threadChangedFilesExpandedById).toEqual({});
   });
 });
 

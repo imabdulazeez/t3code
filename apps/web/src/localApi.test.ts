@@ -601,6 +601,7 @@ describe("wsApi", () => {
     const clientSettings = {
       autoCreatePrOnPush: true,
       autoOpenPlanSidebar: false,
+      changedFilesExpandedByDefault: false,
       confirmThreadArchive: true,
       confirmThreadDelete: false,
       diffFontFamily: "",
@@ -667,6 +668,7 @@ describe("wsApi", () => {
     const clientSettings = {
       autoCreatePrOnPush: true,
       autoOpenPlanSidebar: false,
+      changedFilesExpandedByDefault: false,
       confirmThreadArchive: true,
       confirmThreadDelete: false,
       diffFontFamily: "",

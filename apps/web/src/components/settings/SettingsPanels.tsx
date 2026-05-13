@@ -407,6 +407,10 @@ export function useSettingsRestore(onRestored?: () => void) {
       ...(settings.autoOpenPlanSidebar !== DEFAULT_UNIFIED_SETTINGS.autoOpenPlanSidebar
         ? ["Auto-open task panel"]
         : []),
+      ...(settings.changedFilesExpandedByDefault !==
+      DEFAULT_UNIFIED_SETTINGS.changedFilesExpandedByDefault
+        ? ["Expand changed files by default"]
+        : []),
       ...(settings.enableAssistantStreaming !== DEFAULT_UNIFIED_SETTINGS.enableAssistantStreaming
         ? ["Assistant output"]
         : []),
@@ -431,6 +435,7 @@ export function useSettingsRestore(onRestored?: () => void) {
     [
       isGitWritingModelDirty,
       settings.autoOpenPlanSidebar,
+      settings.changedFilesExpandedByDefault,
       settings.confirmThreadArchive,
       settings.confirmThreadDelete,
       settings.addProjectBaseDirectory,
@@ -463,6 +468,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       diffIgnoreWhitespace: DEFAULT_UNIFIED_SETTINGS.diffIgnoreWhitespace,
       sidebarThreadPreviewCount: DEFAULT_UNIFIED_SETTINGS.sidebarThreadPreviewCount,
       autoOpenPlanSidebar: DEFAULT_UNIFIED_SETTINGS.autoOpenPlanSidebar,
+      changedFilesExpandedByDefault: DEFAULT_UNIFIED_SETTINGS.changedFilesExpandedByDefault,
       enableAssistantStreaming: DEFAULT_UNIFIED_SETTINGS.enableAssistantStreaming,
       automaticGitFetchInterval: DEFAULT_UNIFIED_SETTINGS.automaticGitFetchInterval,
       defaultThreadEnvMode: DEFAULT_UNIFIED_SETTINGS.defaultThreadEnvMode,
@@ -756,6 +762,34 @@ export function GeneralSettingsPanel() {
                 updateSettings({ autoOpenPlanSidebar: Boolean(checked) })
               }
               aria-label="Open the task panel automatically"
+            />
+          }
+        />
+
+        <SettingsRow
+          title="Expand changed files by default"
+          description="When a turn modifies files, show all directories expanded instead of collapsed."
+          resetAction={
+            settings.changedFilesExpandedByDefault !==
+            DEFAULT_UNIFIED_SETTINGS.changedFilesExpandedByDefault ? (
+              <SettingResetButton
+                label="expand changed files by default"
+                onClick={() =>
+                  updateSettings({
+                    changedFilesExpandedByDefault:
+                      DEFAULT_UNIFIED_SETTINGS.changedFilesExpandedByDefault,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <Switch
+              checked={settings.changedFilesExpandedByDefault}
+              onCheckedChange={(checked) =>
+                updateSettings({ changedFilesExpandedByDefault: Boolean(checked) })
+              }
+              aria-label="Expand changed files by default"
             />
           }
         />
