@@ -2431,11 +2431,11 @@ describe("ChatView timeline estimator parity (full app)", () => {
       branchButton.click();
 
       const branchInput = await waitForElement(
-        () => document.querySelector<HTMLInputElement>('input[placeholder="Search refs..."]'),
+        () => document.querySelector<HTMLInputElement>('input[placeholder="Search branches..."]'),
         "Unable to find ref search input.",
       );
       branchInput.focus();
-      await page.getByPlaceholder("Search refs...").fill("1359");
+      await page.getByPlaceholder("Search branches...").fill("1359");
 
       const checkoutItem = await waitForElement(
         () =>
@@ -3314,7 +3314,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
       branchButton.click();
 
       await waitForElement(
-        () => document.querySelector<HTMLInputElement>('input[placeholder="Search refs..."]'),
+        () => document.querySelector<HTMLInputElement>('input[placeholder="Search branches..."]'),
         "Unable to find ref search input.",
       );
 

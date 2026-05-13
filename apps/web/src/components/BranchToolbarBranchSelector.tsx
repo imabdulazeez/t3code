@@ -70,7 +70,7 @@ function getBranchTriggerLabel(input: {
 }): string {
   const { activeWorktreePath, effectiveEnvMode, resolvedActiveBranch } = input;
   if (!resolvedActiveBranch) {
-    return "Select ref";
+    return "Select branch";
   }
   if (effectiveEnvMode === "worktree" && !activeWorktreePath) {
     return `From ${resolvedActiveBranch}`;
@@ -295,11 +295,11 @@ export function BranchToolbarBranchSelector({
   const shouldVirtualizeBranchList = filteredBranchPickerItems.length > 40;
   const totalBranchCount = branchesSearchData?.pages[0]?.totalCount ?? 0;
   const branchStatusText = isBranchesSearchPending
-    ? "Loading refs..."
+    ? "Loading branches..."
     : isFetchingNextPage
-      ? "Loading more refs..."
+      ? "Loading more branches..."
       : hasNextPage
-        ? `Showing ${refs.length} of ${totalBranchCount} refs`
+        ? `Showing ${refs.length} of ${totalBranchCount} branches`
         : null;
 
   // ---------------------------------------------------------------------------
@@ -363,7 +363,7 @@ export function BranchToolbarBranchSelector({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Failed to switch ref.",
+            title: "Failed to switch branch.",
             description: toBranchActionErrorMessage(error),
           }),
         );
@@ -395,7 +395,7 @@ export function BranchToolbarBranchSelector({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Failed to create and switch ref.",
+            title: "Failed to create and switch branch.",
             description: toBranchActionErrorMessage(error),
           }),
         );
@@ -535,7 +535,7 @@ export function BranchToolbarBranchSelector({
           value={itemValue}
           onClick={() => createRef(trimmedBranchQuery)}
         >
-          <span className="truncate">Create new ref &quot;{trimmedBranchQuery}&quot;</span>
+          <span className="truncate">Create new branch &quot;{trimmedBranchQuery}&quot;</span>
         </ComboboxItem>
       );
     }
@@ -602,14 +602,14 @@ export function BranchToolbarBranchSelector({
           <ComboboxInput
             className="[&_input]:font-sans rounded-md"
             inputClassName="ring-0"
-            placeholder="Search refs..."
+            placeholder="Search branches..."
             showTrigger={false}
             size="sm"
             value={branchQuery}
             onChange={(event) => setBranchQuery(event.target.value)}
           />
         </div>
-        <ComboboxEmpty>No refs found.</ComboboxEmpty>
+        <ComboboxEmpty>No branches found.</ComboboxEmpty>
 
         {shouldVirtualizeBranchList ? (
           <ComboboxListVirtualized>
