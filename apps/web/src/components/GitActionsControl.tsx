@@ -1442,7 +1442,6 @@ export default function GitActionsControl({
               description: result.toast.description,
               timeout: 0,
               actionProps: toastActionProps,
-              actionVariant: "outline",
               data: successToastData,
             }),
           );
