@@ -485,6 +485,10 @@ function validateBundledClientAssets(clientDir: string) {
   });
 }
 
+function stripWorkspaceDeps(deps: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(Object.entries(deps).filter(([, v]) => v !== "workspace:*"));
+}
+
 function resolveDesktopRuntimeDependencies(
   dependencies: Record<string, string> | undefined,
   catalog: Record<string, string>,
@@ -802,8 +806,8 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
       buildTimestamp,
     ),
     dependencies: {
-      ...resolvedServerDependencies,
-      ...resolvedDesktopRuntimeDependencies,
+      ...stripWorkspaceDeps(resolvedServerDependencies),
+      ...stripWorkspaceDeps(resolvedDesktopRuntimeDependencies),
     },
     devDependencies: {
       electron: electronVersion,
