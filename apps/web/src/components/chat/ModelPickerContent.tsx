@@ -1,7 +1,7 @@
 import {
   type ProviderInstanceId,
-  type ProviderDriverKind,
   type ResolvedKeybindingsConfig,
+  ProviderDriverKind,
 } from "@t3tools/contracts";
 import { resolveSelectableModel } from "@t3tools/shared/model";
 import { memo, useMemo, useState, useCallback, useEffect, useLayoutEffect, useRef } from "react";
@@ -21,6 +21,7 @@ import {
 import { useSettings, useUpdateSettings } from "~/hooks/useSettings";
 import { cn } from "~/lib/utils";
 import { TooltipProvider } from "../ui/tooltip";
+import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import type { ProviderInstanceEntry } from "../../providerInstances";
 import { providerModelKey, sortProviderModelItems } from "../../modelOrdering";
 
@@ -37,6 +38,8 @@ type ModelPickerItem = {
 };
 
 const EMPTY_MODEL_JUMP_LABELS = new Map<string, string>();
+const OPENCODE_DRIVER_KIND = ProviderDriverKind.make("opencode");
+const ALL_OPENCODE_SUB_PROVIDERS = "all";
 
 // Split a `${instanceId}:${slug}` combobox key back into its pieces. Slugs
 // can contain colons (e.g. some vendor model ids), so we only split on the
@@ -90,6 +93,9 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
     onInstanceModelChange,
   } = props;
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedOpenCodeSubProvider, setSelectedOpenCodeSubProvider] = useState<string>(
+    ALL_OPENCODE_SUB_PROVIDERS,
+  );
   const searchInputRef = useRef<HTMLInputElement>(null);
   const listRegionRef = useRef<HTMLDivElement>(null);
   const highlightedModelKeyRef = useRef<string | null>(null);
@@ -228,10 +234,82 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
     !isLocked && hideUnavailableProviders
       ? baseSidebarInstanceEntries.filter((entry) => entry.isAvailable && entry.status === "ready")
       : baseSidebarInstanceEntries;
+  const selectedInstanceEntry =
+    selectedInstanceId === "favorites" ? null : entryByInstanceId.get(selectedInstanceId);
+  const isSelectedOpenCodeInstance = selectedInstanceEntry?.driverKind === OPENCODE_DRIVER_KIND;
+  const isOpenCodeProviderScope =
+    selectedInstanceId !== "favorites" &&
+    ((!isLocked && isSelectedOpenCodeInstance) ||
+      (isLocked &&
+        props.lockedProvider === OPENCODE_DRIVER_KIND &&
+        (!showLockedInstanceSidebar || isSelectedOpenCodeInstance)));
   const instanceOrder = useMemo(
     () => instanceEntries.map((entry) => entry.instanceId),
     [instanceEntries],
   );
+
+  const openCodeProviderOptions = useMemo(() => {
+    if (selectedInstanceId === "favorites") {
+      return [];
+    }
+
+    let candidateModels: ReadonlyArray<ModelPickerItem> = [];
+
+    if (!isLocked) {
+      if (!isSelectedOpenCodeInstance) {
+        return [];
+      }
+      candidateModels = flatModels.filter((model) => model.instanceId === selectedInstanceId);
+    } else if (props.lockedProvider === OPENCODE_DRIVER_KIND) {
+      if (showLockedInstanceSidebar) {
+        if (!isSelectedOpenCodeInstance) {
+          return [];
+        }
+        candidateModels = flatModels.filter((model) => model.instanceId === selectedInstanceId);
+      } else {
+        candidateModels = flatModels.filter((model) => matchesLockedProvider(model));
+      }
+    } else {
+      return [];
+    }
+
+    const subProviders = new Set<string>();
+    for (const model of candidateModels) {
+      if (model.subProvider) {
+        subProviders.add(model.subProvider);
+      }
+    }
+
+    if (subProviders.size < 2) {
+      return [];
+    }
+
+    return Array.from(subProviders).toSorted((a, b) => a.localeCompare(b));
+  }, [
+    flatModels,
+    isLocked,
+    isSelectedOpenCodeInstance,
+    matchesLockedProvider,
+    props.lockedProvider,
+    selectedInstanceId,
+    showLockedInstanceSidebar,
+  ]);
+
+  const shouldShowOpenCodeProviderFilter = !isSearching && openCodeProviderOptions.length >= 2;
+
+  useEffect(() => {
+    if (!isOpenCodeProviderScope) {
+      return;
+    }
+
+    const selectionIsValid =
+      selectedOpenCodeSubProvider === ALL_OPENCODE_SUB_PROVIDERS ||
+      openCodeProviderOptions.includes(selectedOpenCodeSubProvider);
+    if (selectionIsValid) {
+      return;
+    }
+    setSelectedOpenCodeSubProvider(ALL_OPENCODE_SUB_PROVIDERS);
+  }, [isOpenCodeProviderScope, openCodeProviderOptions, selectedOpenCodeSubProvider]);
 
   // Filter models based on search query and selected instance
   const filteredModels = useMemo(() => {
@@ -317,6 +395,13 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
       result = result.filter((m) => m.instanceId === selectedInstanceId);
     }
 
+    if (
+      shouldShowOpenCodeProviderFilter &&
+      selectedOpenCodeSubProvider !== ALL_OPENCODE_SUB_PROVIDERS
+    ) {
+      result = result.filter((m) => m.subProvider === selectedOpenCodeSubProvider);
+    }
+
     return sortProviderModelItems(result, {
       favoriteModelKeys: favoritesSet,
       groupFavorites: selectedInstanceId !== "favorites",
@@ -331,6 +416,8 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
     searchQuery,
     showLockedInstanceSidebar,
     selectedInstanceId,
+    shouldShowOpenCodeProviderFilter,
+    selectedOpenCodeSubProvider,
   ]);
 
   const handleModelSelect = useCallback(
@@ -610,6 +697,41 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
                 size="sm"
               />
             </div>
+
+            {/* OpenCode provider filter */}
+            {shouldShowOpenCodeProviderFilter && (
+              <div className="border-b px-3 py-2">
+                <Select
+                  value={selectedOpenCodeSubProvider}
+                  onValueChange={(value) => {
+                    if (value !== null) {
+                      setSelectedOpenCodeSubProvider(value);
+                    }
+                  }}
+                >
+                  <SelectTrigger
+                    size="xs"
+                    variant="ghost"
+                    aria-label="OpenCode provider"
+                    className="h-7 w-full justify-between"
+                  >
+                    <SelectValue>
+                      {selectedOpenCodeSubProvider === ALL_OPENCODE_SUB_PROVIDERS
+                        ? "All providers"
+                        : selectedOpenCodeSubProvider}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectPopup>
+                    <SelectItem value={ALL_OPENCODE_SUB_PROVIDERS}>All providers</SelectItem>
+                    {openCodeProviderOptions.map((provider) => (
+                      <SelectItem key={provider} value={provider}>
+                        {provider}
+                      </SelectItem>
+                    ))}
+                  </SelectPopup>
+                </Select>
+              </div>
+            )}
 
             {/* Model list */}
             <div
