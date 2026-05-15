@@ -318,6 +318,23 @@ function getSidebarProviderOrder() {
   );
 }
 
+async function selectOpenCodeProviderFilter(provider: string) {
+  const providerSelect = document.querySelector<HTMLButtonElement>(
+    '[aria-label="OpenCode provider"]',
+  );
+  expect(providerSelect).not.toBeNull();
+  await userEvent.click(providerSelect!);
+
+  let providerItem: HTMLElement | undefined;
+  await vi.waitFor(() => {
+    providerItem = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-slot="select-item"]'),
+    ).find((item) => item.textContent?.trim() === provider);
+    expect(providerItem).toBeDefined();
+  });
+  await userEvent.click(providerItem!);
+}
+
 describe("ProviderModelPicker", () => {
   beforeEach(async () => {
     // Reset test environment before each test
@@ -1219,6 +1236,339 @@ describe("ProviderModelPicker", () => {
       }
       expect(button.className).toContain("border-input");
       expect(button.className).toContain("bg-popover");
+    } finally {
+      await mounted.cleanup();
+    }
+  });
+
+  it("shows OpenCode provider filter and filters models by provider", async () => {
+    const providers: ReadonlyArray<ServerProvider> = [
+      buildOpenCodeProvider([
+        {
+          slug: "github-copilot/claude-opus-4.7",
+          name: "Claude Opus 4.7",
+          subProvider: "GitHub Copilot",
+          isCustom: false,
+          capabilities: createModelCapabilities({
+            optionDescriptors: [
+              selectDescriptor("reasoningEffort", "Reasoning", [
+                { id: "low", label: "low" },
+                { id: "medium", label: "medium", isDefault: true },
+                { id: "high", label: "high" },
+              ]),
+            ],
+          }),
+        },
+        {
+          slug: "github-copilot/claude-sonnet-4.6",
+          name: "Claude Sonnet 4.6",
+          subProvider: "GitHub Copilot",
+          isCustom: false,
+          capabilities: createModelCapabilities({
+            optionDescriptors: [
+              selectDescriptor("reasoningEffort", "Reasoning", [
+                { id: "low", label: "low" },
+                { id: "medium", label: "medium", isDefault: true },
+                { id: "high", label: "high" },
+              ]),
+            ],
+          }),
+        },
+        {
+          slug: "openai/gpt-4-turbo",
+          name: "GPT-4 Turbo",
+          subProvider: "OpenAI",
+          isCustom: false,
+          capabilities: createModelCapabilities({
+            optionDescriptors: [
+              selectDescriptor("reasoningEffort", "Reasoning", [
+                { id: "low", label: "low" },
+                { id: "medium", label: "medium", isDefault: true },
+                { id: "high", label: "high" },
+              ]),
+            ],
+          }),
+        },
+      ]),
+    ];
+    const mounted = await mountPicker({
+      activeInstanceId: OPENCODE_INSTANCE_ID,
+      model: "github-copilot/claude-opus-4.7",
+      lockedProvider: null,
+      providers,
+    });
+
+    try {
+      await page.getByRole("button").click();
+
+      await vi.waitFor(() => {
+        expect(getVisibleModelNames()).toEqual([
+          "Claude Opus 4.7",
+          "Claude Sonnet 4.6",
+          "GPT-4 Turbo",
+        ]);
+      });
+
+      const providerSelect = document.querySelector<HTMLButtonElement>(
+        '[aria-label="OpenCode provider"]',
+      );
+      expect(providerSelect).not.toBeNull();
+
+      await selectOpenCodeProviderFilter("GitHub Copilot");
+
+      await vi.waitFor(() => {
+        expect(getVisibleModelNames()).toEqual(["Claude Opus 4.7", "Claude Sonnet 4.6"]);
+      });
+
+      await selectOpenCodeProviderFilter("All providers");
+
+      await vi.waitFor(() => {
+        expect(getVisibleModelNames()).toEqual([
+          "Claude Opus 4.7",
+          "Claude Sonnet 4.6",
+          "GPT-4 Turbo",
+        ]);
+      });
+    } finally {
+      await mounted.cleanup();
+    }
+  });
+
+  it("does not show OpenCode provider filter with only one upstream provider", async () => {
+    const providers: ReadonlyArray<ServerProvider> = [
+      buildOpenCodeProvider([
+        {
+          slug: "github-copilot/claude-opus-4.7",
+          name: "Claude Opus 4.7",
+          subProvider: "GitHub Copilot",
+          isCustom: false,
+          capabilities: createModelCapabilities({
+            optionDescriptors: [
+              selectDescriptor("reasoningEffort", "Reasoning", [
+                { id: "low", label: "low" },
+                { id: "medium", label: "medium", isDefault: true },
+                { id: "high", label: "high" },
+              ]),
+            ],
+          }),
+        },
+        {
+          slug: "github-copilot/claude-sonnet-4.6",
+          name: "Claude Sonnet 4.6",
+          subProvider: "GitHub Copilot",
+          isCustom: false,
+          capabilities: createModelCapabilities({
+            optionDescriptors: [
+              selectDescriptor("reasoningEffort", "Reasoning", [
+                { id: "low", label: "low" },
+                { id: "medium", label: "medium", isDefault: true },
+                { id: "high", label: "high" },
+              ]),
+            ],
+          }),
+        },
+      ]),
+    ];
+    const mounted = await mountPicker({
+      activeInstanceId: OPENCODE_INSTANCE_ID,
+      model: "github-copilot/claude-opus-4.7",
+      lockedProvider: null,
+      providers,
+    });
+
+    try {
+      await page.getByRole("button").click();
+
+      await vi.waitFor(() => {
+        const providerSelect = document.querySelector<HTMLButtonElement>(
+          '[aria-label="OpenCode provider"]',
+        );
+        expect(providerSelect).toBeNull();
+      });
+    } finally {
+      await mounted.cleanup();
+    }
+  });
+
+  it("shows OpenCode filter only for OpenCode provider, not other providers", async () => {
+    const providers: ReadonlyArray<ServerProvider> = [
+      buildCodexProvider([
+        {
+          slug: "gpt-5-codex",
+          name: "GPT-5 Codex",
+          isCustom: false,
+          capabilities: createModelCapabilities({
+            optionDescriptors: [
+              selectDescriptor("reasoningEffort", "Reasoning", [
+                { id: "low", label: "low" },
+                { id: "medium", label: "medium", isDefault: true },
+                { id: "high", label: "high" },
+              ]),
+            ],
+          }),
+        },
+      ]),
+      buildOpenCodeProvider([
+        {
+          slug: "github-copilot/claude-opus-4.7",
+          name: "Claude Opus 4.7",
+          subProvider: "GitHub Copilot",
+          isCustom: false,
+          capabilities: createModelCapabilities({
+            optionDescriptors: [
+              selectDescriptor("reasoningEffort", "Reasoning", [
+                { id: "low", label: "low" },
+                { id: "medium", label: "medium", isDefault: true },
+                { id: "high", label: "high" },
+              ]),
+            ],
+          }),
+        },
+        {
+          slug: "openai/gpt-4-turbo",
+          name: "GPT-4 Turbo",
+          subProvider: "OpenAI",
+          isCustom: false,
+          capabilities: createModelCapabilities({
+            optionDescriptors: [
+              selectDescriptor("reasoningEffort", "Reasoning", [
+                { id: "low", label: "low" },
+                { id: "medium", label: "medium", isDefault: true },
+                { id: "high", label: "high" },
+              ]),
+            ],
+          }),
+        },
+      ]),
+    ];
+    const mounted = await mountPicker({
+      activeInstanceId: ProviderInstanceId.make("codex"),
+      model: "gpt-5-codex",
+      lockedProvider: null,
+      providers,
+    });
+
+    try {
+      await page.getByRole("button").click();
+
+      await vi.waitFor(() => {
+        const providerSelect = document.querySelector<HTMLButtonElement>(
+          '[aria-label="OpenCode provider"]',
+        );
+        expect(providerSelect).toBeNull();
+        expect(getVisibleModelNames()).toEqual(["GPT-5 Codex"]);
+      });
+
+      await page.getByRole("button", { name: "OpenCode", exact: true }).click();
+
+      await vi.waitFor(() => {
+        const providerSelect = document.querySelector<HTMLButtonElement>(
+          '[aria-label="OpenCode provider"]',
+        );
+        expect(providerSelect).not.toBeNull();
+        expect(getVisibleModelNames()).toEqual(["Claude Opus 4.7", "GPT-4 Turbo"]);
+      });
+
+      await selectOpenCodeProviderFilter("GitHub Copilot");
+
+      await vi.waitFor(() => {
+        expect(getVisibleModelNames()).toEqual(["Claude Opus 4.7"]);
+      });
+
+      await page.getByRole("button", { name: "Codex", exact: true }).click();
+
+      await vi.waitFor(() => {
+        expect(
+          document.querySelector<HTMLButtonElement>('[aria-label="OpenCode provider"]'),
+        ).toBeNull();
+        expect(getVisibleModelNames()).toEqual(["GPT-5 Codex"]);
+      });
+
+      await page.getByRole("button", { name: "OpenCode", exact: true }).click();
+
+      await vi.waitFor(() => {
+        expect(
+          document.querySelector<HTMLButtonElement>('[aria-label="OpenCode provider"]'),
+        ).not.toBeNull();
+        expect(getVisibleModelNames()).toEqual(["Claude Opus 4.7"]);
+      });
+    } finally {
+      await mounted.cleanup();
+    }
+  });
+
+  it("preserves OpenCode provider filter selection across search", async () => {
+    const providers: ReadonlyArray<ServerProvider> = [
+      buildOpenCodeProvider([
+        {
+          slug: "github-copilot/claude-opus-4.7",
+          name: "Claude Opus 4.7",
+          subProvider: "GitHub Copilot",
+          isCustom: false,
+          capabilities: createModelCapabilities({
+            optionDescriptors: [
+              selectDescriptor("reasoningEffort", "Reasoning", [
+                { id: "low", label: "low" },
+                { id: "medium", label: "medium", isDefault: true },
+                { id: "high", label: "high" },
+              ]),
+            ],
+          }),
+        },
+        {
+          slug: "openai/gpt-4-turbo",
+          name: "GPT-4 Turbo",
+          subProvider: "OpenAI",
+          isCustom: false,
+          capabilities: createModelCapabilities({
+            optionDescriptors: [
+              selectDescriptor("reasoningEffort", "Reasoning", [
+                { id: "low", label: "low" },
+                { id: "medium", label: "medium", isDefault: true },
+                { id: "high", label: "high" },
+              ]),
+            ],
+          }),
+        },
+      ]),
+    ];
+    const mounted = await mountPicker({
+      activeInstanceId: OPENCODE_INSTANCE_ID,
+      model: "github-copilot/claude-opus-4.7",
+      lockedProvider: null,
+      providers,
+    });
+
+    try {
+      await page.getByRole("button").click();
+
+      await selectOpenCodeProviderFilter("GitHub Copilot");
+
+      await vi.waitFor(() => {
+        expect(getVisibleModelNames()).toEqual(["Claude Opus 4.7"]);
+      });
+
+      const searchInput = page.getByPlaceholder("Search models...");
+      await searchInput.fill("turbo");
+
+      await vi.waitFor(() => {
+        const providerSelect = document.querySelector<HTMLButtonElement>(
+          '[aria-label="OpenCode provider"]',
+        );
+        expect(providerSelect).toBeNull();
+        const text = document.body.textContent ?? "";
+        expect(text).toContain("GPT-4 Turbo");
+      });
+
+      await searchInput.fill("");
+
+      await vi.waitFor(() => {
+        const providerSelect = document.querySelector<HTMLButtonElement>(
+          '[aria-label="OpenCode provider"]',
+        );
+        expect(providerSelect).not.toBeNull();
+        expect(getVisibleModelNames()).toEqual(["Claude Opus 4.7"]);
+      });
     } finally {
       await mounted.cleanup();
     }
