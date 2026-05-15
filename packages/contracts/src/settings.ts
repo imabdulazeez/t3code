@@ -53,6 +53,7 @@ export const ClientSettingsSchema = Schema.Struct({
   dismissedProviderUpdateNotificationKeys: Schema.Array(TrimmedNonEmptyString).pipe(
     Schema.withDecodingDefault(Effect.succeed([])),
   ),
+  hideUnavailableProviders: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   terminalFontFamily: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
   // Model favorites. Historically keyed by provider kind, now
   // widened to `ProviderInstanceId` so users can favorite a specific model
@@ -489,6 +490,7 @@ export const ClientSettingsPatch = Schema.Struct({
   diffFontFamily: Schema.optionalKey(Schema.String),
   diffIgnoreWhitespace: Schema.optionalKey(Schema.Boolean),
   diffWordWrap: Schema.optionalKey(Schema.Boolean),
+  hideUnavailableProviders: Schema.optionalKey(Schema.Boolean),
   favorites: Schema.optionalKey(
     Schema.Array(
       Schema.Struct({

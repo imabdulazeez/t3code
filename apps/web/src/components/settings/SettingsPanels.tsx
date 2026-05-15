@@ -404,6 +404,9 @@ export function useSettingsRestore(onRestored?: () => void) {
         ? ["Diff whitespace changes"]
         : []),
       ...(settings.diffFontFamily !== DEFAULT_UNIFIED_SETTINGS.diffFontFamily ? ["Diff font"] : []),
+      ...(settings.hideUnavailableProviders !== DEFAULT_UNIFIED_SETTINGS.hideUnavailableProviders
+        ? ["Hide unavailable providers"]
+        : []),
       ...(settings.autoOpenPlanSidebar !== DEFAULT_UNIFIED_SETTINGS.autoOpenPlanSidebar
         ? ["Auto-open task panel"]
         : []),
@@ -443,6 +446,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       settings.diffFontFamily,
       settings.diffIgnoreWhitespace,
       settings.diffWordWrap,
+      settings.hideUnavailableProviders,
       settings.automaticGitFetchInterval,
       settings.enableAssistantStreaming,
       settings.sidebarThreadPreviewCount,
@@ -469,6 +473,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       sidebarThreadPreviewCount: DEFAULT_UNIFIED_SETTINGS.sidebarThreadPreviewCount,
       autoOpenPlanSidebar: DEFAULT_UNIFIED_SETTINGS.autoOpenPlanSidebar,
       changedFilesExpandedByDefault: DEFAULT_UNIFIED_SETTINGS.changedFilesExpandedByDefault,
+      hideUnavailableProviders: DEFAULT_UNIFIED_SETTINGS.hideUnavailableProviders,
       enableAssistantStreaming: DEFAULT_UNIFIED_SETTINGS.enableAssistantStreaming,
       automaticGitFetchInterval: DEFAULT_UNIFIED_SETTINGS.automaticGitFetchInterval,
       defaultThreadEnvMode: DEFAULT_UNIFIED_SETTINGS.defaultThreadEnvMode,
@@ -1293,6 +1298,35 @@ export function ProviderSettingsPanel() {
 
   return (
     <SettingsPageContainer>
+      <SettingsSection title="Model picker">
+        <SettingsRow
+          title="Hide unavailable providers"
+          description="Hide disabled and coming-soon providers from the model picker."
+          resetAction={
+            settings.hideUnavailableProviders !==
+            DEFAULT_UNIFIED_SETTINGS.hideUnavailableProviders ? (
+              <SettingResetButton
+                label="hide unavailable providers"
+                onClick={() =>
+                  updateSettings({
+                    hideUnavailableProviders: DEFAULT_UNIFIED_SETTINGS.hideUnavailableProviders,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <Switch
+              checked={settings.hideUnavailableProviders}
+              onCheckedChange={(checked) =>
+                updateSettings({ hideUnavailableProviders: Boolean(checked) })
+              }
+              aria-label="Hide unavailable providers from the model picker"
+            />
+          }
+        />
+      </SettingsSection>
+
       <SettingsSection
         title="Providers"
         headerAction={

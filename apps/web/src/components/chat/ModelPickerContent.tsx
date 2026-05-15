@@ -94,6 +94,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
   const listRegionRef = useRef<HTMLDivElement>(null);
   const highlightedModelKeyRef = useRef<string | null>(null);
   const favorites = useSettings((s) => s.favorites ?? []);
+  const hideUnavailableProviders = useSettings((s) => s.hideUnavailableProviders);
   const [selectedInstanceId, setSelectedInstanceId] = useState<ProviderInstanceId | "favorites">(
     () => {
       if (props.lockedProvider !== null) {
@@ -220,9 +221,13 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
   );
   const showLockedInstanceSidebar = isLocked && lockedInstanceEntries.length > 1;
   const showSidebar = !isSearching && (!isLocked || showLockedInstanceSidebar);
-  const sidebarInstanceEntries = showLockedInstanceSidebar
+  const baseSidebarInstanceEntries = showLockedInstanceSidebar
     ? lockedInstanceEntries
     : instanceEntries;
+  const sidebarInstanceEntries =
+    !isLocked && hideUnavailableProviders
+      ? baseSidebarInstanceEntries.filter((entry) => entry.isAvailable && entry.status === "ready")
+      : baseSidebarInstanceEntries;
   const instanceOrder = useMemo(
     () => instanceEntries.map((entry) => entry.instanceId),
     [instanceEntries],
@@ -538,7 +543,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
             onSelectInstance={handleSelectInstance}
             instanceEntries={sidebarInstanceEntries}
             showFavorites={!isLocked}
-            showComingSoon={!isLocked}
+            showComingSoon={!isLocked && !hideUnavailableProviders}
           />
         )}
 

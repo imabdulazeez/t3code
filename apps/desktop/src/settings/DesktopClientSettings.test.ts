@@ -21,6 +21,7 @@ const clientSettings: ClientSettings = {
   diffIgnoreWhitespace: true,
   diffWordWrap: true,
   dismissedProviderUpdateNotificationKeys: [],
+  hideUnavailableProviders: false,
   favorites: [],
   providerModelPreferences: {},
   sidebarProjectGroupingMode: "repository_path",
