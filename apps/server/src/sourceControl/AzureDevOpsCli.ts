@@ -80,10 +80,12 @@ export interface AzureDevOpsCliShape {
     readonly target?: SourceControlProvider.SourceControlRefSelector;
     readonly title: string;
     readonly bodyFile: string;
+    readonly headRepository?: string;
   }) => Effect.Effect<void, AzureDevOpsCliError>;
 
   readonly getDefaultBranch: (input: {
     readonly cwd: string;
+    readonly repository?: string;
   }) => Effect.Effect<string | null, AzureDevOpsCliError>;
 
   readonly checkoutPullRequest: (input: {

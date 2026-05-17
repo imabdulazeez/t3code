@@ -140,10 +140,12 @@ export interface BitbucketApiShape {
     readonly target?: SourceControlProvider.SourceControlRefSelector;
     readonly title: string;
     readonly bodyFile: string;
+    readonly headRepository?: string;
   }) => Effect.Effect<void, BitbucketApiError>;
   readonly getDefaultBranch: (input: {
     readonly cwd: string;
     readonly context?: SourceControlProvider.SourceControlProviderContext;
+    readonly repository?: string;
   }) => Effect.Effect<string | null, BitbucketApiError>;
   readonly checkoutPullRequest: (input: {
     readonly cwd: string;

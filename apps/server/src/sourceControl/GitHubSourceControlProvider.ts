@@ -177,6 +177,7 @@ export const make = Effect.fn("makeGitHubSourceControlProvider")(function* () {
           headSelector: input.headSelector,
           title: input.title,
           bodyFile: input.bodyFile,
+          ...(input.headRepository !== undefined ? { headRepository: input.headRepository } : {}),
         })
         .pipe(Effect.mapError((error) => providerError("createChangeRequest", error))),
     getRepositoryCloneUrls: (input) =>
@@ -189,7 +190,10 @@ export const make = Effect.fn("makeGitHubSourceControlProvider")(function* () {
         .pipe(Effect.mapError((error) => providerError("createRepository", error))),
     getDefaultBranch: (input) =>
       github
-        .getDefaultBranch(input)
+        .getDefaultBranch({
+          cwd: input.cwd,
+          ...(input.repository !== undefined ? { repository: input.repository } : {}),
+        })
         .pipe(Effect.mapError((error) => providerError("getDefaultBranch", error))),
     checkoutChangeRequest: (input) =>
       github

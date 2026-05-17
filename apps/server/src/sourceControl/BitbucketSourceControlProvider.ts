@@ -82,6 +82,7 @@ export const make = Effect.fn("makeBitbucketSourceControlProvider")(function* ()
           ...(input.target ? { target: input.target } : {}),
           title: input.title,
           bodyFile: input.bodyFile,
+          ...(input.headRepository !== undefined ? { headRepository: input.headRepository } : {}),
         })
         .pipe(Effect.mapError((error) => providerError("createChangeRequest", error)));
     },
@@ -98,6 +99,7 @@ export const make = Effect.fn("makeBitbucketSourceControlProvider")(function* ()
         .getDefaultBranch({
           cwd: input.cwd,
           ...(input.context ? { context: input.context } : {}),
+          ...(input.repository !== undefined ? { repository: input.repository } : {}),
         })
         .pipe(Effect.mapError((error) => providerError("getDefaultBranch", error))),
     checkoutChangeRequest: (input) =>

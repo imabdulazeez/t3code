@@ -83,10 +83,12 @@ export interface GitLabCliShape {
     readonly target?: SourceControlProvider.SourceControlRefSelector;
     readonly title: string;
     readonly bodyFile: string;
+    readonly headRepository?: string;
   }) => Effect.Effect<void, GitLabCliError>;
 
   readonly getDefaultBranch: (input: {
     readonly cwd: string;
+    readonly repository?: string;
   }) => Effect.Effect<string | null, GitLabCliError>;
 
   readonly checkoutMergeRequest: (input: {

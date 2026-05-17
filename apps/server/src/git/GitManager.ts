@@ -1058,7 +1058,10 @@ export const makeGitManager = Effect.fn("makeGitManager")(function* () {
     cwd: string,
     branch: string,
     upstreamRef: string | null,
-    headContext: Pick<BranchHeadContext, "isCrossRepository" | "remoteName">,
+    headContext: Pick<
+      BranchHeadContext,
+      "isCrossRepository" | "remoteName" | "headRepositoryNameWithOwner"
+    >,
   ) {
     const configured = yield* gitCore.readConfigValue(cwd, `branch.${branch}.gh-merge-base`);
     if (configured) return configured;
@@ -1073,7 +1076,14 @@ export const makeGitManager = Effect.fn("makeGitManager")(function* () {
     }
 
     const defaultFromProvider = yield* sourceControlProvider(cwd).pipe(
-      Effect.flatMap((provider) => provider.getDefaultBranch({ cwd })),
+      Effect.flatMap((provider) =>
+        provider.getDefaultBranch({
+          cwd,
+          ...(headContext.headRepositoryNameWithOwner
+            ? { repository: headContext.headRepositoryNameWithOwner }
+            : {}),
+        }),
+      ),
       Effect.catch(() => Effect.succeed(null)),
     );
     if (defaultFromProvider) {
@@ -1321,6 +1331,9 @@ export const makeGitManager = Effect.fn("makeGitManager")(function* () {
         headSelector: headContext.preferredHeadSelector,
         title: generated.title,
         bodyFile,
+        ...(headContext.headRepositoryNameWithOwner
+          ? { headRepository: headContext.headRepositoryNameWithOwner }
+          : {}),
       })
       .pipe(Effect.ensuring(fileSystem.remove(bodyFile).pipe(Effect.catch(() => Effect.void))));
 

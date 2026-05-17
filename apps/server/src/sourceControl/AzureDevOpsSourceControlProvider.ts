@@ -116,6 +116,7 @@ export const make = Effect.fn("makeAzureDevOpsSourceControlProvider")(function* 
           ...(input.target !== undefined ? { target: input.target } : {}),
           title: input.title,
           bodyFile: input.bodyFile,
+          ...(input.headRepository !== undefined ? { headRepository: input.headRepository } : {}),
         })
         .pipe(Effect.mapError((error) => providerError("createChangeRequest", error)));
     },
@@ -129,7 +130,10 @@ export const make = Effect.fn("makeAzureDevOpsSourceControlProvider")(function* 
         .pipe(Effect.mapError((error) => providerError("createRepository", error))),
     getDefaultBranch: (input) =>
       azure
-        .getDefaultBranch({ cwd: input.cwd })
+        .getDefaultBranch({
+          cwd: input.cwd,
+          ...(input.repository !== undefined ? { repository: input.repository } : {}),
+        })
         .pipe(Effect.mapError((error) => providerError("getDefaultBranch", error))),
     checkoutChangeRequest: (input) =>
       azure

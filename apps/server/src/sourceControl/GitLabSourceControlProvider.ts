@@ -121,6 +121,7 @@ export const make = Effect.fn("makeGitLabSourceControlProvider")(function* () {
           ...(input.target ? { target: input.target } : {}),
           title: input.title,
           bodyFile: input.bodyFile,
+          ...(input.headRepository !== undefined ? { headRepository: input.headRepository } : {}),
         })
         .pipe(Effect.mapError((error) => providerError("createChangeRequest", error)));
     },
@@ -134,7 +135,10 @@ export const make = Effect.fn("makeGitLabSourceControlProvider")(function* () {
         .pipe(Effect.mapError((error) => providerError("createRepository", error))),
     getDefaultBranch: (input) =>
       gitlab
-        .getDefaultBranch(input)
+        .getDefaultBranch({
+          cwd: input.cwd,
+          ...(input.repository !== undefined ? { repository: input.repository } : {}),
+        })
         .pipe(Effect.mapError((error) => providerError("getDefaultBranch", error))),
     checkoutChangeRequest: (input) =>
       gitlab
