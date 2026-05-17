@@ -906,6 +906,9 @@ export const makeGitManager = Effect.fn("makeGitManager")(function* () {
         headSelector,
         state: "open",
         limit: 1,
+        ...(headContext.headRepositoryNameWithOwner
+          ? { repository: headContext.headRepositoryNameWithOwner }
+          : {}),
       });
       const normalizedPullRequests = pullRequests.map(toPullRequestInfo);
 
@@ -941,6 +944,9 @@ export const makeGitManager = Effect.fn("makeGitManager")(function* () {
         headSelector,
         state: "all",
         limit: 20,
+        ...(headContext.headRepositoryNameWithOwner
+          ? { repository: headContext.headRepositoryNameWithOwner }
+          : {}),
       });
 
       for (const pr of pullRequests.map(toPullRequestInfo)) {

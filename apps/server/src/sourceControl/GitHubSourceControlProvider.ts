@@ -103,6 +103,7 @@ export const make = Effect.fn("makeGitHubSourceControlProvider")(function* () {
             cwd: input.cwd,
             headSelector: input.headSelector,
             ...(input.limit !== undefined ? { limit: input.limit } : {}),
+            ...(input.repository !== undefined ? { repository: input.repository } : {}),
           })
           .pipe(
             Effect.map((items) => items.map(toChangeRequest)),
@@ -125,6 +126,7 @@ export const make = Effect.fn("makeGitHubSourceControlProvider")(function* () {
             String(input.limit ?? 20),
             "--json",
             "number,title,url,baseRefName,headRefName,state,mergedAt,updatedAt,isCrossRepository,headRepository,headRepositoryOwner",
+            ...(input.repository ? ["--repo", input.repository] : []),
           ],
         })
         .pipe(

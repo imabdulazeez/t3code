@@ -55,6 +55,7 @@ export interface GitHubCliShape {
     readonly cwd: string;
     readonly headSelector: string;
     readonly limit?: number;
+    readonly repository?: string;
   }) => Effect.Effect<ReadonlyArray<GitHubPullRequestSummary>, GitHubCliError>;
 
   readonly getPullRequest: (input: {
@@ -258,6 +259,7 @@ export const make = Effect.fn("makeGitHubCli")(function* () {
           String(input.limit ?? 1),
           "--json",
           "number,title,url,baseRefName,headRefName,state,mergedAt,isCrossRepository,headRepository,headRepositoryOwner",
+          ...(input.repository ? ["--repo", input.repository] : []),
         ],
       }).pipe(
         Effect.map((result) => result.stdout.trim()),

@@ -58,6 +58,7 @@ export interface SourceControlProviderShape {
     readonly headSelector: string;
     readonly state: ChangeRequestState | "all";
     readonly limit?: number;
+    readonly repository?: string;
   }) => Effect.Effect<ReadonlyArray<ChangeRequest>, SourceControlProviderError>;
   readonly getChangeRequest: (input: {
     readonly cwd: string;
