@@ -17,6 +17,17 @@ function policyInstruction(instruction: string | undefined): ReadonlyArray<strin
   return trimmed ? ["", "Additional instructions:", limitSection(trimmed, 4_000)] : [];
 }
 
+function buildPromptSections(input: {
+  instructions: ReadonlyArray<string>;
+  instructionsOverride: string | undefined;
+  contractLine: string;
+  contextLines: ReadonlyArray<string>;
+}): string {
+  const override = input.instructionsOverride?.trim();
+  const instructionLines = override ? [override] : input.instructions;
+  return [...instructionLines, input.contractLine, ...input.contextLines].join("\n");
+}
+
 // ---------------------------------------------------------------------------
 // Commit message
 // ---------------------------------------------------------------------------
@@ -27,16 +38,14 @@ export interface CommitMessagePromptInput {
   stagedPatch: string;
   includeBranch: boolean;
   policy?: TextGenerationPolicy | undefined;
+  instructionsOverride?: string | undefined;
 }
 
 export function buildCommitMessagePrompt(input: CommitMessagePromptInput) {
   const wantsBranch = input.includeBranch;
 
-  const prompt = [
+  const instructions = [
     "You write concise git commit messages.",
-    wantsBranch
-      ? "Return a JSON object with keys: subject, body, branch."
-      : "Return a JSON object with keys: subject, body.",
     "Rules:",
     "- subject must be imperative, <= 72 chars, and no trailing period",
     "- body can be empty string or short bullet points",
@@ -44,7 +53,14 @@ export function buildCommitMessagePrompt(input: CommitMessagePromptInput) {
       ? ["- branch must be a short semantic git branch fragment for this change"]
       : []),
     "- capture the primary user-visible or developer-visible change",
-    ...policyInstruction(input.policy?.commitInstructions),
+  ];
+
+  const contractLine = wantsBranch
+    ? "Return a JSON object with keys: subject, body, branch."
+    : "Return a JSON object with keys: subject, body.";
+
+  const contextLines = [
+    ...policyInstruction(input.instructionsOverride ? undefined : input.policy?.commitInstructions),
     "",
     `Branch: ${input.branch ?? "(detached)"}`,
     "",
@@ -53,7 +69,14 @@ export function buildCommitMessagePrompt(input: CommitMessagePromptInput) {
     "",
     "Staged patch:",
     limitSection(input.stagedPatch, 40_000),
-  ].join("\n");
+  ];
+
+  const prompt = buildPromptSections({
+    instructions,
+    instructionsOverride: input.instructionsOverride,
+    contractLine,
+    contextLines,
+  });
 
   if (wantsBranch) {
     return {
@@ -86,12 +109,12 @@ export interface PrContentPromptInput {
   diffSummary: string;
   diffPatch: string;
   policy?: TextGenerationPolicy | undefined;
+  instructionsOverride?: string | undefined;
 }
 
 export function buildPrContentPrompt(input: PrContentPromptInput) {
-  const prompt = [
+  const instructions = [
     "You write GitHub pull request content.",
-    "Return a JSON object with keys: title, body.",
     "Rules:",
     "- title should be concise and specific",
     "- body must be markdown and include headings '## Summary' and '## Testing'",
@@ -99,7 +122,14 @@ export function buildPrContentPrompt(input: PrContentPromptInput) {
     "- do NOT serialize the response as a string inside a field; the title and body fields receive their literal values directly",
     "- under Summary, provide short bullet points",
     "- under Testing, include bullet points with concrete checks or 'Not run' where appropriate",
-    ...policyInstruction(input.policy?.changeRequestInstructions),
+  ];
+
+  const contractLine = "Return a JSON object with keys: title, body.";
+
+  const contextLines = [
+    ...policyInstruction(
+      input.instructionsOverride ? undefined : input.policy?.changeRequestInstructions,
+    ),
     "",
     `Base branch: ${input.baseBranch}`,
     `Head branch: ${input.headBranch}`,
@@ -112,7 +142,14 @@ export function buildPrContentPrompt(input: PrContentPromptInput) {
     "",
     "Diff patch:",
     limitSection(input.diffPatch, 40_000),
-  ].join("\n");
+  ];
+
+  const prompt = buildPromptSections({
+    instructions,
+    instructionsOverride: input.instructionsOverride,
+    contractLine,
+    contextLines,
+  });
 
   const outputSchema = Schema.Struct({
     title: Schema.String,
@@ -130,6 +167,7 @@ export interface BranchNamePromptInput {
   message: string;
   attachments?: ReadonlyArray<ChatAttachment> | undefined;
   policy?: TextGenerationPolicy | undefined;
+  instructionsOverride?: string | undefined;
 }
 
 interface PromptFromMessageInput {
@@ -139,6 +177,7 @@ interface PromptFromMessageInput {
   message: string;
   attachments?: ReadonlyArray<ChatAttachment> | undefined;
   additionalInstructions?: string | undefined;
+  instructionsOverride?: string | undefined;
 }
 
 function buildPromptFromMessage(input: PromptFromMessageInput): string {
@@ -146,25 +185,26 @@ function buildPromptFromMessage(input: PromptFromMessageInput): string {
     (attachment) => `- ${attachment.name} (${attachment.mimeType}, ${attachment.sizeBytes} bytes)`,
   );
 
-  const promptSections = [
-    input.instruction,
-    input.responseShape,
-    "Rules:",
-    ...input.rules.map((rule) => `- ${rule}`),
+  const instructions = [input.instruction, "Rules:", ...input.rules.map((rule) => `- ${rule}`)];
+  const contractLine = input.responseShape;
+
+  const contextLines = [
+    ...policyInstruction(input.instructionsOverride ? undefined : input.additionalInstructions),
     "",
     "User message:",
     limitSection(input.message, 8_000),
-    ...policyInstruction(input.additionalInstructions),
   ];
+
   if (attachmentLines.length > 0) {
-    promptSections.push(
-      "",
-      "Attachment metadata:",
-      limitSection(attachmentLines.join("\n"), 4_000),
-    );
+    contextLines.push("", "Attachment metadata:", limitSection(attachmentLines.join("\n"), 4_000));
   }
 
-  return promptSections.join("\n");
+  return buildPromptSections({
+    instructions,
+    instructionsOverride: input.instructionsOverride,
+    contractLine,
+    contextLines,
+  });
 }
 
 export function buildBranchNamePrompt(input: BranchNamePromptInput) {
@@ -180,6 +220,7 @@ export function buildBranchNamePrompt(input: BranchNamePromptInput) {
     message: input.message,
     attachments: input.attachments,
     additionalInstructions: input.policy?.branchInstructions,
+    instructionsOverride: input.instructionsOverride,
   });
   const outputSchema = Schema.Struct({
     branch: Schema.String,

@@ -21,6 +21,8 @@ export interface CommitMessageGenerationInput {
   includeBranch?: boolean;
   /** What model and provider to use for generation. */
   modelSelection: ModelSelection;
+  /** Custom prompt instructions to replace the built-in ones. */
+  instructionsOverride?: string | undefined;
 }
 
 export interface CommitMessageGenerationResult {
@@ -39,6 +41,8 @@ export interface PrContentGenerationInput {
   diffPatch: string;
   /** What model and provider to use for generation. */
   modelSelection: ModelSelection;
+  /** Custom prompt instructions to replace the built-in ones. */
+  instructionsOverride?: string | undefined;
 }
 
 export interface PrContentGenerationResult {
@@ -52,6 +56,8 @@ export interface BranchNameGenerationInput {
   attachments?: ReadonlyArray<ChatAttachment> | undefined;
   /** What model and provider to use for generation. */
   modelSelection: ModelSelection;
+  /** Custom prompt instructions to replace the built-in ones. */
+  instructionsOverride?: string | undefined;
 }
 
 export interface BranchNameGenerationResult {

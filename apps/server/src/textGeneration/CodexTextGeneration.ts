@@ -313,6 +313,7 @@ export const makeCodexTextGeneration = Effect.fn("makeCodexTextGeneration")(func
       stagedSummary: input.stagedSummary,
       stagedPatch: input.stagedPatch,
       includeBranch: input.includeBranch === true,
+      ...(input.instructionsOverride ? { instructionsOverride: input.instructionsOverride } : {}),
     });
 
     const generated = yield* runCodexJson({
@@ -341,6 +342,7 @@ export const makeCodexTextGeneration = Effect.fn("makeCodexTextGeneration")(func
       commitSummary: input.commitSummary,
       diffSummary: input.diffSummary,
       diffPatch: input.diffPatch,
+      ...(input.instructionsOverride ? { instructionsOverride: input.instructionsOverride } : {}),
     });
 
     const generated = yield* runCodexJson({
@@ -367,6 +369,7 @@ export const makeCodexTextGeneration = Effect.fn("makeCodexTextGeneration")(func
     const { prompt, outputSchema } = buildBranchNamePrompt({
       message: input.message,
       attachments: input.attachments,
+      ...(input.instructionsOverride ? { instructionsOverride: input.instructionsOverride } : {}),
     });
 
     const generated = yield* runCodexJson({

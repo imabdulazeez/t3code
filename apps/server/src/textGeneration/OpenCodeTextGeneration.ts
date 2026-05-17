@@ -375,6 +375,7 @@ export const makeOpenCodeTextGeneration = Effect.fn("makeOpenCodeTextGeneration"
       stagedSummary: input.stagedSummary,
       stagedPatch: input.stagedPatch,
       includeBranch: input.includeBranch === true,
+      ...(input.instructionsOverride ? { instructionsOverride: input.instructionsOverride } : {}),
     });
     const generated = yield* runOpenCodeJson({
       operation: "generateCommitMessage",
@@ -402,6 +403,7 @@ export const makeOpenCodeTextGeneration = Effect.fn("makeOpenCodeTextGeneration"
       commitSummary: input.commitSummary,
       diffSummary: input.diffSummary,
       diffPatch: input.diffPatch,
+      ...(input.instructionsOverride ? { instructionsOverride: input.instructionsOverride } : {}),
     });
     const generated = yield* runOpenCodeJson({
       operation: "generatePrContent",
@@ -423,6 +425,7 @@ export const makeOpenCodeTextGeneration = Effect.fn("makeOpenCodeTextGeneration"
     const { prompt, outputSchema } = buildBranchNamePrompt({
       message: input.message,
       attachments: input.attachments,
+      ...(input.instructionsOverride ? { instructionsOverride: input.instructionsOverride } : {}),
     });
     const generated = yield* runOpenCodeJson({
       operation: "generateBranchName",

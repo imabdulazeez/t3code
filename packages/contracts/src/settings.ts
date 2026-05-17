@@ -346,6 +346,34 @@ export type ObservabilitySettings = typeof ObservabilitySettings.Type;
 
 export const DEFAULT_AUTOMATIC_GIT_FETCH_INTERVAL = Duration.seconds(30);
 
+export const DEFAULT_COMMIT_MESSAGE_PROMPT_INSTRUCTIONS = [
+  "You write concise git commit messages.",
+  "Rules:",
+  "- subject must be imperative, <= 72 chars, and no trailing period",
+  "- body can be empty string or short bullet points",
+  "- capture the primary user-visible or developer-visible change",
+].join("\n");
+
+export const DEFAULT_PR_CONTENT_PROMPT_INSTRUCTIONS = [
+  "You write GitHub pull request content.",
+  "Rules:",
+  "- title should be concise and specific",
+  "- body must be markdown and include headings '## Summary' and '## Testing'",
+  "- body must be plain markdown text only — do NOT wrap it in JSON, code fences, or repeat the title/body keys inside the body",
+  "- do NOT serialize the response as a string inside a field; the title and body fields receive their literal values directly",
+  "- under Summary, provide short bullet points",
+  "- under Testing, include bullet points with concrete checks or 'Not run' where appropriate",
+].join("\n");
+
+export const DEFAULT_BRANCH_NAME_PROMPT_INSTRUCTIONS = [
+  "You generate concise git branch names.",
+  "Rules:",
+  "- Branch should describe the requested work from the user message.",
+  "- Keep it short and specific (2-6 words).",
+  "- Use plain words only, no issue prefixes and no punctuation-heavy text.",
+  "- If images are attached, use them as primary context for visual/UI issues.",
+].join("\n");
+
 export const ServerSettings = Schema.Struct({
   enableAssistantStreaming: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   automaticGitFetchInterval: Schema.DurationFromMillis.pipe(
@@ -357,6 +385,11 @@ export const ServerSettings = Schema.Struct({
     Schema.withDecodingDefault(Effect.succeed("local" as const satisfies ThreadEnvMode)),
   ),
   addProjectBaseDirectory: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
+  commitMessagePromptInstructions: TrimmedString.pipe(
+    Schema.withDecodingDefault(Effect.succeed("")),
+  ),
+  prContentPromptInstructions: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
+  branchNamePromptInstructions: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
   textGenerationModelSelection: ModelSelection.pipe(
     Schema.withDecodingDefault(
       Effect.succeed({
@@ -458,6 +491,9 @@ export const ServerSettingsPatch = Schema.Struct({
   automaticGitFetchInterval: Schema.optionalKey(Schema.DurationFromMillis),
   defaultThreadEnvMode: Schema.optionalKey(ThreadEnvMode),
   addProjectBaseDirectory: Schema.optionalKey(TrimmedString),
+  commitMessagePromptInstructions: Schema.optionalKey(TrimmedString),
+  prContentPromptInstructions: Schema.optionalKey(TrimmedString),
+  branchNamePromptInstructions: Schema.optionalKey(TrimmedString),
   textGenerationModelSelection: Schema.optionalKey(ModelSelectionPatch),
   observability: Schema.optionalKey(
     Schema.Struct({

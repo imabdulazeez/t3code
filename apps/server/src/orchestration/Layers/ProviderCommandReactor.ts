@@ -593,7 +593,7 @@ const make = Effect.gen(function* () {
     const cwd = input.worktreePath;
     const attachments = input.attachments ?? [];
     yield* Effect.gen(function* () {
-      const { textGenerationModelSelection: modelSelection } =
+      const { textGenerationModelSelection: modelSelection, branchNamePromptInstructions } =
         yield* serverSettingsService.getSettings;
 
       const generated = yield* textGeneration.generateBranchName({
@@ -601,6 +601,9 @@ const make = Effect.gen(function* () {
         message: input.messageText,
         ...(attachments.length > 0 ? { attachments } : {}),
         modelSelection,
+        ...(branchNamePromptInstructions.length > 0
+          ? { instructionsOverride: branchNamePromptInstructions }
+          : {}),
       });
       if (!generated) return;
 

@@ -1120,6 +1120,16 @@ export const makeGitManager = Effect.fn("makeGitManager")(function* () {
         };
       }
 
+      const { commitMessagePromptInstructions } = yield* serverSettingsService.getSettings.pipe(
+        Effect.mapError((cause) =>
+          gitManagerError(
+            "resolveCommitAndBranchSuggestion",
+            "Failed to get server settings.",
+            cause,
+          ),
+        ),
+      );
+
       const generated = yield* textGeneration
         .generateCommitMessage({
           cwd: input.cwd,
@@ -1128,6 +1138,9 @@ export const makeGitManager = Effect.fn("makeGitManager")(function* () {
           stagedPatch: limitContext(context.stagedPatch, 50_000),
           ...(input.includeBranch ? { includeBranch: true } : {}),
           modelSelection: input.modelSelection,
+          ...(commitMessagePromptInstructions.length > 0
+            ? { instructionsOverride: commitMessagePromptInstructions }
+            : {}),
         })
         .pipe(Effect.map((result) => sanitizeCommitMessage(result)));
 
@@ -1301,6 +1314,12 @@ export const makeGitManager = Effect.fn("makeGitManager")(function* () {
     });
     const rangeContext = yield* gitCore.readRangeContext(cwd, baseBranch);
 
+    const { prContentPromptInstructions } = yield* serverSettingsService.getSettings.pipe(
+      Effect.mapError((cause) =>
+        gitManagerError("runPrStep", "Failed to get server settings.", cause),
+      ),
+    );
+
     const generated = yield* textGeneration.generatePrContent({
       cwd,
       baseBranch,
@@ -1309,6 +1328,9 @@ export const makeGitManager = Effect.fn("makeGitManager")(function* () {
       diffSummary: limitContext(rangeContext.diffSummary, 20_000),
       diffPatch: limitContext(rangeContext.diffPatch, 60_000),
       modelSelection,
+      ...(prContentPromptInstructions.length > 0
+        ? { instructionsOverride: prContentPromptInstructions }
+        : {}),
     });
 
     const bodyFile = path.join(tempDir, `t3code-pr-body-${process.pid}-${randomUUID()}.md`);
