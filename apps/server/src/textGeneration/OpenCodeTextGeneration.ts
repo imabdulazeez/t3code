@@ -11,7 +11,7 @@ import {
   type ModelSelection,
   type OpenCodeSettings,
 } from "@t3tools/contracts";
-import { sanitizeBranchFragment, sanitizeFeatureBranchName } from "@t3tools/shared/git";
+import { sanitizeBranchFragment } from "@t3tools/shared/git";
 import { getModelSelectionStringOptionValue } from "@t3tools/shared/model";
 import { extractJsonObject } from "@t3tools/shared/schemaJson";
 
@@ -389,7 +389,7 @@ export const makeOpenCodeTextGeneration = Effect.fn("makeOpenCodeTextGeneration"
       subject: sanitizeCommitSubject(generated.subject),
       body: generated.body.trim(),
       ...("branch" in generated && typeof generated.branch === "string"
-        ? { branch: sanitizeFeatureBranchName(generated.branch) }
+        ? { branch: sanitizeBranchFragment(generated.branch) }
         : {}),
     };
   });

@@ -1103,22 +1103,22 @@ describe("resolveLiveThreadBranchUpdate", () => {
 });
 
 describe("resolveAutoFeatureBranchName", () => {
-  it("uses semantic preferred ref names when available", () => {
+  it("uses sanitized preferred ref names without forcing a prefix", () => {
     const ref = resolveAutoFeatureBranchName(["main", "feature/other"], "fix toast copy");
-    assert.equal(ref, "feature/fix-toast-copy");
+    assert.equal(ref, "fix-toast-copy");
   });
 
-  it("normalizes preferred names that already include a ref namespace", () => {
+  it("preserves model-chosen ref namespaces like feature/, chore/, or fix/", () => {
     const ref = resolveAutoFeatureBranchName(["main"], "feature/refine-toolbar-actions");
     assert.equal(ref, "feature/refine-toolbar-actions");
   });
 
   it("increments suffix when the preferred ref name already exists", () => {
     const ref = resolveAutoFeatureBranchName(
-      ["main", "feature/fix-toast-copy", "feature/fix-toast-copy-2"],
+      ["main", "fix-toast-copy", "fix-toast-copy-2"],
       "fix toast copy",
     );
-    assert.equal(ref, "feature/fix-toast-copy-3");
+    assert.equal(ref, "fix-toast-copy-3");
   });
 
   it("treats existing ref names as case-insensitive for collision checks", () => {

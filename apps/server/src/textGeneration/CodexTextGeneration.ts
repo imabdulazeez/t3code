@@ -9,7 +9,7 @@ import * as Stream from "effect/Stream";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 import { type CodexSettings, type ModelSelection } from "@t3tools/contracts";
-import { sanitizeBranchFragment, sanitizeFeatureBranchName } from "@t3tools/shared/git";
+import { sanitizeBranchFragment } from "@t3tools/shared/git";
 
 import { resolveAttachmentPath } from "../attachmentStore.ts";
 import { ServerConfig } from "../config.ts";
@@ -328,7 +328,7 @@ export const makeCodexTextGeneration = Effect.fn("makeCodexTextGeneration")(func
       subject: sanitizeCommitSubject(generated.subject),
       body: generated.body.trim(),
       ...("branch" in generated && typeof generated.branch === "string"
-        ? { branch: sanitizeFeatureBranchName(generated.branch) }
+        ? { branch: sanitizeBranchFragment(generated.branch) }
         : {}),
     };
   });
