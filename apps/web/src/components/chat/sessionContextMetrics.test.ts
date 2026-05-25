@@ -138,11 +138,30 @@ describe("sessionContextMetrics", () => {
     expect(metrics.output).toBe(300);
     expect(metrics.reasoning).toBe(50);
     expect(metrics.cacheRead).toBe(100);
-    expect(metrics.cacheWrite).toBeNull();
-    expect(metrics.total).toBe(950);
+    expect(metrics.total).toBe(1500);
     expect(metrics.limit).toBe(10_000);
     expect(metrics.usage).toBe(15);
     expect(metrics.lastActivityAt).toBe("2026-01-01T00:00:10Z");
+  });
+
+  it("falls back to cumulative token fields when last* fields are absent", () => {
+    const thread = makeThread({
+      activities: [
+        makeContextWindowActivity({
+          usedTokens: 50_000,
+          maxTokens: 200_000,
+          inputTokens: 30_000,
+          outputTokens: 15_000,
+          cachedInputTokens: 4_500,
+        }),
+      ],
+    });
+    const metrics = getSessionContextMetrics(thread, [makeProvider()]);
+    expect(metrics.input).toBe(30_000);
+    expect(metrics.output).toBe(15_000);
+    expect(metrics.cacheRead).toBe(4_500);
+    expect(metrics.total).toBe(50_000);
+    expect(metrics.usage).toBe(25);
   });
 
   it("returns null token fields when no snapshot exists", () => {

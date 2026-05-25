@@ -159,8 +159,8 @@ function StatsGrid({
   metrics: SessionContextMetrics;
   formatter: ReturnType<typeof createSessionContextFormatter>;
 }) {
-  const entries: Array<{ label: string; value: string }> = [
-    { label: "Session", value: metrics.sessionTitle || "—" },
+  const rawEntries: Array<{ label: string; value: string }> = [
+    { label: "Session", value: metrics.sessionTitle },
     { label: "Messages", value: formatter.number(metrics.messageCount) },
     { label: "Provider", value: metrics.providerLabel },
     { label: "Model", value: metrics.modelLabel },
@@ -171,12 +171,17 @@ function StatsGrid({
     { label: "Output", value: formatter.number(metrics.output) },
     { label: "Reasoning", value: formatter.number(metrics.reasoning) },
     { label: "Cache Read", value: formatter.number(metrics.cacheRead) },
-    { label: "Cache Write", value: formatter.number(metrics.cacheWrite) },
     { label: "User Messages", value: formatter.number(metrics.userMessageCount) },
     { label: "Assistant Messages", value: formatter.number(metrics.assistantMessageCount) },
     { label: "Session Created", value: formatter.time(metrics.sessionCreatedAt) },
     { label: "Last Activity", value: formatter.time(metrics.lastActivityAt) },
   ];
+  const entries = rawEntries.filter((entry) => {
+    const trimmed = entry.value.trim();
+    if (trimmed.length === 0 || trimmed === "—") return false;
+    if (trimmed === "0" || trimmed === "0%") return false;
+    return true;
+  });
 
   return (
     <section aria-label="Session statistics">

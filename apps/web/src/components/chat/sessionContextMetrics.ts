@@ -11,7 +11,6 @@ export interface SessionContextMetrics {
   output: number | null;
   reasoning: number | null;
   cacheRead: number | null;
-  cacheWrite: number | null;
   total: number | null;
   usage: number | null;
   userMessageCount: number;
@@ -37,20 +36,18 @@ export function getSessionContextMetrics(
     provider?.displayName?.trim() || provider?.driver || thread.modelSelection.instanceId;
   const modelLabel = model?.name?.trim() || modelSlug;
 
-  const input = snapshot?.lastInputTokens ?? null;
-  const output = snapshot?.lastOutputTokens ?? null;
-  const reasoning = snapshot?.lastReasoningOutputTokens ?? null;
-  const cacheRead = snapshot?.lastCachedInputTokens ?? null;
-  const cacheWrite: number | null = null;
-
-  const hasAnyToken =
-    input !== null || output !== null || reasoning !== null || cacheRead !== null;
-  const total = hasAnyToken
-    ? (input ?? 0) + (output ?? 0) + (reasoning ?? 0) + (cacheRead ?? 0)
-    : null;
+  const input = snapshot?.lastInputTokens ?? snapshot?.inputTokens ?? null;
+  const output = snapshot?.lastOutputTokens ?? snapshot?.outputTokens ?? null;
+  const reasoning = snapshot?.lastReasoningOutputTokens ?? snapshot?.reasoningOutputTokens ?? null;
+  const cacheRead = snapshot?.lastCachedInputTokens ?? snapshot?.cachedInputTokens ?? null;
 
   const limit = snapshot?.maxTokens ?? null;
   const usedTokens = snapshot?.usedTokens ?? null;
+  const hasAnyToken =
+    input !== null || output !== null || reasoning !== null || cacheRead !== null;
+  const total =
+    usedTokens ??
+    (hasAnyToken ? (input ?? 0) + (output ?? 0) + (reasoning ?? 0) + (cacheRead ?? 0) : null);
   const usage =
     limit !== null && limit > 0 && usedTokens !== null && usedTokens > 0
       ? Math.round((usedTokens / limit) * 100)
@@ -76,7 +73,6 @@ export function getSessionContextMetrics(
     output,
     reasoning,
     cacheRead,
-    cacheWrite,
     total,
     usage,
     userMessageCount,
