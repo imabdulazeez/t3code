@@ -953,8 +953,11 @@ export default function GitActionsControl({
 }: GitActionsControlProps) {
   const activeEnvironmentId = activeThreadRef?.environmentId ?? null;
   const threadToastData = useMemo(
-    () => (activeThreadRef ? { threadRef: activeThreadRef } : undefined),
-    [activeThreadRef],
+    () =>
+      activeEnvironmentId && gitCwd
+        ? { projectRef: { environmentId: activeEnvironmentId, cwd: gitCwd } }
+        : undefined,
+    [activeEnvironmentId, gitCwd],
   );
   const activeServerThreadSelector = useMemo(
     () => createThreadSelectorByRef(activeThreadRef),

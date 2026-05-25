@@ -1,4 +1,4 @@
-import type { ScopedThreadRef, ThreadId } from "@t3tools/contracts";
+import type { EnvironmentId, ScopedThreadRef, ThreadId } from "@t3tools/contracts";
 
 export function shouldHideCollapsedToastContent(
   visibleToastIndex: number,
@@ -94,10 +94,21 @@ export function shouldRenderThreadScopedToast(
     | {
         threadRef?: ScopedThreadRef | null;
         threadId?: ThreadId | null;
+        projectRef?: { environmentId: EnvironmentId; cwd: string } | null;
       }
     | undefined,
   activeThreadRef: ScopedThreadRef | null,
+  activeProjectRef?: { environmentId: EnvironmentId; cwd: string } | null,
 ): boolean {
+  if (data?.projectRef) {
+    return (
+      activeProjectRef !== null &&
+      activeProjectRef !== undefined &&
+      data.projectRef.environmentId === activeProjectRef.environmentId &&
+      data.projectRef.cwd === activeProjectRef.cwd
+    );
+  }
+
   if (data?.threadRef) {
     return (
       activeThreadRef !== null &&

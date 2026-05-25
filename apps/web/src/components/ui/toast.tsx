@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { useParams } from "@tanstack/react-router";
-import { type ScopedThreadRef, type ThreadId } from "@t3tools/contracts";
+import { type EnvironmentId, type ScopedThreadRef, type ThreadId } from "@t3tools/contracts";
 import {
   CheckIcon,
   ChevronDownIcon,
@@ -30,6 +30,8 @@ import { buttonVariants } from "~/components/ui/button";
 import { useComposerDraftStore } from "~/composerDraftStore";
 import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
 import { resolveThreadRouteTarget } from "~/threadRoutes";
+import { useStore } from "~/store";
+import { createProjectSelectorByRef, createThreadSelectorByRef } from "~/storeSelectors";
 import {
   buildVisibleToastLayout,
   shouldHideCollapsedToastContent,
@@ -39,6 +41,7 @@ import {
 export type ThreadToastData = {
   threadRef?: ScopedThreadRef | null;
   threadId?: ThreadId | null;
+  projectRef?: { environmentId: EnvironmentId; cwd: string } | null;
   leadingIcon?: ReactNode;
   tooltipStyle?: boolean;
   onClose?: (() => void) | undefined;
@@ -504,9 +507,29 @@ function ToastProvider({ children, position = "top-right", ...props }: ToastProv
 function Toasts({ position = "top-right" }: { position: ToastPosition }) {
   const { toasts } = Toast.useToastManager<ThreadToastData>();
   const activeThreadRef = useActiveThreadRefFromRoute();
+  const activeThreadSelector = useMemo(
+    () => createThreadSelectorByRef(activeThreadRef),
+    [activeThreadRef],
+  );
+  const activeThread = useStore(activeThreadSelector);
+  const activeProjectSelector = useMemo(
+    () =>
+      createProjectSelectorByRef(
+        activeThread
+          ? { environmentId: activeThread.environmentId, projectId: activeThread.projectId }
+          : null,
+      ),
+    [activeThread],
+  );
+  const activeProject = useStore(activeProjectSelector);
+  const activeProjectRef = useMemo(
+    () =>
+      activeProject ? { environmentId: activeProject.environmentId, cwd: activeProject.cwd } : null,
+    [activeProject],
+  );
   const isTop = position.startsWith("top");
   const visibleToasts = toasts.filter((toast) =>
-    shouldRenderThreadScopedToast(toast.data, activeThreadRef),
+    shouldRenderThreadScopedToast(toast.data, activeThreadRef, activeProjectRef),
   );
   const visibleToastLayout = buildVisibleToastLayout(visibleToasts);
 
@@ -677,12 +700,34 @@ function AnchoredToastProvider({ children, ...props }: Toast.Provider.Props) {
 function AnchoredToasts() {
   const { toasts } = Toast.useToastManager<ThreadToastData>();
   const activeThreadRef = useActiveThreadRefFromRoute();
+  const activeThreadSelector = useMemo(
+    () => createThreadSelectorByRef(activeThreadRef),
+    [activeThreadRef],
+  );
+  const activeThread = useStore(activeThreadSelector);
+  const activeProjectSelector = useMemo(
+    () =>
+      createProjectSelectorByRef(
+        activeThread
+          ? { environmentId: activeThread.environmentId, projectId: activeThread.projectId }
+          : null,
+      ),
+    [activeThread],
+  );
+  const activeProject = useStore(activeProjectSelector);
+  const activeProjectRef = useMemo(
+    () =>
+      activeProject ? { environmentId: activeProject.environmentId, cwd: activeProject.cwd } : null,
+    [activeProject],
+  );
 
   return (
     <Toast.Portal data-slot="toast-portal-anchored">
       <Toast.Viewport className="outline-none" data-slot="toast-viewport-anchored">
         {toasts
-          .filter((toast) => shouldRenderThreadScopedToast(toast.data, activeThreadRef))
+          .filter((toast) =>
+            shouldRenderThreadScopedToast(toast.data, activeThreadRef, activeProjectRef),
+          )
           .map((toast) => {
             const tooltipStyle = toast.data?.tooltipStyle ?? false;
             const positionerProps = toast.positionerProps;
