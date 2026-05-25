@@ -330,10 +330,16 @@ const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryActions(
   onImplementPlanInNewThread: () => void;
   onImplementPlanInNewThreadDraft: () => void;
   onRevertPlan?: () => void;
+  onOpenContextTab?: () => void;
 }) {
   return (
     <>
-      {props.activeContextWindow ? <ContextWindowMeter usage={props.activeContextWindow} /> : null}
+      {props.activeContextWindow && props.onOpenContextTab ? (
+        <ContextWindowMeter
+          usage={props.activeContextWindow}
+          onOpenContextTab={props.onOpenContextTab}
+        />
+      ) : null}
       {props.isPreparingWorktree ? (
         <span className="text-muted-foreground/70 text-xs">Preparing worktree...</span>
       ) : null}
@@ -519,6 +525,7 @@ export interface ChatComposerProps {
   scheduleComposerFocus: () => void;
   setThreadError: (threadId: ThreadId | null, error: string | null) => void;
   onExpandImage: (preview: ExpandedImagePreview) => void;
+  onOpenContextTab?: () => void;
 }
 
 // --------------------------------------------------------------------------
@@ -598,6 +605,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     scheduleComposerFocus,
     setThreadError,
     onExpandImage,
+    onOpenContextTab,
   } = props;
 
   // ------------------------------------------------------------------
@@ -2470,6 +2478,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   onImplementPlanInNewThread={handleImplementPlanInNewThreadPrimaryAction}
                   onImplementPlanInNewThreadDraft={handleImplementPlanInNewThreadDraftPrimaryAction}
                   onRevertPlan={onRevertPlan}
+                  {...(onOpenContextTab ? { onOpenContextTab } : {})}
                 />
               </div>
             </div>
