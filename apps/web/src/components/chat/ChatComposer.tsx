@@ -310,10 +310,10 @@ const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryActions(
 }) {
   return (
     <>
-      {props.activeContextWindow ? (
+      {props.activeContextWindow && props.onOpenContextTab ? (
         <ContextWindowMeter
           usage={props.activeContextWindow}
-          {...(props.onOpenContextTab ? { onOpenContextTab: props.onOpenContextTab } : {})}
+          onOpenContextTab={props.onOpenContextTab}
         />
       ) : null}
       {props.isPreparingWorktree ? (

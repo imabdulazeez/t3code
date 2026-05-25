@@ -2,11 +2,7 @@ import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { BarChart3, ChevronDown, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "~/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "~/components/ui/collapsible";
 import { useServerProviders } from "~/rpc/serverState";
 import { useStore } from "~/store";
 import { createThreadSelectorByRef } from "~/storeSelectors";
@@ -19,10 +15,7 @@ import {
   type SessionContextBreakdownSegment,
 } from "./sessionContextBreakdown";
 import { createSessionContextFormatter } from "./sessionContextFormat";
-import {
-  getSessionContextMetrics,
-  type SessionContextMetrics,
-} from "./sessionContextMetrics";
+import { getSessionContextMetrics, type SessionContextMetrics } from "./sessionContextMetrics";
 
 const SEGMENT_COLORS: Record<SessionContextBreakdownKey, string> = {
   system: "bg-amber-500",
@@ -48,15 +41,8 @@ interface SessionContextTabProps {
   onClose: () => void;
 }
 
-export function SessionContextTab({
-  environmentId,
-  threadId,
-  onClose,
-}: SessionContextTabProps) {
-  const threadRef = useMemo(
-    () => ({ environmentId, threadId }),
-    [environmentId, threadId],
-  );
+export function SessionContextTab({ environmentId, threadId, onClose }: SessionContextTabProps) {
+  const threadRef = useMemo(() => ({ environmentId, threadId }), [environmentId, threadId]);
   const thread = useStore(useMemo(() => createThreadSelectorByRef(threadRef), [threadRef]));
   const providers = useServerProviders();
 
@@ -138,7 +124,7 @@ function SessionContextTabHeader({ onClose }: { onClose: () => void }) {
     <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-border px-4">
       <div className="flex min-w-0 items-center gap-2">
         <BarChart3 className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-        <span className="truncate text-sm font-medium text-foreground">Context</span>
+        <span className="truncate text-sm font-medium text-foreground">Context Usage</span>
       </div>
       <button
         type="button"
@@ -166,6 +152,7 @@ function StatsGrid({
     { label: "Model", value: metrics.modelLabel },
     { label: "Context Limit", value: formatter.number(metrics.limit) },
     { label: "Total Tokens", value: formatter.number(metrics.total) },
+    { label: "Total Processed", value: formatter.number(metrics.totalProcessedTokens) },
     { label: "Usage", value: formatter.percent(metrics.usage) },
     { label: "Input", value: formatter.number(metrics.input) },
     { label: "Output", value: formatter.number(metrics.output) },
@@ -194,15 +181,17 @@ function StatsGrid({
             <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
               {entry.label}
             </span>
-            <span
-              className="truncate text-sm font-medium text-foreground"
-              title={entry.value}
-            >
+            <span className="truncate text-sm font-medium text-foreground" title={entry.value}>
               {entry.value}
             </span>
           </div>
         ))}
       </div>
+      {metrics.compactsAutomatically ? (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Automatically compacts its context when needed.
+        </p>
+      ) : null}
     </section>
   );
 }
@@ -220,9 +209,7 @@ function BreakdownSection({
         Breakdown
       </h3>
       {segments.length === 0 ? (
-        <p className="text-xs text-muted-foreground">
-          Not enough data to compute a breakdown yet.
-        </p>
+        <p className="text-xs text-muted-foreground">Not enough data to compute a breakdown yet.</p>
       ) : (
         <>
           <div

@@ -12,6 +12,8 @@ export interface SessionContextMetrics {
   reasoning: number | null;
   cacheRead: number | null;
   total: number | null;
+  totalProcessedTokens: number | null;
+  compactsAutomatically: boolean;
   usage: number | null;
   userMessageCount: number;
   assistantMessageCount: number;
@@ -74,6 +76,8 @@ export function getSessionContextMetrics(
     reasoning,
     cacheRead,
     total,
+    totalProcessedTokens: snapshot?.totalProcessedTokens ?? null,
+    compactsAutomatically: snapshot?.compactsAutomatically ?? false,
     usage,
     userMessageCount,
     assistantMessageCount,
