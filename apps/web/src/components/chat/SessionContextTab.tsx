@@ -283,7 +283,7 @@ function RawMessagesSection({
                       className="group flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-xs"
                     >
                       <ChevronDown
-                        className="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-[panel-open]:rotate-180"
+                        className="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-panel-open:rotate-180"
                         aria-hidden
                       />
                       <span className="font-medium uppercase tracking-[0.06em] text-muted-foreground">

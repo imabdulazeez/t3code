@@ -62,7 +62,7 @@ export function ContextWindowMeter(props: {
         </svg>
         <span
           className={cn(
-            "relative flex h-[15px] w-[15px] items-center justify-center rounded-full bg-background text-[8px] font-medium transition-colors group-hover/meter:bg-accent",
+            "relative flex h-3.75 w-3.75 items-center justify-center rounded-full bg-background text-[8px] font-medium transition-colors group-hover/meter:bg-accent",
             "text-muted-foreground",
           )}
         >
