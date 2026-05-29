@@ -14,6 +14,8 @@ import {
 } from "../Services/ThreadDeletionReactor.ts";
 
 type ThreadDeletedEvent = Extract<OrchestrationEvent, { type: "thread.deleted" }>;
+type ProjectDeletedEvent = Extract<OrchestrationEvent, { type: "project.deleted" }>;
+type CleanupEvent = ThreadDeletedEvent | ProjectDeletedEvent;
 
 export const logCleanupCauseUnlessInterrupted = <R, E>({
   effect,
@@ -50,39 +52,55 @@ const make = Effect.gen(function* () {
 
   const closeThreadTerminals = (threadId: ThreadDeletedEvent["payload"]["threadId"]) =>
     logCleanupCauseUnlessInterrupted({
-      effect: terminalManager.close({ threadId, deleteHistory: true }),
+      effect: terminalManager.close({
+        owner: { type: "thread", threadId },
+        deleteHistory: true,
+      }),
       message: "thread deletion cleanup skipped terminal close",
       threadId,
     });
 
-  const processThreadDeleted = Effect.fn("processThreadDeleted")(function* (
-    event: ThreadDeletedEvent,
-  ) {
-    const { threadId } = event.payload;
-    yield* stopProviderSession(threadId);
-    yield* closeThreadTerminals(threadId);
+  const closeProjectTerminals = (projectId: ProjectDeletedEvent["payload"]["projectId"]) =>
+    terminalManager.close({ owner: { type: "project", projectId }, deleteHistory: true }).pipe(
+      Effect.catchCause((cause) => {
+        if (Cause.hasInterruptsOnly(cause)) {
+          return Effect.failCause(cause);
+        }
+        return Effect.logDebug("project deletion cleanup skipped terminal close", {
+          projectId,
+          cause: Cause.pretty(cause),
+        });
+      }),
+    );
+
+  const processCleanupEvent = Effect.fn("processCleanupEvent")(function* (event: CleanupEvent) {
+    if (event.type === "thread.deleted") {
+      yield* stopProviderSession(event.payload.threadId);
+      yield* closeThreadTerminals(event.payload.threadId);
+      return;
+    }
+    yield* closeProjectTerminals(event.payload.projectId);
   });
 
-  const processThreadDeletedSafely = (event: ThreadDeletedEvent) =>
-    processThreadDeleted(event).pipe(
+  const processCleanupEventSafely = (event: CleanupEvent) =>
+    processCleanupEvent(event).pipe(
       Effect.catchCause((cause) => {
         if (Cause.hasInterruptsOnly(cause)) {
           return Effect.failCause(cause);
         }
         return Effect.logWarning("thread deletion reactor failed to process event", {
           eventType: event.type,
-          threadId: event.payload.threadId,
           cause: Cause.pretty(cause),
         });
       }),
     );
 
-  const worker = yield* makeDrainableWorker(processThreadDeletedSafely);
+  const worker = yield* makeDrainableWorker(processCleanupEventSafely);
 
   const start: ThreadDeletionReactorShape["start"] = Effect.fn("start")(function* () {
     yield* Effect.forkScoped(
       Stream.runForEach(orchestrationEngine.streamDomainEvents, (event) => {
-        if (event.type !== "thread.deleted") {
+        if (event.type !== "thread.deleted" && event.type !== "project.deleted") {
           return Effect.void;
         }
         return worker.enqueue(event);

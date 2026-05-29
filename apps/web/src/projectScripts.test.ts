@@ -34,6 +34,7 @@ describe("projectScripts helpers", () => {
         command: "bun install",
         icon: "configure" as const,
         runOnWorktreeCreate: true,
+        defaultScope: "chat" as const,
       },
       {
         id: "test",
@@ -41,6 +42,7 @@ describe("projectScripts helpers", () => {
         command: "bun test",
         icon: "test" as const,
         runOnWorktreeCreate: false,
+        defaultScope: "chat" as const,
       },
     ];
 

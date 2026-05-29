@@ -6,6 +6,7 @@ import {
   type OrchestrationEvent,
   type OrchestrationShellSnapshot,
   type OrchestrationShellStreamEvent,
+  ProjectId,
   type ServerConfig,
   type TerminalEvent,
   ThreadId,
@@ -15,9 +16,14 @@ import { Throttler } from "@tanstack/react-pacer";
 import {
   createKnownEnvironment,
   getKnownEnvironmentWsBaseUrl,
+  parseScopedThreadKey,
+  projectTerminalOwnerRef,
   scopedThreadKey,
   scopeProjectRef,
   scopeThreadRef,
+  terminalOwnerKey,
+  type TerminalOwnerRef,
+  threadTerminalOwnerRef,
 } from "@t3tools/client-runtime";
 
 import {
@@ -26,7 +32,7 @@ import {
   useComposerDraftStore,
 } from "~/composerDraftStore";
 import { ensureLocalApi } from "~/localApi";
-import { collectActiveTerminalThreadIds } from "~/lib/terminalStateCleanup";
+import { collectActiveTerminalOwnerKeys } from "~/lib/terminalStateCleanup";
 import { deriveOrchestrationBatchEffects } from "~/orchestrationEventEffects";
 import { projectQueryKeys } from "~/lib/projectReactQuery";
 import { providerQueryKeys } from "~/lib/providerReactQuery";
@@ -56,6 +62,7 @@ import {
 import { createEnvironmentConnection, type EnvironmentConnection } from "./connection";
 import {
   useStore,
+  selectProjectByRef,
   selectProjectsAcrossEnvironments,
   selectSidebarThreadSummaryByRef,
   selectThreadByRef,
@@ -932,15 +939,28 @@ function reconcileSnapshotDerivedState() {
   syncThreadUiFromStore();
 
   const threads = selectThreadsAcrossEnvironments(useStore.getState());
-  const activeThreadKeys = collectActiveTerminalThreadIds({
+  const projects = selectProjectsAcrossEnvironments(useStore.getState());
+  const draftThreadOwnerKeys: string[] = [];
+  for (const draftThreadKey of useComposerDraftStore.getState().listDraftThreadKeys()) {
+    const parsed = parseScopedThreadKey(draftThreadKey);
+    if (parsed) {
+      draftThreadOwnerKeys.push(
+        terminalOwnerKey(threadTerminalOwnerRef(parsed.environmentId, parsed.threadId)),
+      );
+    }
+  }
+  const activeOwnerKeys = collectActiveTerminalOwnerKeys({
     snapshotThreads: threads.map((thread) => ({
-      key: scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
+      ownerKey: terminalOwnerKey(threadTerminalOwnerRef(thread.environmentId, thread.id)),
       deletedAt: null,
       archivedAt: thread.archivedAt,
     })),
-    draftThreadKeys: useComposerDraftStore.getState().listDraftThreadKeys(),
+    draftThreadOwnerKeys,
+    projectOwnerKeys: projects.map((project) =>
+      terminalOwnerKey(projectTerminalOwnerRef(project.environmentId, project.id)),
+    ),
   });
-  useTerminalStateStore.getState().removeOrphanedTerminalStates(activeThreadKeys);
+  useTerminalStateStore.getState().removeOrphanedTerminalStates(activeOwnerKeys);
 }
 
 export function shouldApplyTerminalEvent(input: {
@@ -1015,10 +1035,15 @@ function applyRecoveredEventBatch(
   for (const event of events) {
     if (event.type === "project.deleted") {
       draftStore.clearProjectDraftThreadId(scopeProjectRef(environmentId, event.payload.projectId));
+      useTerminalStateStore
+        .getState()
+        .removeTerminalState(projectTerminalOwnerRef(environmentId, event.payload.projectId));
     }
   }
   for (const threadId of batchEffects.removeTerminalStateThreadIds) {
-    useTerminalStateStore.getState().removeTerminalState(scopeThreadRef(environmentId, threadId));
+    useTerminalStateStore
+      .getState()
+      .removeTerminalState(threadTerminalOwnerRef(environmentId, threadId));
   }
 
   reconcileThreadDetailSubscriptionEvictionForEnvironment(environmentId);
@@ -1064,7 +1089,9 @@ function applyShellEvent(event: OrchestrationShellStreamEvent, environmentId: En
         markPromotedDraftThreadByRef(threadRef);
       }
       if (previousThread?.archivedAt === null && event.thread.archivedAt !== null && threadRef) {
-        useTerminalStateStore.getState().removeTerminalState(threadRef);
+        useTerminalStateStore
+          .getState()
+          .removeTerminalState(threadTerminalOwnerRef(threadRef.environmentId, threadRef.threadId));
       }
       reconcileThreadDetailSubscriptionEvictionForThread(environmentId, event.thread.id);
       evictIdleThreadDetailSubscriptionsToCapacity();
@@ -1074,7 +1101,9 @@ function applyShellEvent(event: OrchestrationShellStreamEvent, environmentId: En
         disposeThreadDetailSubscriptionByKey(scopedThreadKey(threadRef));
         useComposerDraftStore.getState().clearDraftThread(threadRef);
         useUiStateStore.getState().clearThreadUi(scopedThreadKey(threadRef));
-        useTerminalStateStore.getState().removeTerminalState(threadRef);
+        useTerminalStateStore
+          .getState()
+          .removeTerminalState(threadTerminalOwnerRef(threadRef.environmentId, threadRef.threadId));
       }
       syncThreadUiFromStore();
       return;
@@ -1104,19 +1133,30 @@ function createEnvironmentConnectionHandlers() {
       reconcileSnapshotDerivedState();
     },
     applyTerminalEvent: (event: TerminalEvent, environmentId: EnvironmentId) => {
-      const threadRef = scopeThreadRef(environmentId, ThreadId.make(event.threadId));
-      const serverThread = selectThreadByRef(useStore.getState(), threadRef);
-      const hasDraftThread =
-        useComposerDraftStore.getState().getDraftThreadByRef(threadRef) !== null;
-      if (
-        !shouldApplyTerminalEvent({
-          serverThreadArchivedAt: serverThread?.archivedAt,
-          hasDraftThread,
-        })
-      ) {
-        return;
+      const owner = event.owner;
+      let ownerRef: TerminalOwnerRef;
+      if (owner.type === "thread") {
+        const threadRef = scopeThreadRef(environmentId, ThreadId.make(owner.threadId));
+        const serverThread = selectThreadByRef(useStore.getState(), threadRef);
+        const hasDraftThread =
+          useComposerDraftStore.getState().getDraftThreadByRef(threadRef) !== null;
+        if (
+          !shouldApplyTerminalEvent({
+            serverThreadArchivedAt: serverThread?.archivedAt,
+            hasDraftThread,
+          })
+        ) {
+          return;
+        }
+        ownerRef = threadTerminalOwnerRef(environmentId, ThreadId.make(owner.threadId));
+      } else {
+        const projectRef = scopeProjectRef(environmentId, ProjectId.make(owner.projectId));
+        if (!selectProjectByRef(useStore.getState(), projectRef)) {
+          return;
+        }
+        ownerRef = projectTerminalOwnerRef(environmentId, ProjectId.make(owner.projectId));
       }
-      useTerminalStateStore.getState().applyTerminalEvent(threadRef, event);
+      useTerminalStateStore.getState().applyTerminalEvent(ownerRef, event);
     },
   };
 }

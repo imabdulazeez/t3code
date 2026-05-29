@@ -47,10 +47,13 @@ import {
 } from "@t3tools/contracts";
 import {
   parseScopedThreadKey,
+  projectTerminalOwnerRef,
   scopedProjectKey,
   scopedThreadKey,
   scopeProjectRef,
   scopeThreadRef,
+  terminalOwnerKey,
+  threadTerminalOwnerRef,
 } from "@t3tools/client-runtime";
 import { Link, useLocation, useNavigate, useParams, useRouter } from "@tanstack/react-router";
 import {
@@ -344,7 +347,10 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
   const isSelected = useThreadSelectionStore((state) => state.selectedThreadKeys.has(threadKey));
   const runningTerminalIds = useTerminalStateStore(
     (state) =>
-      selectThreadTerminalState(state.terminalStateByThreadKey, threadRef).runningTerminalIds,
+      selectThreadTerminalState(
+        state.terminalStateByThreadKey,
+        threadTerminalOwnerRef(thread.environmentId, thread.id),
+      ).runningTerminalIds,
   );
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const isRemoteThread =
@@ -1043,6 +1049,20 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
   const sidebarThreadByKeyRef = useRef(sidebarThreadByKey);
   sidebarThreadByKeyRef.current = sidebarThreadByKey;
   const projectThreads = sidebarThreads;
+  const projectTerminalRunningStatus = useTerminalStateStore(
+    useShallow((state) => {
+      let hasRunning = false;
+      for (const member of project.memberProjects) {
+        const ref = projectTerminalOwnerRef(member.environmentId, member.id);
+        const entry = state.terminalStateByThreadKey[terminalOwnerKey(ref)];
+        if (!entry) continue;
+        if (entry.runningTerminalIds.length > 0) {
+          hasRunning = true;
+        }
+      }
+      return { hasRunning };
+    }),
+  );
   const projectExpanded = useUiStateStore(
     (state) => state.projectExpandedById[project.projectKey] ?? true,
   );
@@ -2024,6 +2044,16 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
                 {project.groupedProjectCount} projects
               </span>
             ) : null}
+            {projectTerminalRunningStatus.hasRunning && (
+              <span
+                role="img"
+                aria-label="Project terminal process running"
+                title="Project terminal process running"
+                className="inline-flex shrink-0 items-center justify-center text-teal-600 dark:text-teal-300/90"
+              >
+                <TerminalIcon className="size-3 animate-pulse" />
+              </span>
+            )}
           </span>
         </SidebarMenuButton>
         {/* Environment badge – visible by default, crossfades with the
@@ -2928,7 +2958,7 @@ export default function Sidebar() {
       terminalOpen: routeThreadRef
         ? selectThreadTerminalState(
             useTerminalStateStore.getState().terminalStateByThreadKey,
-            routeThreadRef,
+            threadTerminalOwnerRef(routeThreadRef.environmentId, routeThreadRef.threadId),
           ).terminalOpen
         : false,
       modelPickerOpen,
@@ -3136,7 +3166,7 @@ export default function Sidebar() {
       terminalOpen: routeThreadRef
         ? selectThreadTerminalState(
             useTerminalStateStore.getState().terminalStateByThreadKey,
-            routeThreadRef,
+            threadTerminalOwnerRef(routeThreadRef.environmentId, routeThreadRef.threadId),
           ).terminalOpen
         : false,
       modelPickerOpen,

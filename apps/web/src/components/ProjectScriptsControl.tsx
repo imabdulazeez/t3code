@@ -1,7 +1,9 @@
-import type {
-  ProjectScript,
-  ProjectScriptIcon,
-  ResolvedKeybindingsConfig,
+import {
+  DEFAULT_PROJECT_SCRIPT_SCOPE,
+  type ProjectScript,
+  type ProjectScriptIcon,
+  type ProjectScriptScope,
+  type ResolvedKeybindingsConfig,
 } from "@t3tools/contracts";
 import {
   BugIcon,
@@ -84,16 +86,25 @@ export interface NewProjectScriptInput {
   icon: ProjectScriptIcon;
   runOnWorktreeCreate: boolean;
   keybinding: string | null;
+  defaultScope: ProjectScriptScope;
 }
 
 interface ProjectScriptsControlProps {
   scripts: ProjectScript[];
   keybindings: ResolvedKeybindingsConfig;
   preferredScriptId?: string | null;
-  onRunScript: (script: ProjectScript) => void;
+  onRunScript: (script: ProjectScript, options?: { scope?: ProjectScriptScope }) => void;
   onAddScript: (input: NewProjectScriptInput) => Promise<void> | void;
   onUpdateScript: (scriptId: string, input: NewProjectScriptInput) => Promise<void> | void;
   onDeleteScript: (scriptId: string) => Promise<void> | void;
+}
+
+function alternateScope(scope: ProjectScriptScope): ProjectScriptScope {
+  return scope === "chat" ? "project" : "chat";
+}
+
+function runInScopeLabel(scope: ProjectScriptScope): string {
+  return scope === "chat" ? "Run in chat terminal" : "Run in project terminal";
 }
 
 export default function ProjectScriptsControl({
@@ -113,6 +124,9 @@ export default function ProjectScriptsControl({
   const [icon, setIcon] = useState<ProjectScriptIcon>("play");
   const [iconPickerOpen, setIconPickerOpen] = useState(false);
   const [runOnWorktreeCreate, setRunOnWorktreeCreate] = useState(false);
+  const [defaultScope, setDefaultScope] = useState<ProjectScriptScope>(
+    DEFAULT_PROJECT_SCRIPT_SCOPE,
+  );
   const [keybinding, setKeybinding] = useState("");
   const [validationError, setValidationError] = useState<string | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -171,6 +185,7 @@ export default function ProjectScriptsControl({
         icon,
         runOnWorktreeCreate,
         keybinding: keybindingRule?.key ?? null,
+        defaultScope,
       } satisfies NewProjectScriptInput;
       if (editingScriptId) {
         await onUpdateScript(editingScriptId, payload);
@@ -191,6 +206,7 @@ export default function ProjectScriptsControl({
     setIcon("play");
     setIconPickerOpen(false);
     setRunOnWorktreeCreate(false);
+    setDefaultScope(DEFAULT_PROJECT_SCRIPT_SCOPE);
     setKeybinding("");
     setValidationError(null);
     setDialogOpen(true);
@@ -203,6 +219,7 @@ export default function ProjectScriptsControl({
     setIcon(script.icon);
     setIconPickerOpen(false);
     setRunOnWorktreeCreate(script.runOnWorktreeCreate);
+    setDefaultScope(script.defaultScope ?? DEFAULT_PROJECT_SCRIPT_SCOPE);
     setKeybinding(keybindingValueForCommand(keybindings, commandForProjectScript(script.id)) ?? "");
     setValidationError(null);
     setDialogOpen(true);
@@ -243,6 +260,8 @@ export default function ProjectScriptsControl({
                   keybindings,
                   commandForProjectScript(script.id),
                 );
+                const scriptScope = script.defaultScope ?? DEFAULT_PROJECT_SCRIPT_SCOPE;
+                const altScope = alternateScope(scriptScope);
                 return (
                   <MenuItem
                     key={script.id}
@@ -253,30 +272,57 @@ export default function ProjectScriptsControl({
                     <span className="truncate">
                       {script.runOnWorktreeCreate ? `${script.name} (setup)` : script.name}
                     </span>
+                    <span
+                      className="ms-1 rounded border border-border/60 px-1 text-[10px] uppercase tracking-wide text-muted-foreground"
+                      title={`Default scope: ${scriptScope}`}
+                    >
+                      {scriptScope}
+                    </span>
                     <span className="relative ms-auto flex h-6 min-w-6 items-center justify-end">
                       {shortcutLabel && (
                         <MenuShortcut className="ms-0 transition-opacity group-hover:opacity-0 group-focus-visible:opacity-0">
                           {shortcutLabel}
                         </MenuShortcut>
                       )}
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-xs"
-                        className="absolute right-0 top-1/2 size-6 -translate-y-1/2 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto group-focus-visible:opacity-100 group-focus-visible:pointer-events-auto"
-                        aria-label={`Edit ${script.name}`}
-                        onPointerDown={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                        }}
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          openEditDialog(script);
-                        }}
-                      >
-                        <SettingsIcon className="size-3.5" />
-                      </Button>
+                      <span className="absolute right-0 top-1/2 flex -translate-y-1/2 items-center gap-0.5 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto group-focus-visible:opacity-100 group-focus-visible:pointer-events-auto">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-xs"
+                          className="size-6"
+                          aria-label={runInScopeLabel(altScope)}
+                          title={runInScopeLabel(altScope)}
+                          onPointerDown={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                          }}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            onRunScript(script, { scope: altScope });
+                          }}
+                        >
+                          <PlayIcon className="size-3.5" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-xs"
+                          className="size-6"
+                          aria-label={`Edit ${script.name}`}
+                          onPointerDown={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                          }}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            openEditDialog(script);
+                          }}
+                        >
+                          <SettingsIcon className="size-3.5" />
+                        </Button>
+                      </span>
                     </span>
                   </MenuItem>
                 );
@@ -311,6 +357,7 @@ export default function ProjectScriptsControl({
           setCommand("");
           setIcon("play");
           setRunOnWorktreeCreate(false);
+          setDefaultScope(DEFAULT_PROJECT_SCRIPT_SCOPE);
           setKeybinding("");
           setValidationError(null);
         }}
@@ -405,6 +452,32 @@ export default function ProjectScriptsControl({
                   onCheckedChange={(checked) => setRunOnWorktreeCreate(Boolean(checked))}
                 />
               </label>
+              <div className="space-y-1.5">
+                <Label>Default scope</Label>
+                <div className="inline-flex rounded-md border border-border/70 p-0.5 text-xs">
+                  {(["chat", "project"] as const).map((scope) => {
+                    const isSelected = defaultScope === scope;
+                    return (
+                      <button
+                        key={scope}
+                        type="button"
+                        onClick={() => setDefaultScope(scope)}
+                        className={`rounded px-2.5 py-1 capitalize transition ${
+                          isSelected
+                            ? "bg-accent text-foreground"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {scope}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Chat-scoped terminals live with the current chat. Project-scoped terminals outlive
+                  the chat and are shared across the project.
+                </p>
+              </div>
               {validationError && <p className="text-sm text-destructive">{validationError}</p>}
             </form>
           </DialogPanel>

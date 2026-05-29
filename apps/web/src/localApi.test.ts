@@ -354,7 +354,7 @@ describe("wsApi", () => {
     api.orchestration.subscribeShell(onShellEvent);
 
     const terminalEvent = {
-      threadId: "thread-1",
+      owner: { type: "thread", threadId: "thread-1" },
       terminalId: "terminal-1",
       createdAt: "2026-02-24T00:00:00.000Z",
       type: "output",

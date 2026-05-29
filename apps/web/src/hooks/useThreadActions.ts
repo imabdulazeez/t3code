@@ -1,4 +1,9 @@
-import { parseScopedThreadKey, scopeProjectRef, scopeThreadRef } from "@t3tools/client-runtime";
+import {
+  parseScopedThreadKey,
+  scopeProjectRef,
+  scopeThreadRef,
+  threadTerminalOwnerRef,
+} from "@t3tools/client-runtime";
 import { type ScopedThreadRef, ThreadId } from "@t3tools/contracts";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
@@ -168,7 +173,10 @@ export function useThreadActions() {
       }
 
       try {
-        await api.terminal.close({ threadId: threadRef.threadId, deleteHistory: true });
+        await api.terminal.close({
+          owner: { type: "thread", threadId: threadRef.threadId },
+          deleteHistory: true,
+        });
       } catch {
         // Terminal may already be closed.
       }
@@ -195,7 +203,7 @@ export function useThreadActions() {
         scopeProjectRef(threadRef.environmentId, thread.projectId),
         threadRef,
       );
-      clearTerminalState(threadRef);
+      clearTerminalState(threadTerminalOwnerRef(threadRef.environmentId, threadRef.threadId));
 
       if (shouldNavigateToFallback) {
         if (fallbackThreadId) {

@@ -1,33 +1,39 @@
 interface TerminalRetentionThread {
-  key: string;
+  ownerKey: string;
   deletedAt: string | null;
   archivedAt: string | null;
 }
 
-interface CollectActiveTerminalThreadIdsInput {
+interface CollectActiveTerminalOwnerKeysInput {
   snapshotThreads: readonly TerminalRetentionThread[];
-  draftThreadKeys: Iterable<string>;
+  draftThreadOwnerKeys: Iterable<string>;
+  projectOwnerKeys: Iterable<string>;
 }
 
-export function collectActiveTerminalThreadIds(
-  input: CollectActiveTerminalThreadIdsInput,
+export function collectActiveTerminalOwnerKeys(
+  input: CollectActiveTerminalOwnerKeysInput,
 ): Set<string> {
-  const activeThreadIds = new Set<string>();
-  const snapshotThreadById = new Map(input.snapshotThreads.map((thread) => [thread.key, thread]));
+  const activeOwnerKeys = new Set<string>();
+  const snapshotThreadByOwnerKey = new Map(
+    input.snapshotThreads.map((thread) => [thread.ownerKey, thread]),
+  );
   for (const thread of input.snapshotThreads) {
     if (thread.deletedAt !== null) continue;
     if (thread.archivedAt !== null) continue;
-    activeThreadIds.add(thread.key);
+    activeOwnerKeys.add(thread.ownerKey);
   }
-  for (const draftThreadKey of input.draftThreadKeys) {
-    const snapshotThread = snapshotThreadById.get(draftThreadKey);
+  for (const draftOwnerKey of input.draftThreadOwnerKeys) {
+    const snapshotThread = snapshotThreadByOwnerKey.get(draftOwnerKey);
     if (
       snapshotThread &&
       (snapshotThread.deletedAt !== null || snapshotThread.archivedAt !== null)
     ) {
       continue;
     }
-    activeThreadIds.add(draftThreadKey);
+    activeOwnerKeys.add(draftOwnerKey);
   }
-  return activeThreadIds;
+  for (const projectOwnerKey of input.projectOwnerKeys) {
+    activeOwnerKeys.add(projectOwnerKey);
+  }
+  return activeOwnerKeys;
 }

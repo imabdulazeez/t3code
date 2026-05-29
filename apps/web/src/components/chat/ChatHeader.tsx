@@ -2,14 +2,18 @@ import {
   type EnvironmentId,
   type EditorId,
   type ProjectScript,
+  type ProjectScriptScope,
   type ResolvedKeybindingsConfig,
   type ThreadId,
 } from "@t3tools/contracts";
+import { Button } from "../ui/button";
+import { Group, GroupSeparator } from "../ui/group";
+import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
 import { scopeThreadRef } from "@t3tools/client-runtime";
 import { memo } from "react";
 import GitActionsControl from "../GitActionsControl";
 import { type DraftId } from "~/composerDraftStore";
-import { DiffIcon, TerminalSquareIcon } from "lucide-react";
+import { ChevronDownIcon, DiffIcon, TerminalSquareIcon } from "lucide-react";
 import { Badge } from "../ui/badge";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import ProjectScriptsControl, { type NewProjectScriptInput } from "../ProjectScriptsControl";
@@ -36,12 +40,14 @@ interface ChatHeaderProps {
   diffToggleShortcutLabel: string | null;
   gitCwd: string | null;
   diffOpen: boolean;
-  onRunProjectScript: (script: ProjectScript) => void;
+  onRunProjectScript: (script: ProjectScript, options?: { scope?: ProjectScriptScope }) => void;
   onAddProjectScript: (input: NewProjectScriptInput) => Promise<void>;
   onUpdateProjectScript: (scriptId: string, input: NewProjectScriptInput) => Promise<void>;
   onDeleteProjectScript: (scriptId: string) => Promise<void>;
   onToggleTerminal: () => void;
   onToggleDiff: () => void;
+  terminalScope?: ProjectScriptScope;
+  onSetTerminalScope?: (scope: ProjectScriptScope) => void;
 }
 
 export function shouldShowOpenInPicker(input: {
@@ -80,6 +86,8 @@ export const ChatHeader = memo(function ChatHeader({
   onDeleteProjectScript,
   onToggleTerminal,
   onToggleDiff,
+  terminalScope,
+  onSetTerminalScope,
 }: ChatHeaderProps) {
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const showOpenInPicker = shouldShowOpenInPicker({
@@ -138,30 +146,68 @@ export const ChatHeader = memo(function ChatHeader({
             {...(draftId ? { draftId } : {})}
           />
         )}
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Toggle
-                className="shrink-0"
-                pressed={terminalOpen}
-                onPressedChange={onToggleTerminal}
-                aria-label="Toggle terminal drawer"
-                variant="outline"
-                size="xs"
-                disabled={!terminalAvailable}
-              >
-                <TerminalSquareIcon className="size-3" />
-              </Toggle>
-            }
-          />
-          <TooltipPopup side="bottom">
-            {!terminalAvailable
-              ? "Terminal is unavailable until this thread has an active project."
-              : terminalToggleShortcutLabel
-                ? `Toggle terminal drawer (${terminalToggleShortcutLabel})`
-                : "Toggle terminal drawer"}
-          </TooltipPopup>
-        </Tooltip>
+        <Group aria-label="Terminal">
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Toggle
+                  className="shrink-0"
+                  pressed={terminalOpen}
+                  onPressedChange={onToggleTerminal}
+                  aria-label="Toggle terminal drawer"
+                  variant="outline"
+                  size="xs"
+                  disabled={!terminalAvailable}
+                >
+                  <TerminalSquareIcon className="size-3" />
+                </Toggle>
+              }
+            />
+            <TooltipPopup side="bottom">
+              {!terminalAvailable
+                ? "Terminal is unavailable until this thread has an active project."
+                : `Toggle ${terminalScope === "project" ? "project" : "chat"} terminal${
+                    terminalToggleShortcutLabel ? ` (${terminalToggleShortcutLabel})` : ""
+                  }`}
+            </TooltipPopup>
+          </Tooltip>
+          {onSetTerminalScope && terminalAvailable && (
+            <>
+              <GroupSeparator />
+              <Menu highlightItemOnHover={false}>
+                <MenuTrigger
+                  render={
+                    <Button
+                      size="icon-xs"
+                      variant="outline"
+                      aria-label="Choose default terminal scope"
+                    />
+                  }
+                >
+                  <ChevronDownIcon className="size-3" />
+                </MenuTrigger>
+                <MenuPopup align="end">
+                  <MenuItem onClick={() => onSetTerminalScope("chat")}>
+                    <span className="flex-1">Chat terminal</span>
+                    {terminalScope !== "project" && (
+                      <span className="ms-2 text-[10px] uppercase text-muted-foreground">
+                        Default
+                      </span>
+                    )}
+                  </MenuItem>
+                  <MenuItem onClick={() => onSetTerminalScope("project")}>
+                    <span className="flex-1">Project terminal</span>
+                    {terminalScope === "project" && (
+                      <span className="ms-2 text-[10px] uppercase text-muted-foreground">
+                        Default
+                      </span>
+                    )}
+                  </MenuItem>
+                </MenuPopup>
+              </Menu>
+            </>
+          )}
+        </Group>
         <Tooltip>
           <TooltipTrigger
             render={

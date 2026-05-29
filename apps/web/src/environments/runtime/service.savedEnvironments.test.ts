@@ -94,7 +94,7 @@ vi.mock("~/localApi", () => ({
 }));
 
 vi.mock("~/lib/terminalStateCleanup", () => ({
-  collectActiveTerminalThreadIds: vi.fn(() => []),
+  collectActiveTerminalOwnerKeys: vi.fn(() => new Set<string>()),
 }));
 
 vi.mock("~/orchestrationEventEffects", () => ({

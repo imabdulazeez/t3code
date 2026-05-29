@@ -1,5 +1,11 @@
-import { scopeThreadRef, scopedThreadKey } from "@t3tools/client-runtime";
-import { ThreadId, type TerminalEvent } from "@t3tools/contracts";
+import {
+  projectTerminalOwnerRef,
+  scopedThreadKey,
+  scopeThreadRef,
+  terminalOwnerKey,
+  threadTerminalOwnerRef,
+} from "@t3tools/client-runtime";
+import { type EnvironmentId, ProjectId, ThreadId, type TerminalEvent } from "@t3tools/contracts";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -9,16 +15,20 @@ import {
   useTerminalStateStore,
 } from "./terminalStateStore";
 
+const env = (id: string): EnvironmentId => id as unknown as EnvironmentId;
 const THREAD_ID = ThreadId.make("thread-1");
-const THREAD_REF = scopeThreadRef("environment-a" as never, THREAD_ID);
-const OTHER_THREAD_REF = scopeThreadRef("environment-b" as never, THREAD_ID);
+const PROJECT_ID = ProjectId.make("project-1");
+const THREAD_REF = threadTerminalOwnerRef(env("environment-a"), THREAD_ID);
+const OTHER_THREAD_REF = threadTerminalOwnerRef(env("environment-b"), THREAD_ID);
+const PROJECT_REF = projectTerminalOwnerRef(env("environment-a"), PROJECT_ID);
+const THREAD_OWNER = { type: "thread" as const, threadId: THREAD_ID };
 
 function makeTerminalEvent(
   type: TerminalEvent["type"],
   overrides: Partial<TerminalEvent> = {},
 ): TerminalEvent {
   const base = {
-    threadId: THREAD_ID,
+    owner: THREAD_OWNER,
     terminalId: "default",
     createdAt: "2026-04-02T20:00:00.000Z",
   };
@@ -40,7 +50,7 @@ function makeTerminalEvent(
         ...base,
         type,
         snapshot: {
-          threadId: THREAD_ID,
+          owner: THREAD_OWNER,
           terminalId: "default",
           cwd: "/tmp/workspace",
           worktreePath: null,
@@ -67,7 +77,7 @@ describe("terminalStateStore actions", () => {
     });
   });
 
-  it("returns a closed default terminal state for unknown threads", () => {
+  it("returns a closed default terminal state for unknown owners", () => {
     const terminalState = selectThreadTerminalState(
       useTerminalStateStore.getState().terminalStateByThreadKey,
       THREAD_REF,
@@ -77,6 +87,7 @@ describe("terminalStateStore actions", () => {
       terminalHeight: 280,
       terminalIds: ["default"],
       runningTerminalIds: [],
+      terminalCommands: {},
       activeTerminalId: "default",
       terminalGroups: [{ id: "group-default", terminalIds: ["default"] }],
       activeTerminalGroupId: "group-default",
@@ -174,11 +185,44 @@ describe("terminalStateStore actions", () => {
     ).toEqual(["default", "env-b-terminal"]);
   });
 
-  it("migrates v1 persisted terminal state using the stored version", () => {
+  it("keeps thread and project owners isolated within the same environment", () => {
+    const store = useTerminalStateStore.getState();
+    store.setTerminalOpen(THREAD_REF, true);
+    store.newTerminal(PROJECT_REF, "project-terminal");
+
+    expect(
+      selectThreadTerminalState(
+        useTerminalStateStore.getState().terminalStateByThreadKey,
+        THREAD_REF,
+      ).terminalIds,
+    ).toEqual(["default"]);
+    expect(
+      selectThreadTerminalState(
+        useTerminalStateStore.getState().terminalStateByThreadKey,
+        PROJECT_REF,
+      ).terminalIds,
+    ).toEqual(["default", "project-terminal"]);
+  });
+
+  it("migrates v1 persisted terminal state into owner-keyed state", () => {
+    const legacyThreadRef = scopeThreadRef(env("environment-a"), THREAD_ID);
+    const legacyProjectKey = scopedThreadKey({
+      environmentId: env("environment-a"),
+      threadId: "project:project-1" as unknown as ThreadId,
+    });
     const migrated = migratePersistedTerminalStateStoreState(
       {
         terminalStateByThreadKey: {
-          [scopedThreadKey(THREAD_REF)]: {
+          [scopedThreadKey(legacyThreadRef)]: {
+            terminalOpen: true,
+            terminalHeight: 320,
+            terminalIds: ["default"],
+            runningTerminalIds: [],
+            activeTerminalId: "default",
+            terminalGroups: [{ id: "group-default", terminalIds: ["default"] }],
+            activeTerminalGroupId: "group-default",
+          },
+          [legacyProjectKey]: {
             terminalOpen: true,
             terminalHeight: 320,
             terminalIds: ["default"],
@@ -201,18 +245,22 @@ describe("terminalStateStore actions", () => {
       1,
     );
 
+    const migratedState = {
+      terminalOpen: true,
+      terminalHeight: 320,
+      terminalIds: ["default"],
+      runningTerminalIds: [],
+      terminalCommands: {},
+      activeTerminalId: "default",
+      terminalGroups: [{ id: "group-default", terminalIds: ["default"] }],
+      activeTerminalGroupId: "group-default",
+    };
     expect(migrated).toEqual({
       terminalStateByThreadKey: {
-        [scopedThreadKey(THREAD_REF)]: {
-          terminalOpen: true,
-          terminalHeight: 320,
-          terminalIds: ["default"],
-          runningTerminalIds: [],
-          activeTerminalId: "default",
-          terminalGroups: [{ id: "group-default", terminalIds: ["default"] }],
-          activeTerminalGroupId: "group-default",
-        },
+        [terminalOwnerKey(THREAD_REF)]: migratedState,
+        [terminalOwnerKey(PROJECT_REF)]: migratedState,
       },
+      defaultTerminalScopeByProjectId: {},
     });
   });
 
@@ -236,19 +284,19 @@ describe("terminalStateStore actions", () => {
     ).toEqual([]);
   });
 
-  it("resets to default and clears persisted entry when closing the last terminal", () => {
+  it("keeps an explicit empty state when closing the last terminal", () => {
     const store = useTerminalStateStore.getState();
     store.closeTerminal(THREAD_REF, "default");
 
     expect(
-      useTerminalStateStore.getState().terminalStateByThreadKey[scopedThreadKey(THREAD_REF)],
-    ).toBeUndefined();
+      useTerminalStateStore.getState().terminalStateByThreadKey[terminalOwnerKey(THREAD_REF)],
+    ).toMatchObject({ terminalOpen: false, terminalIds: [], terminalGroups: [] });
     expect(
       selectThreadTerminalState(
         useTerminalStateStore.getState().terminalStateByThreadKey,
         THREAD_REF,
       ).terminalIds,
-    ).toEqual(["default"]);
+    ).toEqual([]);
   });
 
   it("keeps a valid active terminal after closing an active split terminal", () => {
@@ -291,7 +339,7 @@ describe("terminalStateStore actions", () => {
       makeTerminalEvent("started", {
         terminalId: "setup-bootstrap",
         snapshot: {
-          threadId: THREAD_ID,
+          owner: THREAD_OWNER,
           terminalId: "setup-bootstrap",
           cwd: "/tmp/worktree",
           worktreePath: "/tmp/worktree",
@@ -320,7 +368,7 @@ describe("terminalStateStore actions", () => {
     expect(terminalState.terminalIds).toEqual(["default", "setup-bootstrap"]);
     expect(
       useTerminalStateStore.getState().terminalLaunchContextByThreadKey[
-        scopedThreadKey(THREAD_REF)
+        terminalOwnerKey(THREAD_REF)
       ],
     ).toEqual({
       cwd: "/tmp/worktree",
@@ -328,6 +376,42 @@ describe("terminalStateStore actions", () => {
     });
     expect(entries).toHaveLength(1);
     expect(entries[0]?.event.type).toBe("started");
+  });
+
+  it("applies project-owned terminal events to the project owner state", () => {
+    const store = useTerminalStateStore.getState();
+    store.applyTerminalEvent(
+      PROJECT_REF,
+      makeTerminalEvent("started", {
+        owner: { type: "project", projectId: PROJECT_ID },
+        terminalId: "project-default",
+        snapshot: {
+          owner: { type: "project", projectId: PROJECT_ID },
+          terminalId: "project-default",
+          cwd: "/tmp/project",
+          worktreePath: null,
+          status: "running",
+          pid: 321,
+          history: "",
+          exitCode: null,
+          exitSignal: null,
+          updatedAt: "2026-04-02T20:00:00.000Z",
+        },
+      }),
+    );
+
+    const projectState = selectThreadTerminalState(
+      useTerminalStateStore.getState().terminalStateByThreadKey,
+      PROJECT_REF,
+    );
+    expect(projectState.terminalOpen).toBe(true);
+    expect(projectState.terminalIds).toEqual(["default", "project-default"]);
+    expect(
+      selectThreadTerminalState(
+        useTerminalStateStore.getState().terminalStateByThreadKey,
+        THREAD_REF,
+      ).terminalIds,
+    ).toEqual(["default"]);
   });
 
   it("applies activity and exited terminal events to subprocess state while buffering events", () => {
@@ -371,7 +455,7 @@ describe("terminalStateStore actions", () => {
     expect(entries.map((entry) => entry.event.type)).toEqual(["activity", "exited"]);
   });
 
-  it("clears buffered terminal events when a thread terminal state is removed", () => {
+  it("clears buffered terminal events when an owner terminal state is removed", () => {
     const store = useTerminalStateStore.getState();
     store.recordTerminalEvent(THREAD_REF, makeTerminalEvent("output"));
     store.removeTerminalState(THREAD_REF);
@@ -385,7 +469,7 @@ describe("terminalStateStore actions", () => {
     expect(entries).toEqual([]);
   });
 
-  it("is a no-op when clearing terminal state for a thread with no state or buffered events", () => {
+  it("is a no-op when clearing terminal state for an owner with no state or buffered events", () => {
     const store = useTerminalStateStore.getState();
     const before = useTerminalStateStore.getState();
 

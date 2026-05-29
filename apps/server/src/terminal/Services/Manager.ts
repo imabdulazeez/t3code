@@ -2,7 +2,7 @@
  * TerminalManager - Terminal session orchestration service interface.
  *
  * Owns terminal lifecycle operations, output fanout, and session state
- * transitions for thread-scoped terminals.
+ * transitions for owner-scoped terminals (thread- or project-owned).
  *
  * @module TerminalManager
  */
@@ -15,6 +15,7 @@ import {
   TerminalHistoryError,
   TerminalNotRunningError,
   TerminalOpenInput,
+  type TerminalOwner,
   TerminalResizeInput,
   TerminalRestartInput,
   TerminalSessionSnapshot,
@@ -35,7 +36,7 @@ export {
 };
 
 export interface TerminalSessionState {
-  threadId: string;
+  owner: TerminalOwner;
   terminalId: string;
   cwd: string;
   worktreePath: string | null;
@@ -72,7 +73,7 @@ export interface TerminalManagerShape {
   /**
    * Open or attach to a terminal session.
    *
-   * Reuses an existing session for the same thread/terminal id and restores
+   * Reuses an existing session for the same owner/terminal id and restores
    * persisted history on first open.
    */
   readonly open: (
@@ -106,7 +107,7 @@ export interface TerminalManagerShape {
   /**
    * Close an active terminal session.
    *
-   * When `terminalId` is omitted, closes all sessions for the thread.
+   * When `terminalId` is omitted, closes all sessions for the owner.
    */
   readonly close: (input: TerminalCloseInput) => Effect.Effect<void, TerminalError>;
 

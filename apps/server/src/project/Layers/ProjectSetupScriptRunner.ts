@@ -52,14 +52,14 @@ const makeProjectSetupScriptRunner = Effect.gen(function* () {
       });
 
       yield* terminalManager.open({
-        threadId: input.threadId,
+        owner: { type: "thread", threadId: input.threadId },
         terminalId,
         cwd,
         worktreePath: input.worktreePath,
         env,
       });
       yield* terminalManager.write({
-        threadId: input.threadId,
+        owner: { type: "thread", threadId: input.threadId },
         terminalId,
         data: `${script.command}\r`,
       });

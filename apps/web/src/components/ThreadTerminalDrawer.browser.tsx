@@ -1,6 +1,6 @@
 import "../index.css";
 
-import { scopeThreadRef } from "@t3tools/client-runtime";
+import { scopeThreadRef, threadTerminalOwnerRef } from "@t3tools/client-runtime";
 import { ThreadId } from "@t3tools/contracts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-react";
@@ -127,7 +127,7 @@ function createEnvironmentApi() {
   return {
     terminal: {
       open: vi.fn(async () => ({
-        threadId: THREAD_ID,
+        owner: { type: "thread" as const, threadId: THREAD_ID },
         terminalId: "default",
         cwd: "/repo/project",
         worktreePath: null,
@@ -166,8 +166,7 @@ async function mountTerminalViewport(props: {
 
   const screen = await render(
     <TerminalViewport
-      threadRef={props.threadRef}
-      threadId={THREAD_ID}
+      ownerRef={threadTerminalOwnerRef(props.threadRef.environmentId, props.threadRef.threadId)}
       terminalId="default"
       terminalLabel="Terminal"
       cwd="/repo/project"
@@ -186,8 +185,10 @@ async function mountTerminalViewport(props: {
     rerender: async (nextProps: { threadRef: ReturnType<typeof scopeThreadRef> }) => {
       await screen.rerender(
         <TerminalViewport
-          threadRef={nextProps.threadRef}
-          threadId={THREAD_ID}
+          ownerRef={threadTerminalOwnerRef(
+            nextProps.threadRef.environmentId,
+            nextProps.threadRef.threadId,
+          )}
           terminalId="default"
           terminalLabel="Terminal"
           cwd="/repo/project"

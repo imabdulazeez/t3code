@@ -83,7 +83,7 @@ describe("ProjectSetupScriptRunner", () => {
   it("opens the deterministic setup terminal with worktree env and writes the command", async () => {
     const open = vi.fn(() =>
       Effect.succeed({
-        threadId: "thread-1",
+        owner: { type: "thread" as const, threadId: "thread-1" },
         terminalId: "setup-setup",
         cwd: "/repo/worktrees/a",
         worktreePath: "/repo/worktrees/a",
@@ -103,6 +103,7 @@ describe("ProjectSetupScriptRunner", () => {
         command: "bun install",
         icon: "configure",
         runOnWorktreeCreate: true,
+        defaultScope: "chat",
       },
     ]);
     const runner = await Effect.runPromise(
@@ -142,7 +143,7 @@ describe("ProjectSetupScriptRunner", () => {
       cwd: "/repo/worktrees/a",
     });
     expect(open).toHaveBeenCalledWith({
-      threadId: "thread-1",
+      owner: { type: "thread", threadId: "thread-1" },
       terminalId: "setup-setup",
       cwd: "/repo/worktrees/a",
       worktreePath: "/repo/worktrees/a",
@@ -152,7 +153,7 @@ describe("ProjectSetupScriptRunner", () => {
       },
     });
     expect(write).toHaveBeenCalledWith({
-      threadId: "thread-1",
+      owner: { type: "thread", threadId: "thread-1" },
       terminalId: "setup-setup",
       data: "bun install\r",
     });

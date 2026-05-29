@@ -7,11 +7,14 @@ import {
   TerminalCloseInput,
   TerminalEvent,
   TerminalOpenInput,
+  TerminalOwner,
   TerminalResizeInput,
   TerminalSessionSnapshot,
-  TerminalThreadInput,
   TerminalWriteInput,
 } from "./terminal.ts";
+
+const THREAD_OWNER = { type: "thread", threadId: "thread-1" } as const;
+const PROJECT_OWNER = { type: "project", projectId: "project-1" } as const;
 
 function decodeSync<S extends Schema.Top>(schema: S, input: unknown): Schema.Schema.Type<S> {
   return Schema.decodeUnknownSync(schema as never)(input) as Schema.Schema.Type<S>;
@@ -26,11 +29,47 @@ function decodes<S extends Schema.Top>(schema: S, input: unknown): boolean {
   }
 }
 
+describe("TerminalOwner", () => {
+  it("decodes thread owners", () => {
+    const parsed = decodeSync(TerminalOwner, { type: "thread", threadId: " thread-1 " });
+    expect(parsed).toEqual({ type: "thread", threadId: "thread-1" });
+  });
+
+  it("decodes project owners", () => {
+    const parsed = decodeSync(TerminalOwner, { type: "project", projectId: " project-1 " });
+    expect(parsed).toEqual({ type: "project", projectId: "project-1" });
+  });
+
+  it("rejects unknown owner types", () => {
+    expect(decodes(TerminalOwner, { type: "environment", threadId: "thread-1" })).toBe(false);
+  });
+
+  it("rejects owners missing their identifier", () => {
+    expect(decodes(TerminalOwner, { type: "thread" })).toBe(false);
+    expect(decodes(TerminalOwner, { type: "project" })).toBe(false);
+  });
+
+  it("rejects thread owners carrying a projectId", () => {
+    expect(decodes(TerminalOwner, { type: "thread", projectId: "project-1" })).toBe(false);
+  });
+});
+
 describe("TerminalOpenInput", () => {
   it("accepts valid open input", () => {
     expect(
       decodes(TerminalOpenInput, {
-        threadId: "thread-1",
+        owner: THREAD_OWNER,
+        cwd: "/tmp/project",
+        cols: 120,
+        rows: 40,
+      }),
+    ).toBe(true);
+  });
+
+  it("accepts project-owned open input", () => {
+    expect(
+      decodes(TerminalOpenInput, {
+        owner: PROJECT_OWNER,
         cwd: "/tmp/project",
         cols: 120,
         rows: 40,
@@ -41,7 +80,7 @@ describe("TerminalOpenInput", () => {
   it("accepts ultrawide terminal dimensions from xterm fit", () => {
     expect(
       decodes(TerminalOpenInput, {
-        threadId: "thread-1",
+        owner: THREAD_OWNER,
         cwd: "/tmp/project",
         cols: 423,
         rows: 40,
@@ -52,7 +91,7 @@ describe("TerminalOpenInput", () => {
   it("rejects invalid bounds", () => {
     expect(
       decodes(TerminalOpenInput, {
-        threadId: "thread-1",
+        owner: THREAD_OWNER,
         cwd: "/tmp/project",
         cols: 10,
         rows: 0,
@@ -60,9 +99,19 @@ describe("TerminalOpenInput", () => {
     ).toBe(false);
   });
 
+  it("rejects missing owner", () => {
+    expect(
+      decodes(TerminalOpenInput, {
+        cwd: "/tmp/project",
+        cols: 100,
+        rows: 24,
+      }),
+    ).toBe(false);
+  });
+
   it("defaults terminalId when missing", () => {
     const parsed = decodeSync(TerminalOpenInput, {
-      threadId: "thread-1",
+      owner: THREAD_OWNER,
       cwd: "/tmp/project",
       cols: 100,
       rows: 24,
@@ -72,7 +121,7 @@ describe("TerminalOpenInput", () => {
 
   it("accepts optional env overrides", () => {
     const parsed = decodeSync(TerminalOpenInput, {
-      threadId: "thread-1",
+      owner: THREAD_OWNER,
       cwd: "/tmp/project",
       worktreePath: "/tmp/project/.t3/worktrees/feature-a",
       cols: 100,
@@ -92,7 +141,7 @@ describe("TerminalOpenInput", () => {
   it("rejects invalid env keys", () => {
     expect(
       decodes(TerminalOpenInput, {
-        threadId: "thread-1",
+        owner: THREAD_OWNER,
         cwd: "/tmp/project",
         cols: 100,
         rows: 24,
@@ -108,7 +157,7 @@ describe("TerminalWriteInput", () => {
   it("accepts non-empty data", () => {
     expect(
       decodes(TerminalWriteInput, {
-        threadId: "thread-1",
+        owner: THREAD_OWNER,
         data: "echo hello\n",
       }),
     ).toBe(true);
@@ -117,17 +166,10 @@ describe("TerminalWriteInput", () => {
   it("rejects empty data", () => {
     expect(
       decodes(TerminalWriteInput, {
-        threadId: "thread-1",
+        owner: THREAD_OWNER,
         data: "",
       }),
     ).toBe(false);
-  });
-});
-
-describe("TerminalThreadInput", () => {
-  it("trims thread ids", () => {
-    const parsed = decodeSync(TerminalThreadInput, { threadId: " thread-1 " });
-    expect(parsed.threadId).toBe("thread-1");
   });
 });
 
@@ -135,7 +177,7 @@ describe("TerminalResizeInput", () => {
   it("accepts valid size", () => {
     expect(
       decodes(TerminalResizeInput, {
-        threadId: "thread-1",
+        owner: THREAD_OWNER,
         cols: 80,
         rows: 24,
       }),
@@ -146,7 +188,7 @@ describe("TerminalResizeInput", () => {
 describe("TerminalClearInput", () => {
   it("defaults terminal id", () => {
     const parsed = decodeSync(TerminalClearInput, {
-      threadId: "thread-1",
+      owner: THREAD_OWNER,
     });
     expect(parsed.terminalId).toBe(DEFAULT_TERMINAL_ID);
   });
@@ -156,8 +198,16 @@ describe("TerminalCloseInput", () => {
   it("accepts optional deleteHistory", () => {
     expect(
       decodes(TerminalCloseInput, {
-        threadId: "thread-1",
+        owner: THREAD_OWNER,
         deleteHistory: true,
+      }),
+    ).toBe(true);
+  });
+
+  it("accepts project owners", () => {
+    expect(
+      decodes(TerminalCloseInput, {
+        owner: PROJECT_OWNER,
       }),
     ).toBe(true);
   });
@@ -169,7 +219,7 @@ describe("TerminalSessionSnapshot", () => {
   it("accepts running snapshots", () => {
     expect(
       decodes(TerminalSessionSnapshot, {
-        threadId: "thread-1",
+        owner: THREAD_OWNER,
         terminalId: DEFAULT_TERMINAL_ID,
         cwd: "/tmp/project",
         worktreePath: null,
@@ -191,7 +241,7 @@ describe("TerminalEvent", () => {
     expect(
       decodes(TerminalEvent, {
         type: "output",
-        threadId: "thread-1",
+        owner: THREAD_OWNER,
         terminalId: DEFAULT_TERMINAL_ID,
         createdAt: isoTimestamp,
         data: "line\n",
@@ -199,11 +249,11 @@ describe("TerminalEvent", () => {
     ).toBe(true);
   });
 
-  it("accepts exited events", () => {
+  it("accepts project-owned exited events", () => {
     expect(
       decodes(TerminalEvent, {
         type: "exited",
-        threadId: "thread-1",
+        owner: PROJECT_OWNER,
         terminalId: DEFAULT_TERMINAL_ID,
         createdAt: isoTimestamp,
         exitCode: 0,
@@ -216,7 +266,7 @@ describe("TerminalEvent", () => {
     expect(
       decodes(TerminalEvent, {
         type: "activity",
-        threadId: "thread-1",
+        owner: THREAD_OWNER,
         terminalId: DEFAULT_TERMINAL_ID,
         createdAt: isoTimestamp,
         hasRunningSubprocess: true,
@@ -228,11 +278,11 @@ describe("TerminalEvent", () => {
     expect(
       decodes(TerminalEvent, {
         type: "started",
-        threadId: "thread-1",
+        owner: THREAD_OWNER,
         terminalId: DEFAULT_TERMINAL_ID,
         createdAt: isoTimestamp,
         snapshot: {
-          threadId: "thread-1",
+          owner: THREAD_OWNER,
           terminalId: DEFAULT_TERMINAL_ID,
           cwd: "/tmp/project/.t3/worktrees/feature-a",
           worktreePath: "/tmp/project/.t3/worktrees/feature-a",

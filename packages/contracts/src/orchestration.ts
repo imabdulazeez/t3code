@@ -188,12 +188,20 @@ export const ProjectScriptIcon = Schema.Literals([
 ]);
 export type ProjectScriptIcon = typeof ProjectScriptIcon.Type;
 
+export const ProjectScriptScope = Schema.Literals(["chat", "project"]);
+export type ProjectScriptScope = typeof ProjectScriptScope.Type;
+
+export const DEFAULT_PROJECT_SCRIPT_SCOPE: ProjectScriptScope = "chat";
+
 export const ProjectScript = Schema.Struct({
   id: TrimmedNonEmptyString,
   name: TrimmedNonEmptyString,
   command: TrimmedNonEmptyString,
   icon: ProjectScriptIcon,
   runOnWorktreeCreate: Schema.Boolean,
+  defaultScope: ProjectScriptScope.pipe(
+    Schema.withDecodingDefault(Effect.succeed(DEFAULT_PROJECT_SCRIPT_SCOPE)),
+  ),
 });
 export type ProjectScript = typeof ProjectScript.Type;
 

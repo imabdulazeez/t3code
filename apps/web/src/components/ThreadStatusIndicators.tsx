@@ -1,4 +1,9 @@
-import { scopeProjectRef, scopedThreadKey, scopeThreadRef } from "@t3tools/client-runtime";
+import {
+  scopeProjectRef,
+  scopedThreadKey,
+  scopeThreadRef,
+  threadTerminalOwnerRef,
+} from "@t3tools/client-runtime";
 import type { VcsStatusResult } from "@t3tools/contracts";
 import { CloudIcon, GitPullRequestIcon, TerminalIcon } from "lucide-react";
 import { useMemo } from "react";
@@ -198,7 +203,10 @@ export function ThreadRowTrailingStatus({ thread }: { thread: SidebarThreadSumma
   const threadRef = scopeThreadRef(thread.environmentId, thread.id);
   const runningTerminalIds = useTerminalStateStore(
     (state) =>
-      selectThreadTerminalState(state.terminalStateByThreadKey, threadRef).runningTerminalIds,
+      selectThreadTerminalState(
+        state.terminalStateByThreadKey,
+        threadTerminalOwnerRef(thread.environmentId, thread.id),
+      ).runningTerminalIds,
   );
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const isRemoteThread =

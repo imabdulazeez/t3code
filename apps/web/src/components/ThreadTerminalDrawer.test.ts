@@ -82,7 +82,7 @@ describe("resolveTerminalSelectionActionPosition", () => {
           {
             id: 1,
             event: {
-              threadId: "thread-1",
+              owner: { type: "thread", threadId: "thread-1" },
               terminalId: "default",
               createdAt: "2026-04-02T20:00:00.000Z",
               type: "output",
@@ -92,7 +92,7 @@ describe("resolveTerminalSelectionActionPosition", () => {
           {
             id: 2,
             event: {
-              threadId: "thread-1",
+              owner: { type: "thread", threadId: "thread-1" },
               terminalId: "default",
               createdAt: "2026-04-02T20:00:01.000Z",
               type: "output",
@@ -112,7 +112,7 @@ describe("resolveTerminalSelectionActionPosition", () => {
           {
             id: 1,
             event: {
-              threadId: "thread-1",
+              owner: { type: "thread", threadId: "thread-1" },
               terminalId: "default",
               createdAt: "2026-04-02T20:00:00.000Z",
               type: "output",
@@ -122,7 +122,7 @@ describe("resolveTerminalSelectionActionPosition", () => {
           {
             id: 2,
             event: {
-              threadId: "thread-1",
+              owner: { type: "thread", threadId: "thread-1" },
               terminalId: "default",
               createdAt: "2026-04-02T20:00:01.000Z",
               type: "output",

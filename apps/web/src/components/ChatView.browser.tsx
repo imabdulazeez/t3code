@@ -1913,6 +1913,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
           terminalHeight: 280,
           terminalIds: ["default"],
           runningTerminalIds: [],
+          terminalCommands: {},
           activeTerminalId: "default",
           terminalGroups: [{ id: "group-default", terminalIds: ["default"] }],
           activeTerminalGroupId: "group-default",
@@ -2242,6 +2243,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
           command: "bun run lint",
           icon: "lint",
           runOnWorktreeCreate: false,
+          defaultScope: "chat",
         },
       ]),
     });
@@ -2321,6 +2323,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
           command: "bun run test",
           icon: "test",
           runOnWorktreeCreate: false,
+          defaultScope: "chat",
         },
       ]),
     });
@@ -2387,6 +2390,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
           command: "bun install",
           icon: "configure",
           runOnWorktreeCreate: true,
+          defaultScope: "chat",
         },
       ]),
       resolveRpc: (body) => {
@@ -2515,6 +2519,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
           command: "bun install",
           icon: "configure",
           runOnWorktreeCreate: true,
+          defaultScope: "chat",
         },
       ]),
       resolveRpc: (body) => {
@@ -3024,6 +3029,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
           command: "bun install",
           icon: "configure",
           runOnWorktreeCreate: true,
+          defaultScope: "chat",
         },
       ]),
       resolveRpc: (body) => {
