@@ -11,6 +11,7 @@ import {
   ChevronRightIcon,
   EllipsisIcon,
   LoaderIcon,
+  Maximize2Icon,
   PanelRightCloseIcon,
 } from "lucide-react";
 import { cn } from "~/lib/utils";
@@ -28,6 +29,7 @@ import { Menu, MenuItem, MenuPopup, MenuTrigger } from "./ui/menu";
 import { readEnvironmentApi } from "~/environmentApi";
 import { stackedThreadToast, toastManager } from "./ui/toast";
 import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
+import { useFullScreenPlan } from "./chat/FullScreenPlanModal";
 
 function stepStatusIcon(status: string): React.ReactNode {
   if (status === "completed") {
@@ -77,10 +79,21 @@ const PlanSidebar = memo(function PlanSidebar({
   const [proposedPlanExpanded, setProposedPlanExpanded] = useState(false);
   const [isSavingToWorkspace, setIsSavingToWorkspace] = useState(false);
   const { copyToClipboard, isCopied } = useCopyToClipboard();
+  const { openFullScreenPlan } = useFullScreenPlan();
 
   const planMarkdown = activeProposedPlan?.planMarkdown ?? null;
   const displayedPlanMarkdown = planMarkdown ? stripDisplayedPlanMarkdown(planMarkdown) : null;
   const planTitle = planMarkdown ? proposedPlanTitle(planMarkdown) : null;
+
+  const handleOpenFullScreen = useCallback(() => {
+    if (!displayedPlanMarkdown) return;
+    openFullScreenPlan({
+      planMarkdown: displayedPlanMarkdown,
+      title: planTitle ?? label,
+      label,
+      cwd: markdownCwd,
+    });
+  }, [displayedPlanMarkdown, planTitle, label, markdownCwd, openFullScreenPlan]);
 
   const handleCopyPlan = useCallback(() => {
     if (!planMarkdown) return;
@@ -151,6 +164,17 @@ const PlanSidebar = memo(function PlanSidebar({
           ) : null}
         </div>
         <div className="flex items-center gap-1">
+          {planMarkdown && mode === "sidebar" ? (
+            <Button
+              size="icon-xs"
+              variant="ghost"
+              onClick={handleOpenFullScreen}
+              aria-label="Open plan full screen"
+              className="text-muted-foreground/50 hover:text-foreground/70"
+            >
+              <Maximize2Icon className="size-3.5" />
+            </Button>
+          ) : null}
           {planMarkdown ? (
             <Menu>
               <MenuTrigger
