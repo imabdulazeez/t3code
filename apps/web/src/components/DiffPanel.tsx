@@ -1,5 +1,6 @@
 import { parsePatchFiles } from "@pierre/diffs";
 import { FileDiff, type FileDiffMetadata, Virtualizer } from "@pierre/diffs/react";
+import { useDebouncedValue } from "@tanstack/react-pacer";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { scopeThreadRef } from "@t3tools/client-runtime";
@@ -9,9 +10,12 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   Columns2Icon,
+  FoldVerticalIcon,
   PilcrowIcon,
   Rows3Icon,
+  SearchIcon,
   TextWrapIcon,
+  UnfoldVerticalIcon,
 } from "lucide-react";
 import {
   type CSSProperties,
@@ -39,6 +43,7 @@ import { buildThreadRouteParams, resolveThreadRouteRef } from "../threadRoutes";
 import { useSettings } from "../hooks/useSettings";
 import { formatShortTimestamp } from "../timestampFormat";
 import { DiffPanelLoadingState, DiffPanelShell, type DiffPanelMode } from "./DiffPanelShell";
+import { Input } from "./ui/input";
 import { ToggleGroup, Toggle } from "./ui/toggle-group";
 
 type DiffRenderMode = "stacked" | "split";
@@ -211,6 +216,8 @@ export default function DiffPanel({ mode = "inline" }: DiffPanelProps) {
   const [collapsedDiffFileKeys, setCollapsedDiffFileKeys] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
+  const [fileSearchQuery, setFileSearchQuery] = useState("");
+  const [debouncedFileSearchQuery] = useDebouncedValue(fileSearchQuery, { wait: 180 });
   const patchViewportRef = useRef<HTMLDivElement>(null);
   const turnStripRef = useRef<HTMLDivElement>(null);
   const previousDiffOpenRef = useRef(false);
@@ -359,6 +366,7 @@ export default function DiffPanel({ mode = "inline" }: DiffPanelProps) {
   useEffect(() => {
     if (renderableFiles.length === 0) {
       setCollapsedDiffFileKeys((current) => (current.size === 0 ? current : new Set()));
+      setFileSearchQuery("");
       return;
     }
 
@@ -377,15 +385,51 @@ export default function DiffPanel({ mode = "inline" }: DiffPanelProps) {
     previousDiffOpenRef.current = diffOpen;
   }, [diffOpen, settings.diffIgnoreWhitespace, settings.diffWordWrap]);
 
-  useEffect(() => {
-    if (!selectedFilePath || !patchViewportRef.current) {
-      return;
-    }
+  const scrollToFile = useCallback((path: string) => {
+    if (!patchViewportRef.current) return;
     const target = Array.from(
       patchViewportRef.current.querySelectorAll<HTMLElement>("[data-diff-file-path]"),
-    ).find((element) => element.dataset.diffFilePath === selectedFilePath);
+    ).find((element) => element.dataset.diffFilePath === path);
     target?.scrollIntoView({ block: "nearest" });
-  }, [selectedFilePath, renderableFiles]);
+  }, []);
+
+  useEffect(() => {
+    if (!selectedFilePath) return;
+    scrollToFile(selectedFilePath);
+  }, [selectedFilePath, renderableFiles, scrollToFile]);
+
+  const fileSearchMatchPaths = useMemo(() => {
+    const effectiveSearchQuery = fileSearchQuery.length === 0 ? "" : debouncedFileSearchQuery;
+    if (!effectiveSearchQuery) return [];
+    const lower = effectiveSearchQuery.toLowerCase();
+    return renderableFiles
+      .map((f) => resolveFileDiffPath(f))
+      .filter((p) => p.toLowerCase().includes(lower));
+  }, [debouncedFileSearchQuery, fileSearchQuery, renderableFiles]);
+
+  const fileSearchMatchIndexRef = useRef(0);
+
+  useEffect(() => {
+    fileSearchMatchIndexRef.current = 0;
+    if (fileSearchMatchPaths.length > 0) {
+      scrollToFile(fileSearchMatchPaths[0]!);
+    }
+  }, [fileSearchMatchPaths, scrollToFile]);
+
+  const allCollapsed = useMemo(
+    () =>
+      renderableFiles.length > 0 &&
+      renderableFiles.every((f) => collapsedDiffFileKeys.has(buildFileDiffRenderKey(f))),
+    [renderableFiles, collapsedDiffFileKeys],
+  );
+
+  const toggleAllDiffFilesCollapsed = useCallback(() => {
+    if (allCollapsed) {
+      setCollapsedDiffFileKeys(new Set());
+    } else {
+      setCollapsedDiffFileKeys(new Set(renderableFiles.map(buildFileDiffRenderKey)));
+    }
+  }, [allCollapsed, renderableFiles]);
 
   const openDiffFileInEditor = useCallback(
     (filePath: string) => {
@@ -586,7 +630,38 @@ export default function DiffPanel({ mode = "inline" }: DiffPanelProps) {
           ))}
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-1 [-webkit-app-region:no-drag]">
+      <div className="flex shrink-0 items-center gap-2 [-webkit-app-region:no-drag]">
+        <div className="relative flex items-center">
+          <SearchIcon className="pointer-events-none absolute left-1.5 top-1/2 z-10 size-3 -translate-y-1/2 text-muted-foreground/60" />
+          <Input
+            className="h-6 w-40 pl-5 pr-2 text-xs [&_[data-slot=input]]:h-full [&_[data-slot=input]]:px-0 [&_[data-slot=input]]:leading-6"
+            placeholder="Search files…"
+            value={fileSearchQuery}
+            onChange={(e) => setFileSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && fileSearchMatchPaths.length > 0) {
+                fileSearchMatchIndexRef.current =
+                  (fileSearchMatchIndexRef.current + 1) % fileSearchMatchPaths.length;
+                scrollToFile(fileSearchMatchPaths[fileSearchMatchIndexRef.current]!);
+              }
+            }}
+          />
+        </div>
+        <Toggle
+          aria-label={allCollapsed ? "Expand all files" : "Collapse all files"}
+          title={allCollapsed ? "Expand all files" : "Collapse all files"}
+          variant="outline"
+          size="xs"
+          pressed={allCollapsed}
+          onPressedChange={toggleAllDiffFilesCollapsed}
+          disabled={renderableFiles.length === 0}
+        >
+          {allCollapsed ? (
+            <UnfoldVerticalIcon className="size-3" />
+          ) : (
+            <FoldVerticalIcon className="size-3" />
+          )}
+        </Toggle>
         <ToggleGroup
           className="shrink-0"
           variant="outline"
