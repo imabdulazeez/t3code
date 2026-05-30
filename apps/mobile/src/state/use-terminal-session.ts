@@ -7,7 +7,6 @@ import {
   getKnownTerminalSessionListFilter,
   knownTerminalSessionsAtom,
   terminalSessionStateAtom,
-  type TerminalSessionTarget,
   type TerminalSessionState,
 } from "@t3tools/client-runtime";
 import type {
@@ -15,9 +14,21 @@ import type {
   TerminalAttachInput,
   TerminalAttachStreamEvent,
   TerminalMetadataStreamEvent,
+  TerminalOwner,
   TerminalSessionSnapshot,
+  ThreadId,
 } from "@t3tools/contracts";
 import { useMemo } from "react";
+
+export interface MobileTerminalTarget {
+  readonly environmentId: EnvironmentId | null;
+  readonly threadId: ThreadId | null;
+  readonly terminalId: string | null;
+}
+
+function threadOwner(threadId: ThreadId | null): TerminalOwner | null {
+  return threadId === null ? null : { type: "thread", threadId };
+}
 
 import { appAtomRegistry } from "./atom-registry";
 
@@ -55,14 +66,18 @@ export function attachTerminalSession(input: {
   });
 }
 
-export function useTerminalSession(input: TerminalSessionTarget): TerminalSessionState {
-  const target = getKnownTerminalSessionTarget(input);
+export function useTerminalSession(input: MobileTerminalTarget): TerminalSessionState {
+  const target = getKnownTerminalSessionTarget({
+    environmentId: input.environmentId,
+    owner: threadOwner(input.threadId),
+    terminalId: input.terminalId,
+  });
   return useAtomValue(
     target !== null ? terminalSessionStateAtom(target) : EMPTY_TERMINAL_SESSION_ATOM,
   );
 }
 
-export function useTerminalSessionTarget(input: TerminalSessionTarget) {
+export function useTerminalSessionTarget(input: MobileTerminalTarget) {
   return useMemo(
     () => ({
       environmentId: input.environmentId,
@@ -74,10 +89,13 @@ export function useTerminalSessionTarget(input: TerminalSessionTarget) {
 }
 
 export function useKnownTerminalSessions(input: {
-  readonly environmentId: TerminalSessionTarget["environmentId"];
-  readonly threadId: TerminalSessionTarget["threadId"];
+  readonly environmentId: MobileTerminalTarget["environmentId"];
+  readonly threadId: MobileTerminalTarget["threadId"];
 }) {
-  const filter = getKnownTerminalSessionListFilter(input);
+  const filter = getKnownTerminalSessionListFilter({
+    environmentId: input.environmentId,
+    owner: threadOwner(input.threadId),
+  });
   return useAtomValue(
     filter !== null ? knownTerminalSessionsAtom(filter) : EMPTY_KNOWN_TERMINAL_SESSIONS_ATOM,
   );

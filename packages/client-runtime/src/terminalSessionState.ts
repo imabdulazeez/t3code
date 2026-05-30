@@ -1,16 +1,22 @@
 import type {
   TerminalAttachStreamEvent,
   TerminalMetadataStreamEvent,
+  TerminalOwner,
   TerminalSessionSnapshot,
   TerminalSummary,
   EnvironmentId,
 } from "@t3tools/contracts";
-import { ThreadId, type TerminalAttachInput } from "@t3tools/contracts";
+import type { TerminalAttachInput } from "@t3tools/contracts";
 import * as Arr from "effect/Array";
 import { pipe } from "effect/Function";
 import * as Order from "effect/Order";
 import * as Result from "effect/Result";
 import { Atom, type AtomRegistry } from "effect/unstable/reactivity";
+import { terminalOwnerLocalKey } from "./scoped.ts";
+
+function terminalOwnersEqual(left: TerminalOwner, right: TerminalOwner): boolean {
+  return terminalOwnerLocalKey(left) === terminalOwnerLocalKey(right);
+}
 
 export interface TerminalSessionState {
   readonly summary: TerminalSummary | null;
@@ -32,13 +38,13 @@ export interface TerminalBufferState {
 
 export interface TerminalSessionTarget {
   readonly environmentId: EnvironmentId | null;
-  readonly threadId: ThreadId | null;
+  readonly owner: TerminalOwner | null;
   readonly terminalId: string | null;
 }
 
 export interface KnownTerminalSessionTarget {
   readonly environmentId: EnvironmentId;
-  readonly threadId: ThreadId;
+  readonly owner: TerminalOwner;
   readonly terminalId: string;
 }
 
@@ -54,13 +60,13 @@ export interface KnownTerminalMetadata {
 
 export interface TerminalSessionListFilter {
   readonly environmentId: EnvironmentId | null;
-  readonly threadId?: ThreadId | null;
+  readonly owner?: TerminalOwner | null;
   readonly terminalId?: string | null;
 }
 
 export interface KnownTerminalSessionListFilter {
   readonly environmentId: EnvironmentId;
-  readonly threadId: ThreadId | null;
+  readonly owner: TerminalOwner | null;
   readonly terminalId: string | null;
 }
 
@@ -161,13 +167,13 @@ export const EMPTY_TERMINAL_ID_LIST_ATOM = Atom.make(EMPTY_TERMINAL_ID_LIST).pip
 export function getKnownTerminalSessionTarget(
   target: TerminalSessionTarget,
 ): KnownTerminalSessionTarget | null {
-  if (target.environmentId === null || target.threadId === null || target.terminalId === null) {
+  if (target.environmentId === null || target.owner === null || target.terminalId === null) {
     return null;
   }
 
   return {
     environmentId: target.environmentId,
-    threadId: target.threadId,
+    owner: target.owner,
     terminalId: target.terminalId,
   };
 }
@@ -181,7 +187,7 @@ export function getKnownTerminalSessionListFilter(
 
   return {
     environmentId: filter.environmentId,
-    threadId: filter.threadId ?? null,
+    owner: filter.owner ?? null,
     terminalId: filter.terminalId ?? null,
   };
 }
@@ -192,13 +198,13 @@ function knownTargetFromSummary(
 ): KnownTerminalSessionTarget {
   return {
     environmentId,
-    threadId: ThreadId.make(summary.threadId),
+    owner: summary.owner,
     terminalId: summary.terminalId,
   };
 }
 
 function keyFromKnownTarget(target: KnownTerminalSessionTarget): string {
-  return `${target.environmentId}:${target.threadId}:${target.terminalId}`;
+  return `${target.environmentId}:${terminalOwnerLocalKey(target.owner)}:${target.terminalId}`;
 }
 
 function trimBufferToBytes(buffer: string, maxBufferBytes: number): string {
@@ -268,7 +274,7 @@ function listKnownSessionsFromMetadata(
       if (filter?.environmentId && target.environmentId !== filter.environmentId) {
         return Result.failVoid;
       }
-      if (filter?.threadId && target.threadId !== filter.threadId) {
+      if (filter?.owner && !terminalOwnersEqual(target.owner, filter.owner)) {
         return Result.failVoid;
       }
       if (filter?.terminalId && target.terminalId !== filter.terminalId) {
@@ -300,7 +306,7 @@ export const knownTerminalSessionsAtom = Atom.family((filter: KnownTerminalSessi
       (target) => get(terminalSessionBufferAtom(target)),
       {
         environmentId: filter.environmentId,
-        ...(filter.threadId !== null ? { threadId: filter.threadId } : {}),
+        ...(filter.owner !== null ? { owner: filter.owner } : {}),
         ...(filter.terminalId !== null ? { terminalId: filter.terminalId } : {}),
       },
     ),
@@ -313,7 +319,7 @@ export const runningTerminalIdsAtom = Atom.family((filter: KnownTerminalSessionL
       Object.values(get(terminalSessionMetadataAtom(filter.environmentId))),
       Arr.filterMap((entry) =>
         entry.target.environmentId === filter.environmentId &&
-        (filter.threadId === null || entry.target.threadId === filter.threadId) &&
+        (filter.owner === null || terminalOwnersEqual(entry.target.owner, filter.owner)) &&
         (filter.terminalId === null || entry.target.terminalId === filter.terminalId) &&
         entry.summary.hasRunningSubprocess
           ? Result.succeed(entry.target.terminalId)
@@ -367,7 +373,7 @@ export function createTerminalSessionManager(config: TerminalSessionManagerConfi
   ): void {
     const knownTarget = getKnownTerminalSessionTarget({
       environmentId: target.environmentId,
-      threadId: ThreadId.make(snapshot.threadId),
+      owner: snapshot.owner,
       terminalId: snapshot.terminalId,
     });
     if (knownTarget === null) {
@@ -425,7 +431,7 @@ export function createTerminalSessionManager(config: TerminalSessionManagerConfi
 
     const knownTarget = getKnownTerminalSessionTarget({
       environmentId,
-      threadId: ThreadId.make(event.threadId),
+      owner: event.owner,
       terminalId: event.terminalId,
     });
     if (knownTarget === null) {
@@ -448,7 +454,7 @@ export function createTerminalSessionManager(config: TerminalSessionManagerConfi
 
     const knownTarget = getKnownTerminalSessionTarget({
       environmentId: target.environmentId,
-      threadId: ThreadId.make(event.threadId),
+      owner: event.owner,
       terminalId: event.terminalId,
     });
     if (knownTarget === null) {

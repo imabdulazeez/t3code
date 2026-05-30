@@ -284,10 +284,10 @@ it.layer(
       );
       const third = yield* manager.open(openInput());
 
-      assert.equal(first.threadId, "thread-1");
+      assert.deepEqual(first.owner, { type: "thread", threadId: "thread-1" });
       assert.equal(first.terminalId, DEFAULT_TERMINAL_ID);
-      assert.equal(second.threadId, "thread-1");
-      assert.equal(third.threadId, "thread-1");
+      assert.deepEqual(second.owner, { type: "thread", threadId: "thread-1" });
+      assert.deepEqual(third.owner, { type: "thread", threadId: "thread-1" });
       expect(ptyAdapter.spawnInputs).toHaveLength(1);
     }),
   );
@@ -312,7 +312,7 @@ it.layer(
       const snapshot = (yield* Ref.get(attachEvents)).find((event) => event.type === "snapshot");
       expect(snapshot).toBeDefined();
       if (!snapshot || snapshot.type !== "snapshot") return;
-      assert.equal(snapshot.snapshot.threadId, "thread-1");
+      assert.deepEqual(snapshot.snapshot.owner, { type: "thread", threadId: "thread-1" });
       assert.equal(snapshot.snapshot.terminalId, DEFAULT_TERMINAL_ID);
       expect(ptyAdapter.spawnInputs).toHaveLength(1);
     }),
@@ -553,7 +553,8 @@ it.layer(
         events.some(
           (event) =>
             event.type === "cleared" &&
-            event.threadId === "thread-1" &&
+            event.owner.type === "thread" &&
+            event.owner.threadId === "thread-1" &&
             event.terminalId === DEFAULT_TERMINAL_ID,
         ),
       ).toBe(true);
@@ -1334,7 +1335,7 @@ it.layer(
         type: "snapshot",
         terminals: [
           {
-            threadId: "existing-thread",
+            owner: { type: "thread", threadId: "existing-thread" },
             terminalId: DEFAULT_TERMINAL_ID,
           },
         ],
@@ -1347,7 +1348,8 @@ it.layer(
           events.some(
             (event) =>
               event.type === "upsert" &&
-              event.terminal.threadId === "new-thread" &&
+              event.terminal.owner.type === "thread" &&
+              event.terminal.owner.threadId === "new-thread" &&
               event.terminal.terminalId === DEFAULT_TERMINAL_ID,
           ),
         ),
@@ -1364,7 +1366,8 @@ it.layer(
           events.some(
             (event) =>
               event.type === "remove" &&
-              event.threadId === "new-thread" &&
+              event.owner.type === "thread" &&
+              event.owner.threadId === "new-thread" &&
               event.terminalId === DEFAULT_TERMINAL_ID,
           ),
         ),
@@ -1415,7 +1418,7 @@ it.layer(
           {
             type: "snapshot",
             snapshot: {
-              threadId: "thread-1",
+              owner: { type: "thread", threadId: "thread-1" },
               terminalId: DEFAULT_TERMINAL_ID,
             },
           },

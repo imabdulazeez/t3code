@@ -135,7 +135,7 @@ const THREAD_ID = ThreadId.make("thread-terminal-browser");
 
 function createEnvironmentApi() {
   const snapshot = {
-    threadId: THREAD_ID,
+    owner: { type: "thread" as const, threadId: THREAD_ID },
     terminalId: "term-1",
     cwd: "/repo/project",
     worktreePath: null,
@@ -190,8 +190,10 @@ async function mountTerminalViewport(props: {
 
   const screen = await render(
     <TerminalViewport
-      threadRef={props.threadRef}
-      threadId={THREAD_ID}
+      ownerRef={{
+        environmentId: props.threadRef.environmentId,
+        owner: { type: "thread", threadId: THREAD_ID },
+      }}
       terminalId="term-1"
       terminalLabel="Terminal"
       cwd="/repo/project"
@@ -214,8 +216,10 @@ async function mountTerminalViewport(props: {
     }) => {
       await screen.rerender(
         <TerminalViewport
-          threadRef={nextProps.threadRef}
-          threadId={THREAD_ID}
+          ownerRef={{
+            environmentId: nextProps.threadRef.environmentId,
+            owner: { type: "thread", threadId: THREAD_ID },
+          }}
           terminalId="term-1"
           terminalLabel="Terminal"
           cwd="/repo/project"

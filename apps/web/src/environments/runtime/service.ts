@@ -24,9 +24,13 @@ import { Throttler } from "@tanstack/react-pacer";
 import {
   createKnownEnvironment,
   getKnownEnvironmentWsBaseUrl,
+  parseScopedThreadKey,
+  projectTerminalOwnerRef,
   scopedThreadKey,
   scopeProjectRef,
   scopeThreadRef,
+  terminalOwnerKey,
+  threadTerminalOwnerRef,
 } from "@t3tools/client-runtime";
 
 import {
@@ -35,7 +39,7 @@ import {
   useComposerDraftStore,
 } from "~/composerDraftStore";
 import { ensureLocalApi } from "~/localApi";
-import { collectActiveTerminalUiThreadKeys } from "~/lib/terminalUiStateCleanup";
+import { collectActiveTerminalOwnerKeys } from "~/lib/terminalUiStateCleanup";
 import { deriveOrchestrationBatchEffects } from "~/orchestrationEventEffects";
 import { getPrimaryKnownEnvironment } from "../primary";
 import { remoteHttpRuntime } from "../../lib/runtime";
@@ -949,15 +953,28 @@ function reconcileSnapshotDerivedState() {
   syncThreadUiFromStore();
 
   const threads = selectThreadsAcrossEnvironments(useStore.getState());
-  const activeThreadKeys = collectActiveTerminalUiThreadKeys({
+  const projects = selectProjectsAcrossEnvironments(useStore.getState());
+  const draftThreadOwnerKeys: string[] = [];
+  for (const draftThreadKey of useComposerDraftStore.getState().listDraftThreadKeys()) {
+    const parsed = parseScopedThreadKey(draftThreadKey);
+    if (parsed) {
+      draftThreadOwnerKeys.push(
+        terminalOwnerKey(threadTerminalOwnerRef(parsed.environmentId, parsed.threadId)),
+      );
+    }
+  }
+  const activeOwnerKeys = collectActiveTerminalOwnerKeys({
     snapshotThreads: threads.map((thread) => ({
-      key: scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
+      ownerKey: terminalOwnerKey(threadTerminalOwnerRef(thread.environmentId, thread.id)),
       deletedAt: null,
       archivedAt: thread.archivedAt,
     })),
-    draftThreadKeys: useComposerDraftStore.getState().listDraftThreadKeys(),
+    draftThreadOwnerKeys,
+    projectOwnerKeys: projects.map((project) =>
+      terminalOwnerKey(projectTerminalOwnerRef(project.environmentId, project.id)),
+    ),
   });
-  useTerminalUiStateStore.getState().removeOrphanedTerminalUiStates(activeThreadKeys);
+  useTerminalUiStateStore.getState().removeOrphanedTerminalUiStates(activeOwnerKeys);
 }
 
 function applyRecoveredEventBatch(
@@ -1021,12 +1038,15 @@ function applyRecoveredEventBatch(
   for (const event of events) {
     if (event.type === "project.deleted") {
       draftStore.clearProjectDraftThreadId(scopeProjectRef(environmentId, event.payload.projectId));
+      useTerminalUiStateStore
+        .getState()
+        .removeTerminalUiState(projectTerminalOwnerRef(environmentId, event.payload.projectId));
     }
   }
   for (const threadId of batchEffects.removeTerminalUiStateThreadIds) {
     useTerminalUiStateStore
       .getState()
-      .removeTerminalUiState(scopeThreadRef(environmentId, threadId));
+      .removeTerminalUiState(threadTerminalOwnerRef(environmentId, threadId));
   }
 
   reconcileThreadDetailSubscriptionEvictionForEnvironment(environmentId);
@@ -1072,7 +1092,11 @@ function applyShellEvent(event: OrchestrationShellStreamEvent, environmentId: En
         markPromotedDraftThreadByRef(threadRef);
       }
       if (previousThread?.archivedAt === null && event.thread.archivedAt !== null && threadRef) {
-        useTerminalUiStateStore.getState().removeTerminalUiState(threadRef);
+        useTerminalUiStateStore
+          .getState()
+          .removeTerminalUiState(
+            threadTerminalOwnerRef(threadRef.environmentId, threadRef.threadId),
+          );
       }
       reconcileThreadDetailSubscriptionEvictionForThread(environmentId, event.thread.id);
       evictIdleThreadDetailSubscriptionsToCapacity();
@@ -1082,7 +1106,11 @@ function applyShellEvent(event: OrchestrationShellStreamEvent, environmentId: En
         disposeThreadDetailSubscriptionByKey(scopedThreadKey(threadRef));
         useComposerDraftStore.getState().clearDraftThread(threadRef);
         useUiStateStore.getState().clearThreadUi(scopedThreadKey(threadRef));
-        useTerminalUiStateStore.getState().removeTerminalUiState(threadRef);
+        useTerminalUiStateStore
+          .getState()
+          .removeTerminalUiState(
+            threadTerminalOwnerRef(threadRef.environmentId, threadRef.threadId),
+          );
       }
       syncThreadUiFromStore();
       return;

@@ -21,13 +21,13 @@ function makeKnownSession(input: {
   return {
     target: {
       environmentId: EnvironmentId.make("env-1"),
-      threadId: ThreadId.make("thread-1"),
+      owner: { type: "thread", threadId: ThreadId.make("thread-1") },
       terminalId: input.terminalId,
     },
     state: {
       summary: input.cwd
         ? {
-            threadId: "thread-1",
+            owner: { type: "thread", threadId: "thread-1" },
             terminalId: input.terminalId,
             cwd: input.cwd,
             worktreePath: input.cwd,

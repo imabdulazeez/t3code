@@ -22,7 +22,12 @@ import {
   DEFAULT_TERMINAL_ID,
   ServerConfig as ServerConfigSchema,
 } from "@t3tools/contracts";
-import { scopedThreadKey, scopeThreadRef } from "@t3tools/client-runtime";
+import {
+  scopedThreadKey,
+  scopeThreadRef,
+  terminalOwnerKey,
+  threadTerminalOwnerRef,
+} from "@t3tools/client-runtime";
 import { createModelCapabilities, createModelSelection } from "@t3tools/shared/model";
 import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import * as Option from "effect/Option";
@@ -107,6 +112,7 @@ const LOCAL_ENVIRONMENT_ID = EnvironmentId.make("environment-local");
 const REMOTE_ENVIRONMENT_ID = EnvironmentId.make("environment-remote");
 const THREAD_REF = scopeThreadRef(LOCAL_ENVIRONMENT_ID, THREAD_ID);
 const THREAD_KEY = scopedThreadKey(THREAD_REF);
+const THREAD_OWNER_KEY = terminalOwnerKey(threadTerminalOwnerRef(LOCAL_ENVIRONMENT_ID, THREAD_ID));
 const UUID_ROUTE_RE = /^\/draft\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const PROJECT_DRAFT_KEY = `${LOCAL_ENVIRONMENT_ID}:${PROJECT_ID}`;
 const PROJECT_LOGICAL_KEY = deriveLogicalProjectKeyFromSettings(
@@ -1762,7 +1768,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
     });
     useTerminalUiStateStore.persist.clearStorage();
     useTerminalUiStateStore.setState({
-      terminalUiStateByThreadKey: {},
+      terminalUiStateByOwnerKey: {},
     });
   });
 
@@ -1940,8 +1946,8 @@ describe("ChatView timeline estimator parity (full app)", () => {
     }
 
     useTerminalUiStateStore.setState({
-      terminalUiStateByThreadKey: {
-        [THREAD_KEY]: {
+      terminalUiStateByOwnerKey: {
+        [THREAD_OWNER_KEY]: {
           terminalOpen: true,
           terminalHeight: 280,
           terminalIds: ["default"],
@@ -1960,7 +1966,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
           {
             type: "upsert",
             terminal: {
-              threadId: THREAD_ID,
+              owner: { type: "thread", threadId: THREAD_ID },
               terminalId: DEFAULT_TERMINAL_ID,
               cwd: "/repo/project",
               worktreePath: null,
@@ -2569,7 +2575,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
 
   it("sends bootstrap turn-starts and waits for server setup on first-send worktree drafts", async () => {
     useTerminalUiStateStore.setState({
-      terminalUiStateByThreadKey: {},
+      terminalUiStateByOwnerKey: {},
     });
     useComposerDraftStore.setState({
       draftThreadsByThreadKey: {
@@ -3074,7 +3080,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
 
   it("shows the send state once bootstrap dispatch is in flight", async () => {
     useTerminalUiStateStore.setState({
-      terminalUiStateByThreadKey: {},
+      terminalUiStateByOwnerKey: {},
     });
     useComposerDraftStore.setState({
       draftThreadsByThreadKey: {
@@ -3910,7 +3916,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
           {
             type: "upsert",
             terminal: {
-              threadId: THREAD_ID,
+              owner: { type: "thread", threadId: THREAD_ID },
               terminalId: DEFAULT_TERMINAL_ID,
               cwd: "/repo/project",
               worktreePath: null,
@@ -3933,7 +3939,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
           expect(
             terminalSessionManager.listSessions({
               environmentId: LOCAL_ENVIRONMENT_ID,
-              threadId: THREAD_ID,
+              owner: { type: "thread", threadId: THREAD_ID },
             }),
           ).toMatchObject([
             {

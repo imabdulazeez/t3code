@@ -230,7 +230,7 @@ describe("TerminalSessionSnapshot", () => {
   it("accepts running snapshots", () => {
     expect(
       decodes(TerminalSessionSnapshot, {
-        threadId: "thread-1",
+        owner: threadOwner,
         terminalId: DEFAULT_TERMINAL_ID,
         cwd: "/tmp/project",
         worktreePath: null,
@@ -253,7 +253,7 @@ describe("TerminalEvent", () => {
     expect(
       decodes(TerminalEvent, {
         type: "output",
-        threadId: "thread-1",
+        owner: threadOwner,
         terminalId: DEFAULT_TERMINAL_ID,
         data: "line\n",
       }),
@@ -264,7 +264,7 @@ describe("TerminalEvent", () => {
     expect(
       decodes(TerminalEvent, {
         type: "exited",
-        threadId: "thread-1",
+        owner: threadOwner,
         terminalId: DEFAULT_TERMINAL_ID,
         exitCode: 0,
         exitSignal: null,
@@ -276,7 +276,7 @@ describe("TerminalEvent", () => {
     expect(
       decodes(TerminalEvent, {
         type: "closed",
-        threadId: "thread-1",
+        owner: threadOwner,
         terminalId: DEFAULT_TERMINAL_ID,
       }),
     ).toBe(true);
@@ -286,7 +286,7 @@ describe("TerminalEvent", () => {
     expect(
       decodes(TerminalEvent, {
         type: "activity",
-        threadId: "thread-1",
+        owner: threadOwner,
         terminalId: DEFAULT_TERMINAL_ID,
         hasRunningSubprocess: true,
         label: "vim",
@@ -298,10 +298,10 @@ describe("TerminalEvent", () => {
     expect(
       decodes(TerminalEvent, {
         type: "started",
-        threadId: "thread-1",
+        owner: threadOwner,
         terminalId: DEFAULT_TERMINAL_ID,
         snapshot: {
-          threadId: "thread-1",
+          owner: threadOwner,
           terminalId: DEFAULT_TERMINAL_ID,
           cwd: "/tmp/project/.t3/worktrees/feature-a",
           worktreePath: "/tmp/project/.t3/worktrees/feature-a",

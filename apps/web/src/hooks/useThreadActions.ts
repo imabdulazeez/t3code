@@ -1,4 +1,9 @@
-import { parseScopedThreadKey, scopeProjectRef, scopeThreadRef } from "@t3tools/client-runtime";
+import {
+  parseScopedThreadKey,
+  scopeProjectRef,
+  scopeThreadRef,
+  threadTerminalOwnerRef,
+} from "@t3tools/client-runtime";
 import { type ScopedThreadRef, ThreadId } from "@t3tools/contracts";
 import { useRouter } from "@tanstack/react-router";
 import { useCallback, useRef } from "react";
@@ -196,7 +201,7 @@ export function useThreadActions() {
         scopeProjectRef(threadRef.environmentId, thread.projectId),
         threadRef,
       );
-      clearTerminalUiState(threadRef);
+      clearTerminalUiState(threadTerminalOwnerRef(threadRef.environmentId, threadRef.threadId));
 
       if (shouldNavigateToFallback) {
         if (fallbackThreadId) {

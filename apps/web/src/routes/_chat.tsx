@@ -9,6 +9,7 @@ import {
 } from "../lib/chatThreadActions";
 import { isTerminalFocused } from "../lib/terminalFocus";
 import { resolveShortcutCommand } from "../keybindings";
+import { threadTerminalOwnerRef } from "@t3tools/client-runtime";
 import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../terminalUiStateStore";
 import { useThreadSelectionStore } from "../threadSelectionStore";
 import { resolveSidebarNewThreadEnvMode } from "~/components/Sidebar.logic";
@@ -23,7 +24,10 @@ function ChatRouteGlobalShortcuts() {
   const keybindings = useServerKeybindings();
   const terminalOpen = useTerminalUiStateStore((state) =>
     routeThreadRef
-      ? selectThreadTerminalUiState(state.terminalUiStateByThreadKey, routeThreadRef).terminalOpen
+      ? selectThreadTerminalUiState(
+          state.terminalUiStateByOwnerKey,
+          threadTerminalOwnerRef(routeThreadRef.environmentId, routeThreadRef.threadId),
+        ).terminalOpen
       : false,
   );
   const appSettings = useSettings();

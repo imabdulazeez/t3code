@@ -1,12 +1,18 @@
 /**
- * Single Zustand store for terminal UI state keyed by scoped thread identity.
+ * Single Zustand store for terminal UI state keyed by scoped terminal owner.
  *
  * Terminal UI transition helpers are intentionally private to keep the public
  * API constrained to store actions/selectors.
  */
 
-import { parseScopedThreadKey, scopedThreadKey } from "@t3tools/client-runtime";
-import { type ScopedThreadRef } from "@t3tools/contracts";
+import {
+  parseScopedThreadKey,
+  projectTerminalOwnerRef,
+  terminalOwnerKey,
+  type TerminalOwnerRef,
+  threadTerminalOwnerRef,
+} from "@t3tools/client-runtime";
+import { type ProjectId, type ProjectScriptScope } from "@t3tools/contracts";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { resolveStorage } from "./lib/storage";
@@ -16,6 +22,18 @@ import {
   MAX_TERMINALS_PER_GROUP,
   type ThreadTerminalGroup,
 } from "./types";
+
+const LEGACY_PROJECT_TERMINAL_THREAD_PREFIX = "project:";
+
+function ownerRefLocalId(ownerRef: TerminalOwnerRef): string {
+  return ownerRef.owner.type === "thread" ? ownerRef.owner.threadId : ownerRef.owner.projectId;
+}
+
+function isUsableOwnerRef(
+  ownerRef: TerminalOwnerRef | null | undefined,
+): ownerRef is TerminalOwnerRef {
+  return Boolean(ownerRef) && ownerRefLocalId(ownerRef as TerminalOwnerRef).length > 0;
+}
 
 interface ThreadTerminalUiState {
   terminalOpen: boolean;
@@ -30,28 +48,69 @@ interface ThreadTerminalUiState {
 const TERMINAL_UI_STATE_STORAGE_KEY = "t3code:terminal-state:v1";
 
 interface PersistedTerminalUiStateStoreState {
+  terminalUiStateByOwnerKey?: Record<string, ThreadTerminalUiState>;
   terminalUiStateByThreadKey?: Record<string, ThreadTerminalUiState>;
   terminalStateByThreadKey?: Record<string, ThreadTerminalUiState>;
+  defaultTerminalScopeByProjectId?: Record<string, ProjectScriptScope>;
+}
+
+function migrateLegacyThreadKeyToOwnerKey(legacyKey: string): string | null {
+  const parsed = parseScopedThreadKey(legacyKey);
+  if (!parsed) {
+    return null;
+  }
+  const localId = parsed.threadId as unknown as string;
+  if (localId.startsWith(LEGACY_PROJECT_TERMINAL_THREAD_PREFIX)) {
+    const projectId = localId.slice(LEGACY_PROJECT_TERMINAL_THREAD_PREFIX.length);
+    if (projectId.length === 0) {
+      return null;
+    }
+    return terminalOwnerKey(projectTerminalOwnerRef(parsed.environmentId, projectId as ProjectId));
+  }
+  return terminalOwnerKey(threadTerminalOwnerRef(parsed.environmentId, parsed.threadId));
+}
+
+function resolveOwnerStateKey(rawKey: string, version: number): string | null {
+  if (version >= 5) {
+    return rawKey.includes("::") ? rawKey : null;
+  }
+  return migrateLegacyThreadKeyToOwnerKey(rawKey);
 }
 
 export function migratePersistedTerminalUiStateStoreState(
   persistedState: unknown,
-  _version: number,
+  version: number,
 ): PersistedTerminalUiStateStoreState {
   if (!persistedState || typeof persistedState !== "object") {
-    return { terminalUiStateByThreadKey: {} };
+    return { terminalUiStateByOwnerKey: {}, defaultTerminalScopeByProjectId: {} };
   }
 
   const candidate = persistedState as PersistedTerminalUiStateStoreState;
-  const persistedUiStateByThreadKey =
-    candidate.terminalUiStateByThreadKey ?? candidate.terminalStateByThreadKey ?? {};
-  const terminalUiStateByThreadKey = Object.fromEntries(
-    Object.entries(persistedUiStateByThreadKey).filter(([threadKey]) =>
-      parseScopedThreadKey(threadKey),
-    ),
-  );
+  const persistedUiState =
+    candidate.terminalUiStateByOwnerKey ??
+    candidate.terminalUiStateByThreadKey ??
+    candidate.terminalStateByThreadKey ??
+    {};
+  const terminalUiStateByOwnerKey: Record<string, ThreadTerminalUiState> = {};
+  for (const [rawKey, uiState] of Object.entries(persistedUiState)) {
+    const ownerKey = resolveOwnerStateKey(rawKey, version);
+    if (!ownerKey) {
+      continue;
+    }
+    terminalUiStateByOwnerKey[ownerKey] = uiState;
+  }
 
-  return { terminalUiStateByThreadKey };
+  const defaultTerminalScopeByProjectId =
+    candidate.defaultTerminalScopeByProjectId &&
+    typeof candidate.defaultTerminalScopeByProjectId === "object"
+      ? Object.fromEntries(
+          Object.entries(candidate.defaultTerminalScopeByProjectId).filter(
+            ([, scope]) => scope === "chat" || scope === "project",
+          ),
+        )
+      : {};
+
+  return { terminalUiStateByOwnerKey, defaultTerminalScopeByProjectId };
 }
 
 function createTerminalUiStateStorage() {
@@ -233,8 +292,8 @@ function isValidTerminalId(terminalId: string): boolean {
   return terminalId.trim().length > 0;
 }
 
-function terminalThreadKey(threadRef: ScopedThreadRef): string {
-  return scopedThreadKey(threadRef);
+function terminalUiStateKey(ownerRef: TerminalOwnerRef): string {
+  return terminalOwnerKey(ownerRef);
 }
 
 function copyTerminalGroups(groups: ThreadTerminalGroup[]): ThreadTerminalGroup[] {
@@ -464,100 +523,118 @@ function reconcileThreadTerminalSessionIds(
 }
 
 export function selectThreadTerminalUiState(
-  terminalUiStateByThreadKey: Record<string, ThreadTerminalUiState>,
-  threadRef: ScopedThreadRef | null | undefined,
+  terminalUiStateByOwnerKey: Record<string, ThreadTerminalUiState>,
+  ownerRef: TerminalOwnerRef | null | undefined,
 ): ThreadTerminalUiState {
-  if (!threadRef || threadRef.threadId.length === 0) {
+  if (!isUsableOwnerRef(ownerRef)) {
     return getDefaultThreadTerminalUiState();
   }
   return (
-    terminalUiStateByThreadKey[terminalThreadKey(threadRef)] ?? getDefaultThreadTerminalUiState()
+    terminalUiStateByOwnerKey[terminalUiStateKey(ownerRef)] ?? getDefaultThreadTerminalUiState()
   );
 }
 
-function updateTerminalUiStateByThreadKey(
-  terminalUiStateByThreadKey: Record<string, ThreadTerminalUiState>,
-  threadRef: ScopedThreadRef,
+function updateTerminalUiStateByOwnerKey(
+  terminalUiStateByOwnerKey: Record<string, ThreadTerminalUiState>,
+  ownerRef: TerminalOwnerRef,
   updater: (state: ThreadTerminalUiState) => ThreadTerminalUiState,
 ): Record<string, ThreadTerminalUiState> {
-  if (threadRef.threadId.length === 0) {
-    return terminalUiStateByThreadKey;
+  if (!isUsableOwnerRef(ownerRef)) {
+    return terminalUiStateByOwnerKey;
   }
 
-  const threadKey = terminalThreadKey(threadRef);
-  const current = selectThreadTerminalUiState(terminalUiStateByThreadKey, threadRef);
+  const ownerKey = terminalUiStateKey(ownerRef);
+  const current = selectThreadTerminalUiState(terminalUiStateByOwnerKey, ownerRef);
   const next = updater(current);
   if (next === current) {
-    return terminalUiStateByThreadKey;
+    return terminalUiStateByOwnerKey;
   }
 
   if (isDefaultThreadTerminalUiState(next)) {
-    if (terminalUiStateByThreadKey[threadKey] === undefined) {
-      return terminalUiStateByThreadKey;
+    if (terminalUiStateByOwnerKey[ownerKey] === undefined) {
+      return terminalUiStateByOwnerKey;
     }
-    const { [threadKey]: _removed, ...rest } = terminalUiStateByThreadKey;
+    const { [ownerKey]: _removed, ...rest } = terminalUiStateByOwnerKey;
     return rest;
   }
 
   return {
-    ...terminalUiStateByThreadKey,
-    [threadKey]: next,
+    ...terminalUiStateByOwnerKey,
+    [ownerKey]: next,
   };
 }
 
 interface TerminalUiStateStoreState {
-  terminalUiStateByThreadKey: Record<string, ThreadTerminalUiState>;
-  setTerminalOpen: (threadRef: ScopedThreadRef, open: boolean) => void;
-  setTerminalHeight: (threadRef: ScopedThreadRef, height: number) => void;
-  splitTerminal: (threadRef: ScopedThreadRef, terminalId: string) => void;
-  newTerminal: (threadRef: ScopedThreadRef, terminalId: string) => void;
+  terminalUiStateByOwnerKey: Record<string, ThreadTerminalUiState>;
+  defaultTerminalScopeByProjectId: Record<string, ProjectScriptScope>;
+  setDefaultTerminalScope: (projectId: string, scope: ProjectScriptScope) => void;
+  setTerminalOpen: (ownerRef: TerminalOwnerRef, open: boolean) => void;
+  setTerminalHeight: (ownerRef: TerminalOwnerRef, height: number) => void;
+  splitTerminal: (ownerRef: TerminalOwnerRef, terminalId: string) => void;
+  newTerminal: (ownerRef: TerminalOwnerRef, terminalId: string) => void;
   ensureTerminal: (
-    threadRef: ScopedThreadRef,
+    ownerRef: TerminalOwnerRef,
     terminalId: string,
     options?: { open?: boolean; active?: boolean },
   ) => void;
-  setActiveTerminal: (threadRef: ScopedThreadRef, terminalId: string) => void;
-  closeTerminal: (threadRef: ScopedThreadRef, terminalId: string) => void;
-  reconcileTerminalIds: (threadRef: ScopedThreadRef, nextIds: string[]) => void;
-  clearTerminalUiState: (threadRef: ScopedThreadRef) => void;
-  removeTerminalUiState: (threadRef: ScopedThreadRef) => void;
-  removeOrphanedTerminalUiStates: (activeThreadKeys: Set<string>) => void;
+  setActiveTerminal: (ownerRef: TerminalOwnerRef, terminalId: string) => void;
+  closeTerminal: (ownerRef: TerminalOwnerRef, terminalId: string) => void;
+  reconcileTerminalIds: (ownerRef: TerminalOwnerRef, nextIds: string[]) => void;
+  clearTerminalUiState: (ownerRef: TerminalOwnerRef) => void;
+  removeTerminalUiState: (ownerRef: TerminalOwnerRef) => void;
+  removeOrphanedTerminalUiStates: (activeOwnerKeys: Set<string>) => void;
 }
 
 export const useTerminalUiStateStore = create<TerminalUiStateStoreState>()(
   persist(
     (set) => {
       const updateTerminal = (
-        threadRef: ScopedThreadRef,
+        ownerRef: TerminalOwnerRef,
         updater: (state: ThreadTerminalUiState) => ThreadTerminalUiState,
       ) => {
         set((state) => {
-          const nextTerminalUiStateByThreadKey = updateTerminalUiStateByThreadKey(
-            state.terminalUiStateByThreadKey,
-            threadRef,
+          const nextTerminalUiStateByOwnerKey = updateTerminalUiStateByOwnerKey(
+            state.terminalUiStateByOwnerKey,
+            ownerRef,
             updater,
           );
-          if (nextTerminalUiStateByThreadKey === state.terminalUiStateByThreadKey) {
+          if (nextTerminalUiStateByOwnerKey === state.terminalUiStateByOwnerKey) {
             return state;
           }
           return {
-            terminalUiStateByThreadKey: nextTerminalUiStateByThreadKey,
+            terminalUiStateByOwnerKey: nextTerminalUiStateByOwnerKey,
           };
         });
       };
 
       return {
-        terminalUiStateByThreadKey: {},
-        setTerminalOpen: (threadRef, open) =>
-          updateTerminal(threadRef, (state) => setThreadTerminalOpen(state, open)),
-        setTerminalHeight: (threadRef, height) =>
-          updateTerminal(threadRef, (state) => setThreadTerminalHeight(state, height)),
-        splitTerminal: (threadRef, terminalId) =>
-          updateTerminal(threadRef, (state) => splitThreadTerminal(state, terminalId)),
-        newTerminal: (threadRef, terminalId) =>
-          updateTerminal(threadRef, (state) => newThreadTerminal(state, terminalId)),
-        ensureTerminal: (threadRef, terminalId, options) =>
-          updateTerminal(threadRef, (state) => {
+        terminalUiStateByOwnerKey: {},
+        defaultTerminalScopeByProjectId: {},
+        setDefaultTerminalScope: (projectId, scope) =>
+          set((state) => {
+            if (
+              projectId.length === 0 ||
+              state.defaultTerminalScopeByProjectId[projectId] === scope
+            ) {
+              return state;
+            }
+            return {
+              defaultTerminalScopeByProjectId: {
+                ...state.defaultTerminalScopeByProjectId,
+                [projectId]: scope,
+              },
+            };
+          }),
+        setTerminalOpen: (ownerRef, open) =>
+          updateTerminal(ownerRef, (state) => setThreadTerminalOpen(state, open)),
+        setTerminalHeight: (ownerRef, height) =>
+          updateTerminal(ownerRef, (state) => setThreadTerminalHeight(state, height)),
+        splitTerminal: (ownerRef, terminalId) =>
+          updateTerminal(ownerRef, (state) => splitThreadTerminal(state, terminalId)),
+        newTerminal: (ownerRef, terminalId) =>
+          updateTerminal(ownerRef, (state) => newThreadTerminal(state, terminalId)),
+        ensureTerminal: (ownerRef, terminalId, options) =>
+          updateTerminal(ownerRef, (state) => {
             let nextState = state;
             if (!state.terminalIds.includes(terminalId)) {
               nextState = newThreadTerminal(nextState, terminalId);
@@ -577,64 +654,65 @@ export const useTerminalUiStateStore = create<TerminalUiStateStoreState>()(
             }
             return normalizeThreadTerminalUiState(nextState);
           }),
-        setActiveTerminal: (threadRef, terminalId) =>
-          updateTerminal(threadRef, (state) => setThreadActiveTerminal(state, terminalId)),
-        closeTerminal: (threadRef, terminalId) =>
-          updateTerminal(threadRef, (state) => closeThreadTerminal(state, terminalId)),
-        reconcileTerminalIds: (threadRef, nextIds) =>
-          updateTerminal(threadRef, (state) => reconcileThreadTerminalSessionIds(state, nextIds)),
-        clearTerminalUiState: (threadRef) =>
+        setActiveTerminal: (ownerRef, terminalId) =>
+          updateTerminal(ownerRef, (state) => setThreadActiveTerminal(state, terminalId)),
+        closeTerminal: (ownerRef, terminalId) =>
+          updateTerminal(ownerRef, (state) => closeThreadTerminal(state, terminalId)),
+        reconcileTerminalIds: (ownerRef, nextIds) =>
+          updateTerminal(ownerRef, (state) => reconcileThreadTerminalSessionIds(state, nextIds)),
+        clearTerminalUiState: (ownerRef) =>
           set((state) => {
-            const nextTerminalUiStateByThreadKey = updateTerminalUiStateByThreadKey(
-              state.terminalUiStateByThreadKey,
-              threadRef,
+            const nextTerminalUiStateByOwnerKey = updateTerminalUiStateByOwnerKey(
+              state.terminalUiStateByOwnerKey,
+              ownerRef,
               () => createDefaultThreadTerminalUiState(),
             );
-            if (nextTerminalUiStateByThreadKey === state.terminalUiStateByThreadKey) {
+            if (nextTerminalUiStateByOwnerKey === state.terminalUiStateByOwnerKey) {
               return state;
             }
             return {
-              terminalUiStateByThreadKey: nextTerminalUiStateByThreadKey,
+              terminalUiStateByOwnerKey: nextTerminalUiStateByOwnerKey,
             };
           }),
-        removeTerminalUiState: (threadRef) =>
+        removeTerminalUiState: (ownerRef) =>
           set((state) => {
-            const threadKey = terminalThreadKey(threadRef);
-            const hadTerminalUiState = state.terminalUiStateByThreadKey[threadKey] !== undefined;
+            const ownerKey = terminalUiStateKey(ownerRef);
+            const hadTerminalUiState = state.terminalUiStateByOwnerKey[ownerKey] !== undefined;
             if (!hadTerminalUiState) {
               return state;
             }
-            const nextTerminalUiStateByThreadKey = { ...state.terminalUiStateByThreadKey };
-            delete nextTerminalUiStateByThreadKey[threadKey];
+            const nextTerminalUiStateByOwnerKey = { ...state.terminalUiStateByOwnerKey };
+            delete nextTerminalUiStateByOwnerKey[ownerKey];
             return {
-              terminalUiStateByThreadKey: nextTerminalUiStateByThreadKey,
+              terminalUiStateByOwnerKey: nextTerminalUiStateByOwnerKey,
             };
           }),
-        removeOrphanedTerminalUiStates: (activeThreadKeys) =>
+        removeOrphanedTerminalUiStates: (activeOwnerKeys) =>
           set((state) => {
-            const orphanedIds = Object.keys(state.terminalUiStateByThreadKey).filter(
-              (key) => !activeThreadKeys.has(key),
+            const orphanedIds = Object.keys(state.terminalUiStateByOwnerKey).filter(
+              (key) => !activeOwnerKeys.has(key),
             );
             if (orphanedIds.length === 0) {
               return state;
             }
-            const next = { ...state.terminalUiStateByThreadKey };
+            const next = { ...state.terminalUiStateByOwnerKey };
             for (const id of orphanedIds) {
               delete next[id];
             }
             return {
-              terminalUiStateByThreadKey: next,
+              terminalUiStateByOwnerKey: next,
             };
           }),
       };
     },
     {
       name: TERMINAL_UI_STATE_STORAGE_KEY,
-      version: 4,
+      version: 5,
       storage: createJSONStorage(createTerminalUiStateStorage),
       migrate: migratePersistedTerminalUiStateStoreState,
       partialize: (state) => ({
-        terminalUiStateByThreadKey: state.terminalUiStateByThreadKey,
+        terminalUiStateByOwnerKey: state.terminalUiStateByOwnerKey,
+        defaultTerminalScopeByProjectId: state.defaultTerminalScopeByProjectId,
       }),
     },
   ),

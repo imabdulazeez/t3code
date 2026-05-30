@@ -6,7 +6,6 @@ import {
   TerminalAttachStreamEvent,
   TerminalMetadataStreamEvent,
   TerminalSessionSnapshot,
-  ThreadId,
 } from "@t3tools/contracts";
 
 import {
@@ -27,12 +26,12 @@ function resetAtomRegistry() {
 
 const TARGET = {
   environmentId: EnvironmentId.make("env-local"),
-  threadId: ThreadId.make("thread-1"),
+  owner: { type: "thread", threadId: "thread-1" },
   terminalId: "term-1",
 } as const;
 
 const BASE_SNAPSHOT: TerminalSessionSnapshot = {
-  threadId: TARGET.threadId,
+  owner: TARGET.owner,
   terminalId: TARGET.terminalId,
   cwd: "/repo",
   worktreePath: null,
@@ -55,7 +54,7 @@ function applyAttachEvents(
   manager.attach({
     environmentId: target.environmentId,
     terminal: {
-      owner: { type: "thread", threadId: target.threadId },
+      owner: target.owner,
       terminalId: target.terminalId,
     },
     client: {
@@ -104,7 +103,7 @@ describe("createTerminalSessionManager", () => {
       },
       {
         type: "output",
-        threadId: TARGET.threadId,
+        owner: TARGET.owner,
         terminalId: TARGET.terminalId,
         data: " world",
       },
@@ -128,7 +127,7 @@ describe("createTerminalSessionManager", () => {
     applyAttachEvents(manager, TARGET, [
       {
         type: "output",
-        threadId: TARGET.threadId,
+        owner: TARGET.owner,
         terminalId: TARGET.terminalId,
         data: "abcdef",
       },
@@ -146,7 +145,7 @@ describe("createTerminalSessionManager", () => {
     applyAttachEvents(manager, TARGET, [
       {
         type: "output",
-        threadId: TARGET.threadId,
+        owner: TARGET.owner,
         terminalId: TARGET.terminalId,
         data: "🙂🙂",
       },
@@ -161,7 +160,7 @@ describe("createTerminalSessionManager", () => {
     });
     const otherTarget = {
       environmentId: EnvironmentId.make("env-remote"),
-      threadId: ThreadId.make("thread-1"),
+      owner: { type: "thread", threadId: "thread-1" },
       terminalId: "term-1",
     } as const;
 
@@ -169,7 +168,7 @@ describe("createTerminalSessionManager", () => {
       applyAttachEvents(manager, target, [
         {
           type: "output",
-          threadId: target.threadId,
+          owner: target.owner,
           terminalId: target.terminalId,
           data: target.environmentId,
         },
@@ -192,7 +191,7 @@ describe("createTerminalSessionManager", () => {
         type: "snapshot",
         terminals: [
           {
-            threadId: TARGET.threadId,
+            owner: TARGET.owner,
             terminalId: "term-10",
             cwd: "/repo",
             worktreePath: null,
@@ -205,7 +204,7 @@ describe("createTerminalSessionManager", () => {
             label: "Terminal 10",
           },
           {
-            threadId: TARGET.threadId,
+            owner: TARGET.owner,
             terminalId: TARGET.terminalId,
             cwd: "/repo",
             worktreePath: null,
@@ -218,7 +217,7 @@ describe("createTerminalSessionManager", () => {
             label: "Terminal 1",
           },
           {
-            threadId: TARGET.threadId,
+            owner: TARGET.owner,
             terminalId: "term-2",
             cwd: "/repo",
             worktreePath: null,
@@ -238,7 +237,7 @@ describe("createTerminalSessionManager", () => {
       manager
         .listSessions({
           environmentId: TARGET.environmentId,
-          threadId: TARGET.threadId,
+          owner: TARGET.owner,
         })
         .map((session) => session.target.terminalId),
     ).toEqual(["term-1", "term-2", "term-10"]);
@@ -252,7 +251,7 @@ describe("createTerminalSessionManager", () => {
     applyAttachEvents(manager, TARGET, [
       {
         type: "output",
-        threadId: TARGET.threadId,
+        owner: TARGET.owner,
         terminalId: TARGET.terminalId,
         data: "hello",
       },
@@ -263,7 +262,7 @@ describe("createTerminalSessionManager", () => {
     expect(
       manager.listSessions({
         environmentId: TARGET.environmentId,
-        threadId: TARGET.threadId,
+        owner: TARGET.owner,
       }),
     ).toEqual([]);
   });
@@ -277,7 +276,7 @@ describe("createTerminalSessionManager", () => {
       {
         type: "upsert",
         terminal: {
-          threadId: TARGET.threadId,
+          owner: TARGET.owner,
           terminalId: TARGET.terminalId,
           cwd: "/repo",
           worktreePath: null,
@@ -298,14 +297,14 @@ describe("createTerminalSessionManager", () => {
       },
       {
         type: "closed",
-        threadId: TARGET.threadId,
+        owner: TARGET.owner,
         terminalId: TARGET.terminalId,
       },
     ]);
     applyMetadataEvents(manager, TARGET.environmentId, [
       {
         type: "remove",
-        threadId: TARGET.threadId,
+        owner: TARGET.owner,
         terminalId: TARGET.terminalId,
       },
     ]);
@@ -313,7 +312,7 @@ describe("createTerminalSessionManager", () => {
     expect(
       manager.listSessions({
         environmentId: TARGET.environmentId,
-        threadId: TARGET.threadId,
+        owner: TARGET.owner,
       }),
     ).toEqual([]);
     expect(manager.getSnapshot(TARGET)).toMatchObject({
@@ -336,7 +335,7 @@ describe("createTerminalSessionManager", () => {
       },
       {
         type: "closed",
-        threadId: TARGET.threadId,
+        owner: TARGET.owner,
         terminalId: TARGET.terminalId,
       },
     ]);
@@ -392,7 +391,7 @@ describe("createTerminalSessionManager", () => {
       manager,
       {
         environmentId: TARGET.environmentId,
-        threadId: TARGET.threadId,
+        owner: TARGET.owner,
         terminalId: "term-2",
       },
       [
@@ -413,7 +412,7 @@ describe("createTerminalSessionManager", () => {
         type: "snapshot",
         terminals: [
           {
-            threadId: TARGET.threadId,
+            owner: TARGET.owner,
             terminalId: "term-2",
             cwd: "/repo",
             worktreePath: null,
@@ -432,13 +431,13 @@ describe("createTerminalSessionManager", () => {
     expect(
       manager.listSessions({
         environmentId: TARGET.environmentId,
-        threadId: TARGET.threadId,
+        owner: TARGET.owner,
       }),
     ).toMatchObject([
       {
         target: {
           environmentId: TARGET.environmentId,
-          threadId: TARGET.threadId,
+          owner: TARGET.owner,
           terminalId: "term-2",
         },
         state: {
@@ -461,7 +460,7 @@ describe("createTerminalSessionManager", () => {
       {
         type: "upsert",
         terminal: {
-          threadId: TARGET.threadId,
+          owner: TARGET.owner,
           terminalId: TARGET.terminalId,
           cwd: "/repo",
           worktreePath: null,
@@ -480,7 +479,7 @@ describe("createTerminalSessionManager", () => {
       {
         type: "upsert",
         terminal: {
-          threadId: TARGET.threadId,
+          owner: TARGET.owner,
           terminalId: TARGET.terminalId,
           cwd: "/repo",
           worktreePath: null,
@@ -496,7 +495,7 @@ describe("createTerminalSessionManager", () => {
     ]);
 
     expect(
-      manager.listSessions({ environmentId: TARGET.environmentId, threadId: TARGET.threadId }),
+      manager.listSessions({ environmentId: TARGET.environmentId, owner: TARGET.owner }),
     ).toMatchObject([
       {
         state: {
@@ -515,7 +514,7 @@ describe("createTerminalSessionManager", () => {
       {
         type: "upsert",
         terminal: {
-          threadId: TARGET.threadId,
+          owner: TARGET.owner,
           terminalId: TARGET.terminalId,
           cwd: "/repo",
           worktreePath: null,
@@ -539,7 +538,7 @@ describe("createTerminalSessionManager", () => {
     const equalTarget = { ...TARGET };
     const filter = getKnownTerminalSessionListFilter({
       environmentId: TARGET.environmentId,
-      threadId: TARGET.threadId,
+      owner: TARGET.owner,
     });
     expect(filter).not.toBeNull();
     if (filter === null) {

@@ -85,7 +85,7 @@ describe("ProjectSetupScriptRunner", () => {
   it("opens the deterministic setup terminal with worktree env and writes the command", async () => {
     const open = vi.fn(() =>
       Effect.succeed({
-        threadId: "thread-1",
+        owner: { type: "thread" as const, threadId: "thread-1" },
         terminalId: "setup-setup",
         cwd: "/repo/worktrees/a",
         worktreePath: "/repo/worktrees/a",

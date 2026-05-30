@@ -4257,7 +4257,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
   it.effect("routes websocket rpc terminal methods", () =>
     Effect.gen(function* () {
       const snapshot = {
-        threadId: "thread-1",
+        owner: { type: "thread" as const, threadId: "thread-1" },
         terminalId: "default",
         cwd: "/tmp/project",
         worktreePath: null,

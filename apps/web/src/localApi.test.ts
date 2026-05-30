@@ -353,7 +353,7 @@ describe("wsApi", () => {
     api.orchestration.subscribeShell(onShellEvent);
 
     const terminalAttachEvent = {
-      threadId: "thread-1",
+      owner: { type: "thread", threadId: "thread-1" },
       terminalId: "terminal-1",
       type: "output",
       data: "hello",
@@ -363,7 +363,7 @@ describe("wsApi", () => {
     const terminalMetadataEvent = {
       type: "upsert",
       terminal: {
-        threadId: "thread-1",
+        owner: { type: "thread", threadId: "thread-1" },
         terminalId: "terminal-1",
         cwd: "/tmp/workspace",
         worktreePath: null,

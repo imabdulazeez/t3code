@@ -147,7 +147,6 @@ type DrainProcessEventAction =
   | {
       type: "output";
       owner: TerminalOwner;
-      threadId: string;
       terminalId: string;
       sequence: number;
       history: string | null;
@@ -156,7 +155,7 @@ type DrainProcessEventAction =
   | {
       type: "exit";
       process: PtyProcess | null;
-      threadId: string;
+      owner: TerminalOwner;
       terminalId: string;
       sequence: number;
       exitCode: number | null;
@@ -203,7 +202,7 @@ function terminalWireLabel(session: TerminalSessionState): string {
 
 function snapshot(session: TerminalSessionState): TerminalSessionSnapshot {
   return {
-    threadId: session.threadId,
+    owner: session.owner,
     terminalId: session.terminalId,
     cwd: session.cwd,
     worktreePath: session.worktreePath,
@@ -220,7 +219,7 @@ function snapshot(session: TerminalSessionState): TerminalSessionSnapshot {
 
 function summary(session: TerminalSessionState): TerminalSummary {
   return {
-    threadId: session.threadId,
+    owner: session.owner,
     terminalId: session.terminalId,
     cwd: session.cwd,
     worktreePath: session.worktreePath,
@@ -274,7 +273,7 @@ function isDuplicateAttachSnapshotEvent(
   return typeof event.sequence === "number" && typeof initialSnapshot.sequence === "number"
     ? event.sequence <= initialSnapshot.sequence
     : event.type === "started" &&
-        event.snapshot.threadId === initialSnapshot.threadId &&
+        ownerKeyPart(event.snapshot.owner) === ownerKeyPart(initialSnapshot.owner) &&
         event.snapshot.terminalId === initialSnapshot.terminalId &&
         event.snapshot.updatedAt <= initialSnapshot.updatedAt;
 }
@@ -1482,7 +1481,6 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
             return {
               type: "output",
               owner: session.owner,
-              threadId: session.threadId,
               terminalId: session.terminalId,
               sequence: eventStamp.sequence,
               history: sanitized.visibleText.length > 0 ? session.history : null,
@@ -1512,7 +1510,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
           return {
             type: "exit",
             process,
-            threadId: session.threadId,
+            owner: session.owner,
             terminalId: session.terminalId,
             sequence: eventStamp.sequence,
             exitCode: session.exitCode,
@@ -1531,7 +1529,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
 
           yield* publishEvent({
             type: "output",
-            threadId: action.threadId,
+            owner: action.owner,
             terminalId: action.terminalId,
             sequence: action.sequence,
             data: action.data,
@@ -1542,7 +1540,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
         yield* clearKillFiber(action.process);
         yield* publishEvent({
           type: "exited",
-          threadId: action.threadId,
+          owner: action.owner,
           terminalId: action.terminalId,
           sequence: action.sequence,
           exitCode: action.exitCode,
@@ -1711,7 +1709,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
 
               yield* publishEvent({
                 type: eventType,
-                threadId: session.threadId,
+                owner: session.owner,
                 terminalId: session.terminalId,
                 sequence: eventStamp.sequence,
                 snapshot: snapshot(session),
@@ -1751,7 +1749,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
         const message = error.message;
         yield* publishEvent({
           type: "error",
-          threadId: session.threadId,
+          owner: session.owner,
           terminalId: session.terminalId,
           sequence: session.eventSequence,
           message,
@@ -1773,7 +1771,6 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
       const key = toSessionKey(owner, terminalId);
       const session = yield* getSession(owner, terminalId);
       const closedEventSequence = Option.isSome(session) ? session.value.eventSequence + 1 : 0;
-      const closedThreadId = Option.isSome(session) ? session.value.threadId : ownerLocalId(owner);
 
       if (Option.isSome(session)) {
         yield* stopProcess(session.value);
@@ -1794,7 +1791,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
       if (removed) {
         yield* publishEvent({
           type: "closed",
-          threadId: closedThreadId,
+          owner,
           terminalId,
           sequence: closedEventSequence,
         });
@@ -1859,7 +1856,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
           return [
             Option.some({
               type: "activity" as const,
-              threadId: liveSession.value.threadId,
+              owner: liveSession.value.owner,
               terminalId: liveSession.value.terminalId,
               sequence: eventStamp.sequence,
               hasRunningSubprocess: next.hasRunningSubprocess,
@@ -2111,22 +2108,19 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
             .sort(
               (left, right) =>
                 right.updatedAt.localeCompare(left.updatedAt) ||
-                left.threadId.localeCompare(right.threadId) ||
+                ownerLocalId(left.owner).localeCompare(ownerLocalId(right.owner)) ||
                 left.terminalId.localeCompare(right.terminalId),
             ),
         ),
       );
 
     const readTerminalMetadata = (input: {
-      readonly threadId: string;
+      readonly owner: TerminalOwner;
       readonly terminalId: string;
     }) =>
       readManagerState.pipe(
         Effect.map((state) => {
-          const session = [...state.sessions.values()].find(
-            (candidate) =>
-              candidate.threadId === input.threadId && candidate.terminalId === input.terminalId,
-          );
+          const session = state.sessions.get(toSessionKey(input.owner, input.terminalId));
           return session ? summary(session) : null;
         }),
       );
@@ -2148,7 +2142,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
 
         unsubscribe = yield* subscribe((event) => {
           if (
-            event.threadId !== ownerLocalId(input.owner) ||
+            ownerKeyPart(event.owner) !== ownerKeyPart(input.owner) ||
             event.terminalId !== input.terminalId
           ) {
             return Effect.void;
@@ -2209,13 +2203,13 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
       if (event.type === "closed") {
         return Effect.succeed({
           type: "remove" as const,
-          threadId: event.threadId,
+          owner: event.owner,
           terminalId: event.terminalId,
         });
       }
 
       return readTerminalMetadata({
-        threadId: event.threadId,
+        owner: event.owner,
         terminalId: event.terminalId,
       }).pipe(
         Effect.map((terminal) =>
@@ -2326,7 +2320,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
           yield* persistHistory(input.owner, terminalId, session.history);
           yield* publishEvent({
             type: "cleared",
-            threadId: session.threadId,
+            owner: input.owner,
             terminalId,
             sequence: eventStamp.sequence,
           });

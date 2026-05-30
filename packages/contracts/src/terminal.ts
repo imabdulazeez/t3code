@@ -108,7 +108,7 @@ export const TerminalSessionStatus = Schema.Literals(["starting", "running", "ex
 export type TerminalSessionStatus = typeof TerminalSessionStatus.Type;
 
 export const TerminalSessionSnapshot = Schema.Struct({
-  threadId: Schema.String.check(Schema.isNonEmpty()),
+  owner: TerminalOwner,
   terminalId: Schema.String.check(Schema.isNonEmpty()),
   cwd: Schema.String.check(Schema.isNonEmpty()),
   worktreePath: Schema.NullOr(TrimmedNonEmptyStringSchema),
@@ -125,7 +125,7 @@ export const TerminalSessionSnapshot = Schema.Struct({
 export type TerminalSessionSnapshot = typeof TerminalSessionSnapshot.Type;
 
 export const TerminalSummary = Schema.Struct({
-  threadId: Schema.String.check(Schema.isNonEmpty()),
+  owner: TerminalOwner,
   terminalId: Schema.String.check(Schema.isNonEmpty()),
   cwd: Schema.String.check(Schema.isNonEmpty()),
   worktreePath: Schema.NullOr(TrimmedNonEmptyStringSchema),
@@ -152,7 +152,7 @@ const TerminalMetadataUpsertEvent = Schema.Struct({
 
 const TerminalMetadataRemoveEvent = Schema.Struct({
   type: Schema.Literal("remove"),
-  threadId: Schema.String.check(Schema.isNonEmpty()),
+  owner: TerminalOwner,
   terminalId: Schema.String.check(Schema.isNonEmpty()),
 });
 
@@ -164,7 +164,7 @@ export const TerminalMetadataStreamEvent = Schema.Union([
 export type TerminalMetadataStreamEvent = typeof TerminalMetadataStreamEvent.Type;
 
 const TerminalEventBaseSchema = Schema.Struct({
-  threadId: Schema.String.check(Schema.isNonEmpty()),
+  owner: TerminalOwner,
   terminalId: Schema.String.check(Schema.isNonEmpty()),
   sequence: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
 });
