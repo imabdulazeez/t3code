@@ -99,10 +99,6 @@ interface ProjectScriptsControlProps {
   onDeleteScript: (scriptId: string) => Promise<void> | void;
 }
 
-function alternateScope(scope: ProjectScriptScope): ProjectScriptScope {
-  return scope === "chat" ? "project" : "chat";
-}
-
 function runInScopeLabel(scope: ProjectScriptScope): string {
   return scope === "chat" ? "Run in chat terminal" : "Run in project terminal";
 }
@@ -261,7 +257,6 @@ export default function ProjectScriptsControl({
                   commandForProjectScript(script.id),
                 );
                 const scriptScope = script.defaultScope ?? DEFAULT_PROJECT_SCRIPT_SCOPE;
-                const altScope = alternateScope(scriptScope);
                 return (
                   <MenuItem
                     key={script.id}
@@ -290,8 +285,8 @@ export default function ProjectScriptsControl({
                           variant="ghost"
                           size="icon-xs"
                           className="size-6"
-                          aria-label={runInScopeLabel(altScope)}
-                          title={runInScopeLabel(altScope)}
+                          aria-label={runInScopeLabel(scriptScope)}
+                          title={runInScopeLabel(scriptScope)}
                           onPointerDown={(event) => {
                             event.preventDefault();
                             event.stopPropagation();
@@ -299,7 +294,7 @@ export default function ProjectScriptsControl({
                           onClick={(event) => {
                             event.preventDefault();
                             event.stopPropagation();
-                            onRunScript(script, { scope: altScope });
+                            onRunScript(script, { scope: scriptScope });
                           }}
                         >
                           <PlayIcon className="size-3.5" />
