@@ -24,6 +24,7 @@ describe("terminalUiStateStore actions", () => {
     useTerminalUiStateStore.persist.clearStorage();
     useTerminalUiStateStore.setState({
       terminalUiStateByOwnerKey: {},
+      customTerminalNamesByOwnerKey: {},
     });
   });
 
@@ -125,9 +126,33 @@ describe("terminalUiStateStore actions", () => {
     ]);
   });
 
+  it("stores custom terminal names and clears them when the terminal closes", () => {
+    const store = useTerminalUiStateStore.getState();
+    store.newTerminal(OWNER_REF, "term-1");
+    store.newTerminal(OWNER_REF, "term-2");
+    store.renameTerminal(OWNER_REF, "term-2", "Lint");
+
+    expect(
+      useTerminalUiStateStore.getState().customTerminalNamesByOwnerKey[
+        terminalOwnerKey(OWNER_REF)
+      ]?.["term-2"],
+    ).toBe("Lint");
+
+    store.closeTerminal(OWNER_REF, "term-2");
+
+    expect(
+      useTerminalUiStateStore.getState().customTerminalNamesByOwnerKey[
+        terminalOwnerKey(OWNER_REF)
+      ]?.["term-2"],
+    ).toBeUndefined();
+  });
+
   it("ensures unknown server terminals are registered, opened, and activated", () => {
     const store = useTerminalUiStateStore.getState();
-    store.ensureTerminal(OWNER_REF, "setup-setup", { open: true, active: true });
+    store.ensureTerminal(OWNER_REF, "setup-setup", {
+      open: true,
+      active: true,
+    });
 
     const terminalUiState = selectThreadTerminalUiState(
       useTerminalUiStateStore.getState().terminalUiStateByOwnerKey,
@@ -197,6 +222,7 @@ describe("terminalUiStateStore actions", () => {
         },
       },
       defaultTerminalScopeByProjectId: {},
+      customTerminalNamesByOwnerKey: {},
     });
   });
 
@@ -214,6 +240,30 @@ describe("terminalUiStateStore actions", () => {
         OWNER_REF,
       ).terminalIds,
     ).toEqual([]);
+  });
+
+  it("does not resurrect a locally closed terminal from stale server reconciliation", () => {
+    const store = useTerminalUiStateStore.getState();
+    store.newTerminal(OWNER_REF, "terminal-only");
+    store.closeTerminal(OWNER_REF, "terminal-only");
+    store.reconcileTerminalIds(OWNER_REF, ["terminal-only"]);
+
+    expect(
+      selectThreadTerminalUiState(
+        useTerminalUiStateStore.getState().terminalUiStateByOwnerKey,
+        OWNER_REF,
+      ).terminalIds,
+    ).toEqual([]);
+
+    store.reconcileTerminalIds(OWNER_REF, []);
+    store.reconcileTerminalIds(OWNER_REF, ["terminal-only"]);
+
+    expect(
+      selectThreadTerminalUiState(
+        useTerminalUiStateStore.getState().terminalUiStateByOwnerKey,
+        OWNER_REF,
+      ).terminalIds,
+    ).toEqual(["terminal-only"]);
   });
 
   it("keeps a valid active terminal after closing an active split terminal", () => {

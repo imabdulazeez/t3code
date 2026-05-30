@@ -746,7 +746,11 @@ const PersistentConsolidatedTerminalDrawer = memo(function PersistentConsolidate
       const api = readEnvironmentApi(threadRef.environmentId);
       if (api && "close" in api.terminal && typeof api.terminal.close === "function") {
         void api.terminal
-          .close({ owner: projectOwnerRef.owner, terminalId, deleteHistory: true })
+          .close({
+            owner: projectOwnerRef.owner,
+            terminalId,
+            deleteHistory: true,
+          })
           .catch(() => undefined);
       }
       storeCloseTerminal(projectOwnerRef, terminalId);
@@ -901,7 +905,9 @@ async function chatImageAttachmentsToComposerImages(
     try {
       const response = await fetch(attachment.previewUrl);
       const blob = await response.blob();
-      const file = new File([blob], attachment.name, { type: attachment.mimeType });
+      const file = new File([blob], attachment.name, {
+        type: attachment.mimeType,
+      });
       restoredImages.push({
         type: "image",
         id: attachment.id,
@@ -1077,6 +1083,7 @@ export default function ChatView(props: ChatViewProps) {
   const storeSplitTerminal = useTerminalUiStateStore((s) => s.splitTerminal);
   const storeNewTerminal = useTerminalUiStateStore((s) => s.newTerminal);
   const storeSetActiveTerminal = useTerminalUiStateStore((s) => s.setActiveTerminal);
+  const storeRenameTerminal = useTerminalUiStateStore((s) => s.renameTerminal);
   const storeCloseTerminal = useTerminalUiStateStore((s) => s.closeTerminal);
   const serverThreadKeys = useStore(
     useShallow((state) =>
@@ -2358,6 +2365,10 @@ export default function ChatView(props: ChatViewProps) {
       storeSetTerminalOpen(targetOwnerRef, true);
       if (shouldCreateNewTerminal) {
         storeNewTerminal(targetOwnerRef, targetTerminalId);
+        const actionTerminalName = script.name.trim();
+        if (actionTerminalName.length > 0) {
+          storeRenameTerminal(targetOwnerRef, targetTerminalId, actionTerminalName);
+        }
       } else {
         storeSetActiveTerminal(targetOwnerRef, targetTerminalId);
       }
@@ -2412,6 +2423,7 @@ export default function ChatView(props: ChatViewProps) {
       runningTerminalIds,
       setThreadError,
       storeNewTerminal,
+      storeRenameTerminal,
       storeSetActiveTerminal,
       storeSetDefaultTerminalScope,
       storeSetTerminalOpen,
@@ -4028,7 +4040,13 @@ export default function ChatView(props: ChatViewProps) {
         search: (previous) => {
           const rest = stripDiffSearchParams(previous);
           return filePath
-            ? { ...rest, diff: "1", diffTurnId: turnId, diffFilePath: filePath, tab: undefined }
+            ? {
+                ...rest,
+                diff: "1",
+                diffTurnId: turnId,
+                diffFilePath: filePath,
+                tab: undefined,
+              }
             : { ...rest, diff: "1", diffTurnId: turnId, tab: undefined };
         },
       });

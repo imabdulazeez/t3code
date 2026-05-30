@@ -554,6 +554,49 @@ function reconcileThreadTerminalSessionIds(
 }
 
 const EMPTY_CUSTOM_TERMINAL_NAMES: Record<string, string> = Object.freeze({});
+const locallyClosedTerminalIdsByOwnerKey = new Map<string, Set<string>>();
+
+function markTerminalLocallyClosed(ownerKey: string, terminalId: string): void {
+  let terminalIds = locallyClosedTerminalIdsByOwnerKey.get(ownerKey);
+  if (!terminalIds) {
+    terminalIds = new Set();
+    locallyClosedTerminalIdsByOwnerKey.set(ownerKey, terminalIds);
+  }
+  terminalIds.add(terminalId);
+}
+
+function clearLocallyClosedTerminal(ownerKey: string, terminalId: string): void {
+  const terminalIds = locallyClosedTerminalIdsByOwnerKey.get(ownerKey);
+  if (!terminalIds) return;
+  terminalIds.delete(terminalId);
+  if (terminalIds.size === 0) {
+    locallyClosedTerminalIdsByOwnerKey.delete(ownerKey);
+  }
+}
+
+function clearLocallyClosedTerminalsForOwnerKey(ownerKey: string): void {
+  locallyClosedTerminalIdsByOwnerKey.delete(ownerKey);
+}
+
+function reconcileLocallyClosedTerminalIds(ownerKey: string, nextIds: string[]): string[] {
+  const terminalIds = locallyClosedTerminalIdsByOwnerKey.get(ownerKey);
+  if (!terminalIds || terminalIds.size === 0) {
+    return nextIds;
+  }
+
+  const nextIdSet = new Set(nextIds);
+  for (const terminalId of Array.from(terminalIds)) {
+    if (!nextIdSet.has(terminalId)) {
+      terminalIds.delete(terminalId);
+    }
+  }
+  if (terminalIds.size === 0) {
+    locallyClosedTerminalIdsByOwnerKey.delete(ownerKey);
+    return nextIds;
+  }
+
+  return nextIds.filter((terminalId) => !terminalIds.has(terminalId));
+}
 
 export function selectCustomTerminalNames(
   customTerminalNamesByOwnerKey: Record<string, Record<string, string>>,
@@ -731,15 +774,33 @@ export const useTerminalUiStateStore = create<TerminalUiStateStoreState>()(
             };
           }),
         setTerminalOpen: (ownerRef, open) =>
-          updateTerminal(ownerRef, (state) => setThreadTerminalOpen(state, open)),
+          updateTerminal(ownerRef, (state) => {
+            if (open && isUsableOwnerRef(ownerRef)) {
+              clearLocallyClosedTerminal(terminalUiStateKey(ownerRef), DEFAULT_THREAD_TERMINAL_ID);
+            }
+            return setThreadTerminalOpen(state, open);
+          }),
         setTerminalHeight: (ownerRef, height) =>
           updateTerminal(ownerRef, (state) => setThreadTerminalHeight(state, height)),
         splitTerminal: (ownerRef, terminalId) =>
-          updateTerminal(ownerRef, (state) => splitThreadTerminal(state, terminalId)),
+          updateTerminal(ownerRef, (state) => {
+            if (isUsableOwnerRef(ownerRef) && isValidTerminalId(terminalId)) {
+              clearLocallyClosedTerminal(terminalUiStateKey(ownerRef), terminalId);
+            }
+            return splitThreadTerminal(state, terminalId);
+          }),
         newTerminal: (ownerRef, terminalId) =>
-          updateTerminal(ownerRef, (state) => newThreadTerminal(state, terminalId)),
+          updateTerminal(ownerRef, (state) => {
+            if (isUsableOwnerRef(ownerRef) && isValidTerminalId(terminalId)) {
+              clearLocallyClosedTerminal(terminalUiStateKey(ownerRef), terminalId);
+            }
+            return newThreadTerminal(state, terminalId);
+          }),
         ensureTerminal: (ownerRef, terminalId, options) =>
           updateTerminal(ownerRef, (state) => {
+            if (isUsableOwnerRef(ownerRef) && isValidTerminalId(terminalId)) {
+              clearLocallyClosedTerminal(terminalUiStateKey(ownerRef), terminalId);
+            }
             let nextState = state;
             if (!state.terminalIds.includes(terminalId)) {
               nextState = newThreadTerminal(nextState, terminalId);
@@ -763,6 +824,19 @@ export const useTerminalUiStateStore = create<TerminalUiStateStoreState>()(
           updateTerminal(ownerRef, (state) => setThreadActiveTerminal(state, terminalId)),
         closeTerminal: (ownerRef, terminalId) =>
           set((state) => {
+            const locallyClosedOwnerKey = isUsableOwnerRef(ownerRef)
+              ? terminalUiStateKey(ownerRef)
+              : null;
+            if (
+              locallyClosedOwnerKey &&
+              isValidTerminalId(terminalId) &&
+              selectThreadTerminalUiState(
+                state.terminalUiStateByOwnerKey,
+                ownerRef,
+              ).terminalIds.includes(terminalId)
+            ) {
+              markTerminalLocallyClosed(locallyClosedOwnerKey, terminalId);
+            }
             const nextTerminalUiStateByOwnerKey = updateTerminalUiStateByOwnerKey(
               state.terminalUiStateByOwnerKey,
               ownerRef,
@@ -786,9 +860,19 @@ export const useTerminalUiStateStore = create<TerminalUiStateStoreState>()(
             };
           }),
         reconcileTerminalIds: (ownerRef, nextIds) =>
-          updateTerminal(ownerRef, (state) => reconcileThreadTerminalSessionIds(state, nextIds)),
+          updateTerminal(ownerRef, (state) =>
+            reconcileThreadTerminalSessionIds(
+              state,
+              isUsableOwnerRef(ownerRef)
+                ? reconcileLocallyClosedTerminalIds(terminalUiStateKey(ownerRef), nextIds)
+                : nextIds,
+            ),
+          ),
         clearTerminalUiState: (ownerRef) =>
           set((state) => {
+            if (isUsableOwnerRef(ownerRef)) {
+              clearLocallyClosedTerminalsForOwnerKey(terminalUiStateKey(ownerRef));
+            }
             const nextTerminalUiStateByOwnerKey = updateTerminalUiStateByOwnerKey(
               state.terminalUiStateByOwnerKey,
               ownerRef,
@@ -804,6 +888,7 @@ export const useTerminalUiStateStore = create<TerminalUiStateStoreState>()(
         removeTerminalUiState: (ownerRef) =>
           set((state) => {
             const ownerKey = terminalUiStateKey(ownerRef);
+            clearLocallyClosedTerminalsForOwnerKey(ownerKey);
             const hadTerminalUiState = state.terminalUiStateByOwnerKey[ownerKey] !== undefined;
             const nextCustomTerminalNamesByOwnerKey = removeCustomTerminalNamesForOwnerKey(
               state.customTerminalNamesByOwnerKey,

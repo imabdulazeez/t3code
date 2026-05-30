@@ -23,6 +23,7 @@ import {
   ServerConfig as ServerConfigSchema,
 } from "@t3tools/contracts";
 import {
+  projectTerminalOwnerRef,
   scopedThreadKey,
   scopeThreadRef,
   terminalOwnerKey,
@@ -112,7 +113,11 @@ const LOCAL_ENVIRONMENT_ID = EnvironmentId.make("environment-local");
 const REMOTE_ENVIRONMENT_ID = EnvironmentId.make("environment-remote");
 const THREAD_REF = scopeThreadRef(LOCAL_ENVIRONMENT_ID, THREAD_ID);
 const THREAD_KEY = scopedThreadKey(THREAD_REF);
+const THREAD_OWNER = { type: "thread", threadId: THREAD_ID } as const;
 const THREAD_OWNER_KEY = terminalOwnerKey(threadTerminalOwnerRef(LOCAL_ENVIRONMENT_ID, THREAD_ID));
+const PROJECT_OWNER_KEY = terminalOwnerKey(
+  projectTerminalOwnerRef(LOCAL_ENVIRONMENT_ID, PROJECT_ID),
+);
 const UUID_ROUTE_RE = /^\/draft\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const PROJECT_DRAFT_KEY = `${LOCAL_ENVIRONMENT_ID}:${PROJECT_ID}`;
 const PROJECT_LOGICAL_KEY = deriveLogicalProjectKeyFromSettings(
@@ -790,7 +795,10 @@ function createSnapshotWithSecondaryProject(options?: {
           id: "thread-secondary-project" as ThreadId,
           projectId: SECOND_PROJECT_ID,
           title: "Release checklist",
-          modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5" },
+          modelSelection: {
+            instanceId: ProviderInstanceId.make("codex"),
+            model: "gpt-5",
+          },
           interactionMode: "default",
           runtimeMode: "full-access",
           branch: "release/docs-portal",
@@ -822,7 +830,10 @@ function createSnapshotWithSecondaryProject(options?: {
           id: ARCHIVED_SECONDARY_THREAD_ID,
           projectId: SECOND_PROJECT_ID,
           title: "Archived Docs Notes",
-          modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5" },
+          modelSelection: {
+            instanceId: ProviderInstanceId.make("codex"),
+            model: "gpt-5",
+          },
           interactionMode: "default",
           runtimeMode: "full-access",
           branch: "release/docs-archive",
@@ -857,7 +868,10 @@ function createSnapshotWithSecondaryProject(options?: {
         id: SECOND_PROJECT_ID,
         title: "Docs Portal",
         workspaceRoot: "/repo/clients/docs-portal",
-        defaultModelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5" },
+        defaultModelSelection: {
+          instanceId: ProviderInstanceId.make("codex"),
+          model: "gpt-5",
+        },
         scripts: [],
         createdAt: NOW_ISO,
         updatedAt: NOW_ISO,
@@ -1092,7 +1106,7 @@ function resolveWsRpc(body: NormalizedWsRpcRequestBody): unknown {
   }
   if (tag === WS_METHODS.terminalOpen) {
     return {
-      threadId: typeof body.threadId === "string" ? body.threadId : THREAD_ID,
+      owner: body.owner && typeof body.owner === "object" ? body.owner : THREAD_OWNER,
       terminalId: typeof body.terminalId === "string" ? body.terminalId : "default",
       cwd: typeof body.cwd === "string" ? body.cwd : "/repo/project",
       worktreePath:
@@ -2037,7 +2051,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
           );
           expect(attachRequest).toMatchObject({
             _tag: WS_METHODS.terminalAttach,
-            threadId: THREAD_ID,
+            owner: THREAD_OWNER,
             terminalId: DEFAULT_TERMINAL_ID,
             cwd: "/repo/project",
           });
@@ -2352,11 +2366,23 @@ describe("ChatView timeline estimator parity (full app)", () => {
           );
           expect(openRequest).toMatchObject({
             _tag: WS_METHODS.terminalOpen,
-            threadId: THREAD_ID,
+            owner: THREAD_OWNER,
             cwd: "/repo/project",
             env: {
               T3CODE_PROJECT_ROOT: "/repo/project",
             },
+          });
+        },
+        { timeout: 8_000, interval: 16 },
+      );
+
+      await vi.waitFor(
+        () => {
+          expect(document.querySelector('button[aria-label="Close Lint"]')).toBeTruthy();
+          expect(
+            useTerminalUiStateStore.getState().customTerminalNamesByOwnerKey[THREAD_OWNER_KEY],
+          ).toMatchObject({
+            [DEFAULT_TERMINAL_ID]: "Lint",
           });
         },
         { timeout: 8_000, interval: 16 },
@@ -2369,8 +2395,198 @@ describe("ChatView timeline estimator parity (full app)", () => {
           );
           expect(writeRequest).toMatchObject({
             _tag: WS_METHODS.terminalWrite,
-            threadId: THREAD_ID,
+            owner: THREAD_OWNER,
             data: "bun run lint\r",
+          });
+        },
+        { timeout: 8_000, interval: 16 },
+      );
+    } finally {
+      await mounted.cleanup();
+    }
+  });
+
+  it("does not rename reused idle chat terminals for project scripts", async () => {
+    useComposerDraftStore.setState({
+      draftThreadsByThreadKey: {
+        [THREAD_KEY]: {
+          threadId: THREAD_ID,
+          environmentId: LOCAL_ENVIRONMENT_ID,
+          projectId: PROJECT_ID,
+          logicalProjectKey: PROJECT_DRAFT_KEY,
+          createdAt: NOW_ISO,
+          runtimeMode: "full-access",
+          interactionMode: "default",
+          branch: null,
+          worktreePath: null,
+          envMode: "local",
+        },
+      },
+      logicalProjectDraftThreadKeyByLogicalProjectKey: {
+        [PROJECT_DRAFT_KEY]: THREAD_KEY,
+      },
+    });
+    useTerminalUiStateStore.setState({
+      terminalUiStateByOwnerKey: {
+        [THREAD_OWNER_KEY]: {
+          terminalOpen: true,
+          terminalHeight: 280,
+          terminalIds: [DEFAULT_TERMINAL_ID],
+          activeTerminalId: DEFAULT_TERMINAL_ID,
+          terminalGroups: [
+            {
+              id: `group-${DEFAULT_TERMINAL_ID}`,
+              terminalIds: [DEFAULT_TERMINAL_ID],
+            },
+          ],
+          activeTerminalGroupId: `group-${DEFAULT_TERMINAL_ID}`,
+        },
+      },
+      customTerminalNamesByOwnerKey: {},
+    });
+
+    const mounted = await mountChatView({
+      viewport: DEFAULT_VIEWPORT,
+      snapshot: withProjectScripts(createDraftOnlySnapshot(), [
+        {
+          id: "lint",
+          name: "Lint",
+          command: "bun run lint",
+          icon: "lint",
+          runOnWorktreeCreate: false,
+          defaultScope: "chat",
+        },
+      ]),
+      configureFixture: (nextFixture) => {
+        nextFixture.terminalMetadataEvents = [
+          {
+            type: "upsert",
+            terminal: {
+              owner: { type: "thread", threadId: THREAD_ID },
+              terminalId: DEFAULT_TERMINAL_ID,
+              cwd: "/repo/project",
+              worktreePath: null,
+              status: "exited",
+              pid: 123,
+              exitCode: 0,
+              exitSignal: null,
+              hasRunningSubprocess: false,
+              label: "Terminal 1",
+              updatedAt: isoAt(0),
+            },
+          },
+        ];
+      },
+    });
+
+    try {
+      const runButton = await waitForElement(
+        () =>
+          Array.from(document.querySelectorAll("button")).find(
+            (button) => button.title === "Run Lint",
+          ) as HTMLButtonElement | null,
+        "Unable to find Run Lint button.",
+      );
+      runButton.click();
+
+      await vi.waitFor(
+        () => {
+          expect(document.querySelector('button[aria-label="Close Lint"]')).toBeNull();
+          expect(document.querySelector('button[aria-label="Close Terminal 1"]')).toBeTruthy();
+          expect(
+            useTerminalUiStateStore.getState().customTerminalNamesByOwnerKey[THREAD_OWNER_KEY],
+          ).toBeUndefined();
+        },
+        { timeout: 8_000, interval: 16 },
+      );
+
+      await vi.waitFor(
+        () => {
+          const openRequest = wsRequests.find(
+            (request) => request._tag === WS_METHODS.terminalOpen,
+          );
+          expect(openRequest).toMatchObject({
+            _tag: WS_METHODS.terminalOpen,
+            owner: THREAD_OWNER,
+            terminalId: DEFAULT_TERMINAL_ID,
+            cwd: "/repo/project",
+          });
+        },
+        { timeout: 8_000, interval: 16 },
+      );
+    } finally {
+      await mounted.cleanup();
+    }
+  });
+
+  it("names newly created project-scoped script terminals after the script", async () => {
+    useComposerDraftStore.setState({
+      draftThreadsByThreadKey: {
+        [THREAD_KEY]: {
+          threadId: THREAD_ID,
+          environmentId: LOCAL_ENVIRONMENT_ID,
+          projectId: PROJECT_ID,
+          logicalProjectKey: PROJECT_DRAFT_KEY,
+          createdAt: NOW_ISO,
+          runtimeMode: "full-access",
+          interactionMode: "default",
+          branch: null,
+          worktreePath: null,
+          envMode: "local",
+        },
+      },
+      logicalProjectDraftThreadKeyByLogicalProjectKey: {
+        [PROJECT_DRAFT_KEY]: THREAD_KEY,
+      },
+    });
+
+    const mounted = await mountChatView({
+      viewport: DEFAULT_VIEWPORT,
+      snapshot: withProjectScripts(createDraftOnlySnapshot(), [
+        {
+          id: "lint",
+          name: "Lint",
+          command: "bun run lint",
+          icon: "lint",
+          runOnWorktreeCreate: false,
+          defaultScope: "project",
+        },
+      ]),
+    });
+
+    try {
+      const runButton = await waitForElement(
+        () =>
+          Array.from(document.querySelectorAll("button")).find(
+            (button) => button.title === "Run Lint",
+          ) as HTMLButtonElement | null,
+        "Unable to find Run Lint button.",
+      );
+      runButton.click();
+
+      await vi.waitFor(
+        () => {
+          expect(document.querySelector('button[aria-label="Close Lint"]')).toBeTruthy();
+          expect(
+            useTerminalUiStateStore.getState().customTerminalNamesByOwnerKey[PROJECT_OWNER_KEY],
+          ).toMatchObject({
+            [DEFAULT_TERMINAL_ID]: "Lint",
+          });
+        },
+        { timeout: 8_000, interval: 16 },
+      );
+
+      await vi.waitFor(
+        () => {
+          const openRequest = wsRequests.find(
+            (request) => request._tag === WS_METHODS.terminalOpen,
+          );
+          expect(openRequest).toMatchObject({
+            _tag: WS_METHODS.terminalOpen,
+            cwd: "/repo/project",
+            env: {
+              T3CODE_PROJECT_ROOT: "/repo/project",
+            },
           });
         },
         { timeout: 8_000, interval: 16 },
@@ -2432,7 +2648,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
           );
           expect(openRequest).toMatchObject({
             _tag: WS_METHODS.terminalOpen,
-            threadId: THREAD_ID,
+            owner: THREAD_OWNER,
             cwd: "/repo/worktrees/feature-draft",
             env: {
               T3CODE_PROJECT_ROOT: "/repo/project",
@@ -2637,7 +2853,11 @@ describe("ChatView timeline estimator parity (full app)", () => {
                 type?: string;
                 bootstrap?: {
                   createThread?: { projectId?: string };
-                  prepareWorktree?: { projectCwd?: string; baseBranch?: string; branch?: string };
+                  prepareWorktree?: {
+                    projectCwd?: string;
+                    baseBranch?: string;
+                    branch?: string;
+                  };
                   runSetupScript?: boolean;
                 };
               }
@@ -2705,7 +2925,9 @@ describe("ChatView timeline estimator parity (full app)", () => {
                   slug: "claude-opus-4-7",
                   name: "Claude Opus 4.7",
                   isCustom: false,
-                  capabilities: createModelCapabilities({ optionDescriptors: [] }),
+                  capabilities: createModelCapabilities({
+                    optionDescriptors: [],
+                  }),
                 },
               ],
               slashCommands: [],
@@ -2726,7 +2948,9 @@ describe("ChatView timeline estimator parity (full app)", () => {
                   slug: "claude-opus-4-7",
                   name: "Claude Opus 4.7",
                   isCustom: false,
-                  capabilities: createModelCapabilities({ optionDescriptors: [] }),
+                  capabilities: createModelCapabilities({
+                    optionDescriptors: [],
+                  }),
                 },
               ],
               slashCommands: [],
@@ -2863,7 +3087,11 @@ describe("ChatView timeline estimator parity (full app)", () => {
                 type?: string;
                 bootstrap?: {
                   createThread?: { projectId?: string };
-                  prepareWorktree?: { projectCwd?: string; baseBranch?: string; branch?: string };
+                  prepareWorktree?: {
+                    projectCwd?: string;
+                    baseBranch?: string;
+                    branch?: string;
+                  };
                   runSetupScript?: boolean;
                 };
               }
@@ -2985,10 +3213,16 @@ describe("ChatView timeline estimator parity (full app)", () => {
       ...snapshotWithSecondThread,
       threads: snapshotWithSecondThread.threads.map((thread) => {
         if (thread.id === THREAD_ID) {
-          return Object.assign({}, thread, { session: null, title: "Thread alpha" });
+          return Object.assign({}, thread, {
+            session: null,
+            title: "Thread alpha",
+          });
         }
         if (thread.id === secondThreadId) {
-          return Object.assign({}, thread, { session: null, title: "Thread beta" });
+          return Object.assign({}, thread, {
+            session: null,
+            title: "Thread beta",
+          });
         }
         return thread;
       }),
@@ -3443,7 +3677,10 @@ describe("ChatView timeline estimator parity (full app)", () => {
     try {
       useComposerDraftStore.getState().setPrompt(THREAD_REF, "selected");
       await waitForComposerText("selected");
-      await setComposerSelectionByTextOffsets({ start: 0, end: "selected".length });
+      await setComposerSelectionByTextOffsets({
+        start: 0,
+        end: "selected".length,
+      });
       await pressComposerKey("(");
       await waitForComposerText("(selected)");
 
@@ -3516,7 +3753,10 @@ describe("ChatView timeline estimator parity (full app)", () => {
 
     try {
       await waitForComposerText("quoted");
-      await setComposerSelectionByTextOffsets({ start: 0, end: "quoted".length });
+      await setComposerSelectionByTextOffsets({
+        start: 0,
+        end: "quoted".length,
+      });
       await pressComposerKey("«");
       await waitForComposerText("«quoted»");
     } finally {
@@ -3537,7 +3777,10 @@ describe("ChatView timeline estimator parity (full app)", () => {
 
     try {
       await waitForComposerText("quoted");
-      await setComposerSelectionByTextOffsets({ start: 0, end: "quoted".length });
+      await setComposerSelectionByTextOffsets({
+        start: 0,
+        end: "quoted".length,
+      });
       const composerEditor = await waitForComposerEditor();
       composerEditor.focus();
       composerEditor.dispatchEvent(
@@ -5056,7 +5299,12 @@ describe("ChatView timeline estimator parity (full app)", () => {
           if (body.partialPath === "~/Development/codex/") {
             return {
               parentPath: "~/Development/codex/",
-              entries: [{ name: "Codex.app", fullPath: "~/Development/codex/Codex.app" }],
+              entries: [
+                {
+                  name: "Codex.app",
+                  fullPath: "~/Development/codex/Codex.app",
+                },
+              ],
             };
           }
 
@@ -5221,7 +5469,9 @@ describe("ChatView timeline estimator parity (full app)", () => {
 
       await vi.waitFor(
         () => {
-          expect(remoteBrowseMock).toHaveBeenCalledWith({ partialPath: "~/workspaces/" });
+          expect(remoteBrowseMock).toHaveBeenCalledWith({
+            partialPath: "~/workspaces/",
+          });
         },
         { timeout: 8_000, interval: 16 },
       );
@@ -5229,7 +5479,9 @@ describe("ChatView timeline estimator parity (full app)", () => {
       await page.getByPlaceholder(ADD_PROJECT_SUBMENU_PLACEHOLDER).fill("~/workspaces/");
       await vi.waitFor(
         () => {
-          expect(remoteBrowseMock).toHaveBeenCalledWith({ partialPath: "~/workspaces/" });
+          expect(remoteBrowseMock).toHaveBeenCalledWith({
+            partialPath: "~/workspaces/",
+          });
         },
         { timeout: 8_000, interval: 16 },
       );
@@ -5321,7 +5573,9 @@ describe("ChatView timeline estimator parity (full app)", () => {
 
       await vi.waitFor(
         () => {
-          expect(pickFolder).toHaveBeenCalledWith({ initialPath: "~/Applications" });
+          expect(pickFolder).toHaveBeenCalledWith({
+            initialPath: "~/Applications",
+          });
         },
         { timeout: 8_000, interval: 16 },
       );
@@ -5599,7 +5853,9 @@ describe("ChatView timeline estimator parity (full app)", () => {
   it("creates a new thread from project search when no active project thread exists", async () => {
     const mounted = await mountChatView({
       viewport: DEFAULT_VIEWPORT,
-      snapshot: createSnapshotWithSecondaryProject({ includeSecondaryThread: false }),
+      snapshot: createSnapshotWithSecondaryProject({
+        includeSecondaryThread: false,
+      }),
       configureFixture: (nextFixture) => {
         nextFixture.serverConfig = {
           ...nextFixture.serverConfig,
@@ -6168,7 +6424,10 @@ describe("ChatView timeline estimator parity (full app)", () => {
         threads: snapshot.threads.map((thread) =>
           thread.id === THREAD_ID
             ? Object.assign({}, thread, {
-                modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5.4" },
+                modelSelection: {
+                  instanceId: ProviderInstanceId.make("codex"),
+                  model: "gpt-5.4",
+                },
               })
             : thread,
         ),
@@ -6226,7 +6485,11 @@ describe("ChatView timeline estimator parity (full app)", () => {
                   isCustom: false,
                   capabilities: createModelCapabilities({
                     optionDescriptors: [
-                      { id: "fastMode", label: "Fast Mode", type: "boolean" as const },
+                      {
+                        id: "fastMode",
+                        label: "Fast Mode",
+                        type: "boolean" as const,
+                      },
                     ],
                   }),
                 },
@@ -6236,7 +6499,11 @@ describe("ChatView timeline estimator parity (full app)", () => {
                   isCustom: false,
                   capabilities: createModelCapabilities({
                     optionDescriptors: [
-                      { id: "fastMode", label: "Fast Mode", type: "boolean" as const },
+                      {
+                        id: "fastMode",
+                        label: "Fast Mode",
+                        type: "boolean" as const,
+                      },
                     ],
                   }),
                 },
@@ -6246,7 +6513,11 @@ describe("ChatView timeline estimator parity (full app)", () => {
                   isCustom: false,
                   capabilities: createModelCapabilities({
                     optionDescriptors: [
-                      { id: "fastMode", label: "Fast Mode", type: "boolean" as const },
+                      {
+                        id: "fastMode",
+                        label: "Fast Mode",
+                        type: "boolean" as const,
+                      },
                     ],
                   }),
                 },
