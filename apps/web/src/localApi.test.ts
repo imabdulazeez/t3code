@@ -226,22 +226,6 @@ function makeDesktopBridge(overrides: Partial<DesktopBridge> = {}): DesktopBridg
     showContextMenu: async () => null,
     openExternal: async () => true,
     onMenuAction: () => () => undefined,
-    getUpdateState: async () => {
-      throw new Error("getUpdateState not implemented in test");
-    },
-    setUpdateChannel: async () => {
-      throw new Error("setUpdateChannel not implemented in test");
-    },
-    checkForUpdate: async () => {
-      throw new Error("checkForUpdate not implemented in test");
-    },
-    downloadUpdate: async () => {
-      throw new Error("downloadUpdate not implemented in test");
-    },
-    installUpdate: async () => {
-      throw new Error("installUpdate not implemented in test");
-    },
-    onUpdateState: () => () => undefined,
     ...overrides,
   };
 }

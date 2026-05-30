@@ -25,14 +25,6 @@ export const BRAND_ASSET_PATHS = {
 
 export type WebAssetBrand = "development" | "nightly" | "production";
 
-export const WEB_ASSET_CHANNELS = ["latest", "nightly"] as const;
-
-export type WebAssetChannel = (typeof WEB_ASSET_CHANNELS)[number];
-
-export function resolveWebAssetBrandForChannel(channel: WebAssetChannel): WebAssetBrand {
-  return channel === "nightly" ? "nightly" : "production";
-}
-
 export interface IconOverride {
   readonly sourceRelativePath: string;
   readonly targetRelativePath: string;

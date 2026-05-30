@@ -7,8 +7,6 @@ import {
   DEFAULT_SERVER_SETTINGS,
   EnvironmentId,
   type DesktopBridge,
-  type DesktopUpdateChannel,
-  type DesktopUpdateState,
   type LocalApi,
   ProviderDriverKind,
   ProviderInstanceId,
@@ -339,25 +337,7 @@ const createDesktopBridgeStub = (overrides?: {
   readonly serverExposureState?: Awaited<ReturnType<DesktopBridge["getServerExposureState"]>>;
   readonly advertisedEndpoints?: Awaited<ReturnType<DesktopBridge["getAdvertisedEndpoints"]>>;
   readonly setServerExposureMode?: DesktopBridge["setServerExposureMode"];
-  readonly setUpdateChannel?: DesktopBridge["setUpdateChannel"];
 }): DesktopBridge => {
-  const idleUpdateState: DesktopUpdateState = {
-    enabled: false,
-    status: "idle",
-    channel: "latest",
-    currentVersion: "0.0.0-test",
-    hostArch: "arm64",
-    appArch: "arm64",
-    runningUnderArm64Translation: false,
-    availableVersion: null,
-    downloadedVersion: null,
-    downloadPercent: null,
-    checkedAt: null,
-    message: null,
-    errorContext: null,
-    canRetry: false,
-  };
-
   return {
     getAppBranding: vi.fn().mockReturnValue(null),
     getLocalEnvironmentBootstrap: () => ({
@@ -450,21 +430,6 @@ const createDesktopBridgeStub = (overrides?: {
     showContextMenu: vi.fn().mockResolvedValue(null),
     openExternal: vi.fn().mockResolvedValue(true),
     onMenuAction: () => () => {},
-    getUpdateState: vi.fn().mockResolvedValue(idleUpdateState),
-    setUpdateChannel:
-      overrides?.setUpdateChannel ??
-      vi.fn().mockImplementation(async (channel: DesktopUpdateChannel) => ({
-        ...idleUpdateState,
-        channel,
-      })),
-    checkForUpdate: vi.fn().mockResolvedValue({ checked: false, state: idleUpdateState }),
-    downloadUpdate: vi
-      .fn()
-      .mockResolvedValue({ accepted: false, completed: false, state: idleUpdateState }),
-    installUpdate: vi
-      .fn()
-      .mockResolvedValue({ accepted: false, completed: false, state: idleUpdateState }),
-    onUpdateState: () => () => {},
   };
 };
 

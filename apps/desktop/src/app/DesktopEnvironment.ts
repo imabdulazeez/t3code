@@ -16,7 +16,6 @@ import {
   resolveDefaultDesktopSettings,
 } from "../settings/DesktopAppSettings.ts";
 import * as DesktopConfig from "./DesktopConfig.ts";
-import { isNightlyDesktopVersion } from "../updates/updateChannels.ts";
 import { FORK_STAGE_LABEL, formatForkDisplayVersion } from "./forkBranding.ts";
 
 export interface MakeDesktopEnvironmentInput {
@@ -56,7 +55,6 @@ export interface DesktopEnvironmentShape {
   readonly backendEntryPath: string;
   readonly backendCwd: string;
   readonly preloadPath: string;
-  readonly appUpdateYmlPath: string;
   readonly devServerUrl: Option.Option<URL>;
   readonly devRemoteT3ServerEntryPath: Option.Option<string>;
   readonly configuredBackendPort: Option.Option<number>;
@@ -87,13 +85,12 @@ const APP_BASE_NAME = "T3 Code";
 
 function resolveDesktopAppStageLabel(input: {
   readonly isDevelopment: boolean;
-  readonly appVersion: string;
 }): DesktopAppStageLabel {
   if (input.isDevelopment) {
     return "Dev";
   }
 
-  return isNightlyDesktopVersion(input.appVersion) ? "Nightly" : FORK_STAGE_LABEL;
+  return FORK_STAGE_LABEL;
 }
 
 function resolveDesktopAppBranding(input: {
@@ -196,9 +193,6 @@ const makeDesktopEnvironment = Effect.fn("desktop.environment.make")(function* (
     backendEntryPath: path.join(appRoot, "apps/server/dist/bin.mjs"),
     backendCwd: input.isPackaged ? homeDirectory : appRoot,
     preloadPath: path.join(input.dirname, "preload.cjs"),
-    appUpdateYmlPath: input.isPackaged
-      ? path.join(resourcesPath, "app-update.yml")
-      : path.join(input.appPath, "dev-app-update.yml"),
     devServerUrl,
     devRemoteT3ServerEntryPath: config.devRemoteT3ServerEntryPath,
     configuredBackendPort: config.configuredBackendPort,
@@ -212,7 +206,7 @@ const makeDesktopEnvironment = Effect.fn("desktop.environment.make")(function* (
     linuxWmClass: isDevelopment ? "t3code-dev" : "t3code",
     userDataDirName,
     legacyUserDataDirName,
-    defaultDesktopSettings: resolveDefaultDesktopSettings(input.appVersion),
+    defaultDesktopSettings: resolveDefaultDesktopSettings(),
     runtimeInfo: resolveDesktopRuntimeInfo({
       platform: input.platform,
       processArch: input.processArch,
