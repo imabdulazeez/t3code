@@ -2273,13 +2273,16 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
       case "thinking_tokens":
         return;
       case "permission_denied":
-        yield* emitRuntimeWarning(
-          context,
-          `Claude denied tool '${message.tool_name}'${
-            message.decision_reason ? `: ${message.decision_reason}` : ""
-          }.`,
-          message,
-        );
+        yield* offerRuntimeEvent({
+          ...base,
+          type: "tool.denied",
+          payload: {
+            toolName: message.tool_name,
+            ...(message.tool_use_id ? { toolUseId: message.tool_use_id } : {}),
+            ...(message.decision_reason ? { reason: message.decision_reason } : {}),
+            ...(message.agent_id ? { agentId: message.agent_id } : {}),
+          },
+        });
         return;
       case "mirror_error":
         yield* emitRuntimeError(
