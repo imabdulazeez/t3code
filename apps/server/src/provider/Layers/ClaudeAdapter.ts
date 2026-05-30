@@ -2270,6 +2270,24 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
           },
         });
         return;
+      case "thinking_tokens":
+        return;
+      case "permission_denied":
+        yield* emitRuntimeWarning(
+          context,
+          `Claude denied tool '${message.tool_name}'${
+            message.decision_reason ? `: ${message.decision_reason}` : ""
+          }.`,
+          message,
+        );
+        return;
+      case "mirror_error":
+        yield* emitRuntimeError(
+          context,
+          `Claude workspace mirror error: ${message.error}`,
+          message,
+        );
+        return;
       default:
         yield* emitRuntimeWarning(
           context,
