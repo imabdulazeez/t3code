@@ -52,6 +52,7 @@ interface PersistedTerminalUiStateStoreState {
   terminalUiStateByThreadKey?: Record<string, ThreadTerminalUiState>;
   terminalStateByThreadKey?: Record<string, ThreadTerminalUiState>;
   defaultTerminalScopeByProjectId?: Record<string, ProjectScriptScope>;
+  customTerminalNamesByOwnerKey?: Record<string, Record<string, string>>;
 }
 
 function migrateLegacyThreadKeyToOwnerKey(legacyKey: string): string | null {
@@ -82,7 +83,11 @@ export function migratePersistedTerminalUiStateStoreState(
   version: number,
 ): PersistedTerminalUiStateStoreState {
   if (!persistedState || typeof persistedState !== "object") {
-    return { terminalUiStateByOwnerKey: {}, defaultTerminalScopeByProjectId: {} };
+    return {
+      terminalUiStateByOwnerKey: {},
+      defaultTerminalScopeByProjectId: {},
+      customTerminalNamesByOwnerKey: {},
+    };
   }
 
   const candidate = persistedState as PersistedTerminalUiStateStoreState;
@@ -110,7 +115,33 @@ export function migratePersistedTerminalUiStateStoreState(
         )
       : {};
 
-  return { terminalUiStateByOwnerKey, defaultTerminalScopeByProjectId };
+  const customTerminalNamesByOwnerKey: Record<string, Record<string, string>> = {};
+  if (
+    candidate.customTerminalNamesByOwnerKey &&
+    typeof candidate.customTerminalNamesByOwnerKey === "object"
+  ) {
+    for (const [rawKey, names] of Object.entries(candidate.customTerminalNamesByOwnerKey)) {
+      const ownerKey = resolveOwnerStateKey(rawKey, version);
+      if (!ownerKey || !names || typeof names !== "object") {
+        continue;
+      }
+      const normalizedNames: Record<string, string> = {};
+      for (const [terminalId, name] of Object.entries(names)) {
+        if (typeof name === "string" && name.trim().length > 0) {
+          normalizedNames[terminalId] = name;
+        }
+      }
+      if (Object.keys(normalizedNames).length > 0) {
+        customTerminalNamesByOwnerKey[ownerKey] = normalizedNames;
+      }
+    }
+  }
+
+  return {
+    terminalUiStateByOwnerKey,
+    defaultTerminalScopeByProjectId,
+    customTerminalNamesByOwnerKey,
+  };
 }
 
 function createTerminalUiStateStorage() {
@@ -522,6 +553,18 @@ function reconcileThreadTerminalSessionIds(
   });
 }
 
+const EMPTY_CUSTOM_TERMINAL_NAMES: Record<string, string> = Object.freeze({});
+
+export function selectCustomTerminalNames(
+  customTerminalNamesByOwnerKey: Record<string, Record<string, string>>,
+  ownerRef: TerminalOwnerRef | null | undefined,
+): Record<string, string> {
+  if (!isUsableOwnerRef(ownerRef)) {
+    return EMPTY_CUSTOM_TERMINAL_NAMES;
+  }
+  return customTerminalNamesByOwnerKey[terminalUiStateKey(ownerRef)] ?? EMPTY_CUSTOM_TERMINAL_NAMES;
+}
+
 export function selectThreadTerminalUiState(
   terminalUiStateByOwnerKey: Record<string, ThreadTerminalUiState>,
   ownerRef: TerminalOwnerRef | null | undefined,
@@ -564,10 +607,40 @@ function updateTerminalUiStateByOwnerKey(
   };
 }
 
+function removeCustomTerminalName(
+  customTerminalNamesByOwnerKey: Record<string, Record<string, string>>,
+  ownerKey: string,
+  terminalId: string,
+): Record<string, Record<string, string>> {
+  const names = customTerminalNamesByOwnerKey[ownerKey];
+  if (!names || names[terminalId] === undefined) {
+    return customTerminalNamesByOwnerKey;
+  }
+  const { [terminalId]: _removed, ...restNames } = names;
+  if (Object.keys(restNames).length === 0) {
+    const { [ownerKey]: _removedOwner, ...rest } = customTerminalNamesByOwnerKey;
+    return rest;
+  }
+  return { ...customTerminalNamesByOwnerKey, [ownerKey]: restNames };
+}
+
+function removeCustomTerminalNamesForOwnerKey(
+  customTerminalNamesByOwnerKey: Record<string, Record<string, string>>,
+  ownerKey: string,
+): Record<string, Record<string, string>> {
+  if (customTerminalNamesByOwnerKey[ownerKey] === undefined) {
+    return customTerminalNamesByOwnerKey;
+  }
+  const { [ownerKey]: _removed, ...rest } = customTerminalNamesByOwnerKey;
+  return rest;
+}
+
 interface TerminalUiStateStoreState {
   terminalUiStateByOwnerKey: Record<string, ThreadTerminalUiState>;
   defaultTerminalScopeByProjectId: Record<string, ProjectScriptScope>;
+  customTerminalNamesByOwnerKey: Record<string, Record<string, string>>;
   setDefaultTerminalScope: (projectId: string, scope: ProjectScriptScope) => void;
+  renameTerminal: (ownerRef: TerminalOwnerRef, terminalId: string, name: string) => void;
   setTerminalOpen: (ownerRef: TerminalOwnerRef, open: boolean) => void;
   setTerminalHeight: (ownerRef: TerminalOwnerRef, height: number) => void;
   splitTerminal: (ownerRef: TerminalOwnerRef, terminalId: string) => void;
@@ -610,6 +683,38 @@ export const useTerminalUiStateStore = create<TerminalUiStateStoreState>()(
       return {
         terminalUiStateByOwnerKey: {},
         defaultTerminalScopeByProjectId: {},
+        customTerminalNamesByOwnerKey: {},
+        renameTerminal: (ownerRef, terminalId, name) =>
+          set((state) => {
+            if (!isUsableOwnerRef(ownerRef) || !isValidTerminalId(terminalId)) {
+              return state;
+            }
+            const ownerKey = terminalUiStateKey(ownerRef);
+            const trimmedName = name.trim();
+            if (trimmedName.length === 0) {
+              const next = removeCustomTerminalName(
+                state.customTerminalNamesByOwnerKey,
+                ownerKey,
+                terminalId,
+              );
+              if (next === state.customTerminalNamesByOwnerKey) {
+                return state;
+              }
+              return { customTerminalNamesByOwnerKey: next };
+            }
+            if (state.customTerminalNamesByOwnerKey[ownerKey]?.[terminalId] === trimmedName) {
+              return state;
+            }
+            return {
+              customTerminalNamesByOwnerKey: {
+                ...state.customTerminalNamesByOwnerKey,
+                [ownerKey]: {
+                  ...state.customTerminalNamesByOwnerKey[ownerKey],
+                  [terminalId]: trimmedName,
+                },
+              },
+            };
+          }),
         setDefaultTerminalScope: (projectId, scope) =>
           set((state) => {
             if (
@@ -657,7 +762,29 @@ export const useTerminalUiStateStore = create<TerminalUiStateStoreState>()(
         setActiveTerminal: (ownerRef, terminalId) =>
           updateTerminal(ownerRef, (state) => setThreadActiveTerminal(state, terminalId)),
         closeTerminal: (ownerRef, terminalId) =>
-          updateTerminal(ownerRef, (state) => closeThreadTerminal(state, terminalId)),
+          set((state) => {
+            const nextTerminalUiStateByOwnerKey = updateTerminalUiStateByOwnerKey(
+              state.terminalUiStateByOwnerKey,
+              ownerRef,
+              (uiState) => closeThreadTerminal(uiState, terminalId),
+            );
+            const ownerKey = terminalUiStateKey(ownerRef);
+            const nextCustomTerminalNamesByOwnerKey = removeCustomTerminalName(
+              state.customTerminalNamesByOwnerKey,
+              ownerKey,
+              terminalId,
+            );
+            if (
+              nextTerminalUiStateByOwnerKey === state.terminalUiStateByOwnerKey &&
+              nextCustomTerminalNamesByOwnerKey === state.customTerminalNamesByOwnerKey
+            ) {
+              return state;
+            }
+            return {
+              terminalUiStateByOwnerKey: nextTerminalUiStateByOwnerKey,
+              customTerminalNamesByOwnerKey: nextCustomTerminalNamesByOwnerKey,
+            };
+          }),
         reconcileTerminalIds: (ownerRef, nextIds) =>
           updateTerminal(ownerRef, (state) => reconcileThreadTerminalSessionIds(state, nextIds)),
         clearTerminalUiState: (ownerRef) =>
@@ -678,13 +805,21 @@ export const useTerminalUiStateStore = create<TerminalUiStateStoreState>()(
           set((state) => {
             const ownerKey = terminalUiStateKey(ownerRef);
             const hadTerminalUiState = state.terminalUiStateByOwnerKey[ownerKey] !== undefined;
-            if (!hadTerminalUiState) {
+            const nextCustomTerminalNamesByOwnerKey = removeCustomTerminalNamesForOwnerKey(
+              state.customTerminalNamesByOwnerKey,
+              ownerKey,
+            );
+            if (
+              !hadTerminalUiState &&
+              nextCustomTerminalNamesByOwnerKey === state.customTerminalNamesByOwnerKey
+            ) {
               return state;
             }
             const nextTerminalUiStateByOwnerKey = { ...state.terminalUiStateByOwnerKey };
             delete nextTerminalUiStateByOwnerKey[ownerKey];
             return {
               terminalUiStateByOwnerKey: nextTerminalUiStateByOwnerKey,
+              customTerminalNamesByOwnerKey: nextCustomTerminalNamesByOwnerKey,
             };
           }),
         removeOrphanedTerminalUiStates: (activeOwnerKeys) =>
@@ -692,15 +827,23 @@ export const useTerminalUiStateStore = create<TerminalUiStateStoreState>()(
             const orphanedIds = Object.keys(state.terminalUiStateByOwnerKey).filter(
               (key) => !activeOwnerKeys.has(key),
             );
-            if (orphanedIds.length === 0) {
+            const orphanedNameKeys = Object.keys(state.customTerminalNamesByOwnerKey).filter(
+              (key) => !activeOwnerKeys.has(key),
+            );
+            if (orphanedIds.length === 0 && orphanedNameKeys.length === 0) {
               return state;
             }
             const next = { ...state.terminalUiStateByOwnerKey };
             for (const id of orphanedIds) {
               delete next[id];
             }
+            const nextCustomTerminalNamesByOwnerKey = { ...state.customTerminalNamesByOwnerKey };
+            for (const key of orphanedNameKeys) {
+              delete nextCustomTerminalNamesByOwnerKey[key];
+            }
             return {
               terminalUiStateByOwnerKey: next,
+              customTerminalNamesByOwnerKey: nextCustomTerminalNamesByOwnerKey,
             };
           }),
       };
@@ -713,6 +856,7 @@ export const useTerminalUiStateStore = create<TerminalUiStateStoreState>()(
       partialize: (state) => ({
         terminalUiStateByOwnerKey: state.terminalUiStateByOwnerKey,
         defaultTerminalScopeByProjectId: state.defaultTerminalScopeByProjectId,
+        customTerminalNamesByOwnerKey: state.customTerminalNamesByOwnerKey,
       }),
     },
   ),

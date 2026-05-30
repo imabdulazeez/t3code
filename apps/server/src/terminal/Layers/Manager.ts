@@ -132,6 +132,7 @@ interface TerminalSessionState {
   hasRunningSubprocess: boolean;
   /** Normalized child command name when `hasRunningSubprocess`; cleared when idle. */
   childCommandLabel: string | null;
+  shellName: string | null;
   runtimeEnv: Record<string, string> | null;
 }
 
@@ -197,7 +198,7 @@ function terminalWireLabel(session: TerminalSessionState): string {
       return truncateTerminalWireLabel(trimmed);
     }
   }
-  return truncateTerminalWireLabel(getTerminalLabel(session.terminalId));
+  return truncateTerminalWireLabel(session.shellName ?? getTerminalLabel(session.terminalId));
 }
 
 function snapshot(session: TerminalSessionState): TerminalSessionSnapshot {
@@ -1584,7 +1585,10 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
       session: TerminalSessionState,
       index = 0,
       lastError: PtySpawnError | null = null,
-    ): Effect.fn.Return<{ process: PtyProcess; shellLabel: string }, PtySpawnError> {
+    ): Effect.fn.Return<
+      { process: PtyProcess; shellLabel: string; shellName: string },
+      PtySpawnError
+    > {
       if (index >= shellCandidates.length) {
         const detail = lastError?.message ?? "Failed to spawn PTY process";
         const tried =
@@ -1624,6 +1628,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
         return {
           process: attempt.success,
           shellLabel: formatShellCandidate(candidate),
+          shellName: basenameForPlatform(candidate.shell, platform),
         };
       }
 
@@ -1701,6 +1706,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
                 session.process = ptyProcess;
                 session.pid = processPid;
                 session.status = "running";
+                session.shellName = spawnResult.shellName;
                 session.unsubscribeData = unsubscribeData;
                 session.unsubscribeExit = unsubscribeExit;
                 eventStamp = advanceEventSequence(session);
@@ -1959,6 +1965,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
           unsubscribeExit: null,
           hasRunningSubprocess: false,
           childCommandLabel: null,
+          shellName: null,
           runtimeEnv: normalizedRuntimeEnv(input.env),
         };
 
@@ -2365,6 +2372,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
               unsubscribeExit: null,
               hasRunningSubprocess: false,
               childCommandLabel: null,
+              shellName: null,
               runtimeEnv: normalizedRuntimeEnv(input.env),
             };
             const createdSession = session;

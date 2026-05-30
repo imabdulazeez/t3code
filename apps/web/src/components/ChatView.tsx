@@ -154,7 +154,11 @@ import {
   type TerminalContextDraft,
   type TerminalContextSelection,
 } from "../lib/terminalContext";
-import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../terminalUiStateStore";
+import {
+  selectCustomTerminalNames,
+  selectThreadTerminalUiState,
+  useTerminalUiStateStore,
+} from "../terminalUiStateStore";
 import {
   useKnownTerminalSessions,
   useProjectKnownTerminalSessions,
@@ -545,6 +549,66 @@ const PersistentConsolidatedTerminalDrawer = memo(function PersistentConsolidate
   const storeSetActiveTerminal = useTerminalUiStateStore((s) => s.setActiveTerminal);
   const storeCloseTerminal = useTerminalUiStateStore((s) => s.closeTerminal);
   const storeSetTerminalOpen = useTerminalUiStateStore((s) => s.setTerminalOpen);
+  const storeRenameTerminal = useTerminalUiStateStore((s) => s.renameTerminal);
+
+  const knownThreadSessions = useKnownTerminalSessions({
+    environmentId: threadRef.environmentId,
+    threadId: threadRef.threadId,
+  });
+  const knownProjectSessions = useProjectKnownTerminalSessions({
+    environmentId: project?.environmentId ?? null,
+    projectId: project?.id ?? null,
+  });
+
+  const chatServerLabelById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const session of knownThreadSessions) {
+      const label = session.state.summary?.label;
+      if (label && label.length > 0) {
+        map.set(session.target.terminalId, label);
+      }
+    }
+    return map;
+  }, [knownThreadSessions]);
+  const projectServerLabelById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const session of knownProjectSessions) {
+      const label = session.state.summary?.label;
+      if (label && label.length > 0) {
+        map.set(session.target.terminalId, label);
+      }
+    }
+    return map;
+  }, [knownProjectSessions]);
+
+  const chatCustomNames = useTerminalUiStateStore((state) =>
+    selectCustomTerminalNames(state.customTerminalNamesByOwnerKey, threadOwnerRef),
+  );
+  const projectCustomNames = useTerminalUiStateStore((state) =>
+    selectCustomTerminalNames(state.customTerminalNamesByOwnerKey, projectOwnerRef),
+  );
+  const chatCustomNameById = useMemo(
+    () => new Map(Object.entries(chatCustomNames)),
+    [chatCustomNames],
+  );
+  const projectCustomNameById = useMemo(
+    () => new Map(Object.entries(projectCustomNames)),
+    [projectCustomNames],
+  );
+
+  const renameChatTerminal = useCallback(
+    (terminalId: string, name: string) => {
+      storeRenameTerminal(threadOwnerRef, terminalId, name);
+    },
+    [storeRenameTerminal, threadOwnerRef],
+  );
+  const renameProjectTerminal = useCallback(
+    (terminalId: string, name: string) => {
+      if (!projectOwnerRef) return;
+      storeRenameTerminal(projectOwnerRef, terminalId, name);
+    },
+    [projectOwnerRef, storeRenameTerminal],
+  );
 
   const [chatFocusRequestId, setChatFocusRequestId] = useState(0);
   const [projectFocusRequestId, setProjectFocusRequestId] = useState(0);
@@ -739,11 +803,15 @@ const PersistentConsolidatedTerminalDrawer = memo(function PersistentConsolidate
       activeTerminalId: projectState.activeTerminalId,
       terminalGroups: projectState.terminalGroups,
       activeTerminalGroupId: projectState.activeTerminalGroupId,
+      serverLabelById: projectServerLabelById,
+      customNameById: projectCustomNameById,
+      allowGrouping: false,
       focusRequestId: focusRequestId + projectFocusRequestId + (visible ? 1 : 0),
       onNewTerminal: newProjectTerminal,
       onSplitTerminal: splitProjectTerminal,
       onActiveTerminalChange: activateProjectTerminal,
       onCloseTerminal: closeProjectTerminal,
+      onRenameTerminal: renameProjectTerminal,
       onAddTerminalContext: handleAddTerminalContext,
     });
   }
@@ -759,11 +827,15 @@ const PersistentConsolidatedTerminalDrawer = memo(function PersistentConsolidate
       activeTerminalId: threadState.activeTerminalId,
       terminalGroups: threadState.terminalGroups,
       activeTerminalGroupId: threadState.activeTerminalGroupId,
+      serverLabelById: chatServerLabelById,
+      customNameById: chatCustomNameById,
+      allowGrouping: true,
       focusRequestId: focusRequestId + chatFocusRequestId + (visible ? 1 : 0),
       onNewTerminal: newChatTerminal,
       onSplitTerminal: splitChatTerminal,
       onActiveTerminalChange: activateChatTerminal,
       onCloseTerminal: closeChatTerminal,
+      onRenameTerminal: renameChatTerminal,
       onAddTerminalContext: handleAddTerminalContext,
     });
   }

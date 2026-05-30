@@ -7,7 +7,7 @@ import {
   type TerminalSessionSnapshot,
 } from "@t3tools/contracts";
 import { terminalOwnerKey, type TerminalOwnerRef } from "@t3tools/client-runtime";
-import { getTerminalLabel } from "@t3tools/shared/terminalLabels";
+import { resolveTerminalSessionLabel } from "@t3tools/shared/terminalLabels";
 import { Terminal, type ITheme } from "@xterm/xterm";
 import {
   type PointerEvent as ReactPointerEvent,
@@ -786,11 +786,15 @@ export interface TerminalDrawerSection {
   activeTerminalId: string;
   terminalGroups: ThreadTerminalGroup[];
   activeTerminalGroupId: string;
+  serverLabelById: Map<string, string>;
+  customNameById: Map<string, string>;
+  allowGrouping: boolean;
   focusRequestId: number;
   onNewTerminal: () => void;
   onSplitTerminal: () => void;
   onActiveTerminalChange: (terminalId: string) => void;
   onCloseTerminal: (terminalId: string) => void;
+  onRenameTerminal: (terminalId: string, name: string) => void;
   onAddTerminalContext: (selection: TerminalContextSelection) => void;
 }
 
@@ -891,7 +895,7 @@ function deriveSectionView(section: TerminalDrawerSection): SectionView {
     });
   }
 
-  const resolvedTerminalGroups =
+  const groupedTerminalGroups =
     nextGroups.length > 0
       ? nextGroups
       : [
@@ -900,6 +904,13 @@ function deriveSectionView(section: TerminalDrawerSection): SectionView {
             terminalIds: [resolvedActiveTerminalId],
           },
         ];
+
+  const resolvedTerminalGroups = section.allowGrouping
+    ? groupedTerminalGroups
+    : normalizedTerminalIds.map((terminalId) => ({
+        id: `group-${terminalId}`,
+        terminalIds: [terminalId],
+      }));
 
   const indexById = resolvedTerminalGroups.findIndex(
     (terminalGroup) => terminalGroup.id === section.activeTerminalGroupId,
@@ -914,14 +925,23 @@ function deriveSectionView(section: TerminalDrawerSection): SectionView {
           ),
         );
 
-  const visibleTerminalIds = resolvedTerminalGroups[resolvedActiveGroupIndex]?.terminalIds ?? [
-    resolvedActiveTerminalId,
-  ];
+  const visibleTerminalIds = section.allowGrouping
+    ? (resolvedTerminalGroups[resolvedActiveGroupIndex]?.terminalIds ?? [resolvedActiveTerminalId])
+    : [resolvedActiveTerminalId];
   const showGroupHeaders =
-    resolvedTerminalGroups.length > 1 ||
-    resolvedTerminalGroups.some((terminalGroup) => terminalGroup.terminalIds.length > 1);
+    section.allowGrouping &&
+    (resolvedTerminalGroups.length > 1 ||
+      resolvedTerminalGroups.some((terminalGroup) => terminalGroup.terminalIds.length > 1));
   const terminalLabelById = new Map(
-    normalizedTerminalIds.map((terminalId, index) => [terminalId, `Terminal ${index + 1}`]),
+    normalizedTerminalIds.map((terminalId) => {
+      const customName = section.customNameById.get(terminalId)?.trim();
+      const serverLabel = section.serverLabelById.get(terminalId);
+      const label =
+        customName && customName.length > 0
+          ? customName
+          : resolveTerminalSessionLabel(terminalId, serverLabel ? { label: serverLabel } : null);
+      return [terminalId, label] as const;
+    }),
   );
 
   return {
@@ -1035,6 +1055,9 @@ export default function ThreadTerminalDrawer({
   const ownerKey = activeSection ? terminalOwnerKey(activeSection.ownerRef) : "";
   const [drawerHeight, setDrawerHeight] = useState(() => clampDrawerHeight(height));
   const [resizeEpoch, setResizeEpoch] = useState(0);
+  const [editingTerminalKey, setEditingTerminalKey] = useState<string | null>(null);
+  const [editingTerminalDraft, setEditingTerminalDraft] = useState("");
+  const skipRenameBlurCommitRef = useRef(false);
   const drawerHeightRef = useRef(drawerHeight);
   const lastSyncedHeightRef = useRef(clampDrawerHeight(height));
   const onHeightChangeRef = useRef(onHeightChange);
@@ -1158,6 +1181,7 @@ export default function ThreadTerminalDrawer({
   const activeTerminalLabelById = activeView.terminalLabelById;
   const hasReachedSplitLimit = activeView.hasReachedSplitLimit;
   const hasTerminalSidebar = activeView.hasRealTerminals;
+  const allowSplit = activeSection.allowGrouping;
 
   const splitTerminalActionLabel = hasReachedSplitLimit
     ? `Split Terminal (max ${MAX_TERMINALS_PER_GROUP} per group)`
@@ -1192,18 +1216,22 @@ export default function ThreadTerminalDrawer({
       {!hasTerminalSidebar && (
         <div className="pointer-events-none absolute right-2 top-2 z-20">
           <div className="pointer-events-auto inline-flex items-center overflow-hidden rounded-md border border-border/80 bg-background/70">
-            <TerminalActionButton
-              className={`p-1 text-foreground/90 transition-colors ${
-                hasReachedSplitLimit
-                  ? "cursor-not-allowed opacity-45 hover:bg-transparent"
-                  : "hover:bg-accent"
-              }`}
-              onClick={onSplitTerminalAction}
-              label={splitTerminalActionLabel}
-            >
-              <SquareSplitHorizontal className="size-3.25" />
-            </TerminalActionButton>
-            <div className="h-4 w-px bg-border/80" />
+            {allowSplit && (
+              <>
+                <TerminalActionButton
+                  className={`p-1 text-foreground/90 transition-colors ${
+                    hasReachedSplitLimit
+                      ? "cursor-not-allowed opacity-45 hover:bg-transparent"
+                      : "hover:bg-accent"
+                  }`}
+                  onClick={onSplitTerminalAction}
+                  label={splitTerminalActionLabel}
+                >
+                  <SquareSplitHorizontal className="size-3.25" />
+                </TerminalActionButton>
+                <div className="h-4 w-px bg-border/80" />
+              </>
+            )}
             <TerminalCreateMenuButton
               className="p-1 text-foreground/90 transition-colors hover:bg-accent"
               options={newTerminalCreateOptions}
@@ -1261,7 +1289,9 @@ export default function ThreadTerminalDrawer({
                         onSessionExited={() => activeSection.onCloseTerminal(terminalId)}
                         onAddTerminalContext={activeSection.onAddTerminalContext}
                         focusRequestId={activeSection.focusRequestId}
-                        autoFocus={terminalId === resolvedActiveTerminalId}
+                        autoFocus={
+                          terminalId === resolvedActiveTerminalId && editingTerminalKey === null
+                        }
                         resizeEpoch={resizeEpoch}
                         drawerHeight={drawerHeight}
                         keybindings={keybindings}
@@ -1287,7 +1317,7 @@ export default function ThreadTerminalDrawer({
                   onSessionExited={() => activeSection.onCloseTerminal(resolvedActiveTerminalId)}
                   onAddTerminalContext={activeSection.onAddTerminalContext}
                   focusRequestId={activeSection.focusRequestId}
-                  autoFocus
+                  autoFocus={editingTerminalKey === null}
                   resizeEpoch={resizeEpoch}
                   drawerHeight={drawerHeight}
                   keybindings={keybindings}
@@ -1300,17 +1330,19 @@ export default function ThreadTerminalDrawer({
             <aside className="flex w-36 min-w-36 flex-col border border-border/70 bg-muted/10">
               <div className="flex h-[22px] items-stretch justify-end border-b border-border/70">
                 <div className="inline-flex h-full items-stretch">
-                  <TerminalActionButton
-                    className={`inline-flex h-full items-center px-1 text-foreground/90 transition-colors ${
-                      hasReachedSplitLimit
-                        ? "cursor-not-allowed opacity-45 hover:bg-transparent"
-                        : "hover:bg-accent/70"
-                    }`}
-                    onClick={onSplitTerminalAction}
-                    label={splitTerminalActionLabel}
-                  >
-                    <SquareSplitHorizontal className="size-3.25" />
-                  </TerminalActionButton>
+                  {allowSplit && (
+                    <TerminalActionButton
+                      className={`inline-flex h-full items-center px-1 text-foreground/90 transition-colors ${
+                        hasReachedSplitLimit
+                          ? "cursor-not-allowed opacity-45 hover:bg-transparent"
+                          : "hover:bg-accent/70"
+                      }`}
+                      onClick={onSplitTerminalAction}
+                      label={splitTerminalActionLabel}
+                    >
+                      <SquareSplitHorizontal className="size-3.25" />
+                    </TerminalActionButton>
+                  )}
                   <TerminalCreateMenuButton
                     className="inline-flex h-full items-center border-l border-border/70 px-1 text-foreground/90 transition-colors hover:bg-accent/70"
                     options={newTerminalCreateOptions}
@@ -1392,9 +1424,28 @@ export default function ThreadTerminalDrawer({
                               {terminalGroup.terminalIds.map((terminalId) => {
                                 const isActive =
                                   isActiveSection && terminalId === sectionActiveTerminalId;
-                                const closeTerminalLabel = `Close ${
-                                  view.terminalLabelById.get(terminalId) ?? "terminal"
-                                }${isActive && closeShortcutLabel ? ` (${closeShortcutLabel})` : ""}`;
+                                const terminalLabel =
+                                  view.terminalLabelById.get(terminalId) ?? "Terminal";
+                                const closeTerminalLabel = `Close ${terminalLabel}${
+                                  isActive && closeShortcutLabel ? ` (${closeShortcutLabel})` : ""
+                                }`;
+                                const editKey = `${sec.id}:${terminalId}`;
+                                const isEditing = editingTerminalKey === editKey;
+                                const commitRename = () => {
+                                  skipRenameBlurCommitRef.current = true;
+                                  sec.onRenameTerminal(terminalId, editingTerminalDraft);
+                                  setEditingTerminalKey(null);
+                                };
+                                const cancelRename = () => {
+                                  skipRenameBlurCommitRef.current = true;
+                                  setEditingTerminalKey(null);
+                                };
+                                const beginRename = () => {
+                                  setEditingTerminalDraft(
+                                    sec.customNameById.get(terminalId) ?? terminalLabel,
+                                  );
+                                  setEditingTerminalKey(editKey);
+                                };
                                 return (
                                   <div
                                     key={terminalId}
@@ -1409,16 +1460,49 @@ export default function ThreadTerminalDrawer({
                                         └
                                       </span>
                                     )}
-                                    <button
-                                      type="button"
-                                      className="flex min-w-0 flex-1 items-center gap-1 text-left"
-                                      onClick={() => sectionActivate(terminalId)}
-                                    >
-                                      <TerminalSquare className="size-3 shrink-0" />
-                                      <span className="truncate">
-                                        {view.terminalLabelById.get(terminalId) ?? "Terminal"}
-                                      </span>
-                                    </button>
+                                    {isEditing ? (
+                                      <div className="flex min-w-0 flex-1 items-center gap-1">
+                                        <TerminalSquare className="size-3 shrink-0" />
+                                        <input
+                                          autoFocus
+                                          value={editingTerminalDraft}
+                                          onChange={(event) =>
+                                            setEditingTerminalDraft(event.target.value)
+                                          }
+                                          onKeyDown={(event) => {
+                                            if (event.key === "Enter") {
+                                              event.preventDefault();
+                                              commitRename();
+                                            } else if (event.key === "Escape") {
+                                              event.preventDefault();
+                                              cancelRename();
+                                            }
+                                          }}
+                                          onBlur={() => {
+                                            if (skipRenameBlurCommitRef.current) {
+                                              skipRenameBlurCommitRef.current = false;
+                                              return;
+                                            }
+                                            sec.onRenameTerminal(terminalId, editingTerminalDraft);
+                                            setEditingTerminalKey(null);
+                                          }}
+                                          className="min-w-0 flex-1 rounded bg-background px-1 text-[11px] text-foreground outline-none ring-1 ring-border"
+                                        />
+                                      </div>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        className="flex min-w-0 flex-1 items-center gap-1 text-left"
+                                        onClick={() => sectionActivate(terminalId)}
+                                        onDoubleClick={(event) => {
+                                          event.stopPropagation();
+                                          beginRename();
+                                        }}
+                                      >
+                                        <TerminalSquare className="size-3 shrink-0" />
+                                        <span className="truncate">{terminalLabel}</span>
+                                      </button>
+                                    )}
                                     <Popover>
                                       <PopoverTrigger
                                         openOnHover
