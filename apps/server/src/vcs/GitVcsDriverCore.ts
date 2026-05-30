@@ -316,6 +316,15 @@ function commandLabel(args: readonly string[]): string {
   return `git ${args.join(" ")}`;
 }
 
+function isMissingRemoteBranchError(stderr: string): boolean {
+  const normalized = stderr.toLowerCase();
+  return (
+    normalized.includes("remote ref does not exist") ||
+    normalized.includes("does not exist") ||
+    normalized.includes("unable to delete")
+  );
+}
+
 function parseDefaultBranchFromRemoteHeadRef(value: string, remoteName: string): string | null {
   const trimmed = value.trim();
   const prefix = `refs/remotes/${remoteName}/`;
@@ -2280,6 +2289,59 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     },
   );
 
+  const deleteBranch: GitVcsDriver.GitVcsDriverShape["deleteBranch"] = Effect.fn("deleteBranch")(
+    function* (input) {
+      const isRemoteRef = input.isRemote === true;
+
+      let deletedLocal = false;
+      if (!isRemoteRef) {
+        yield* executeGit(
+          "GitVcsDriver.deleteBranch.local",
+          input.cwd,
+          ["branch", input.force ? "-D" : "-d", "--", input.refName],
+          {
+            timeoutMs: 10_000,
+            fallbackErrorMessage: "git branch delete failed",
+          },
+        );
+        deletedLocal = true;
+      }
+
+      let deletedRemote = false;
+      if (isRemoteRef || input.deleteRemote) {
+        const remoteName = input.remoteName
+          ? input.remoteName
+          : yield* resolvePrimaryRemoteName(input.cwd).pipe(
+              Effect.catch((error) => (isRemoteRef ? Effect.fail(error) : Effect.succeed(null))),
+            );
+        const remoteBranch = isRemoteRef
+          ? deriveLocalBranchNameFromRemoteRef(input.refName)
+          : input.refName;
+        if (remoteName && remoteBranch) {
+          const pushArgs = ["push", remoteName, "--delete", remoteBranch];
+          const result = yield* executeGit(
+            "GitVcsDriver.deleteBranch.remote",
+            input.cwd,
+            pushArgs,
+            { timeoutMs: 30_000, allowNonZeroExit: true },
+          );
+          if (result.exitCode === 0) {
+            deletedRemote = true;
+          } else if (!isMissingRemoteBranchError(result.stderr)) {
+            return yield* createGitCommandError(
+              "GitVcsDriver.deleteBranch.remote",
+              input.cwd,
+              pushArgs,
+              result.stderr.trim() || "git push --delete failed",
+            );
+          }
+        }
+      }
+
+      return { refName: input.refName, deletedLocal, deletedRemote };
+    },
+  );
+
   const initRepo: GitVcsDriver.GitVcsDriverShape["initRepo"] = (input) =>
     executeGit("GitVcsDriver.initRepo", input.cwd, ["init"], {
       timeoutMs: 10_000,
@@ -2329,6 +2391,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     renameBranch,
     createRef,
     switchRef,
+    deleteBranch,
     initRepo,
     listLocalBranchNames,
   });

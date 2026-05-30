@@ -16,6 +16,8 @@ import {
   type VcsSwitchRefResult,
   type VcsCreateRefInput,
   type VcsCreateRefResult,
+  type VcsDeleteBranchInput,
+  type VcsDeleteBranchResult,
   type VcsCreateWorktreeInput,
   type VcsCreateWorktreeResult,
   type ReviewDiffPreviewInput,
@@ -217,6 +219,9 @@ export interface GitVcsDriverShape {
   readonly switchRef: (
     input: VcsSwitchRefInput,
   ) => Effect.Effect<VcsSwitchRefResult, GitCommandError>;
+  readonly deleteBranch: (
+    input: VcsDeleteBranchInput,
+  ) => Effect.Effect<VcsDeleteBranchResult, GitCommandError>;
   readonly initRepo: (input: VcsInitInput) => Effect.Effect<void, GitCommandError>;
   readonly listLocalBranchNames: (cwd: string) => Effect.Effect<string[], GitCommandError>;
 }

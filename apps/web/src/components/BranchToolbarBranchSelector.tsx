@@ -1,7 +1,7 @@
 import { scopeProjectRef, scopeThreadRef } from "@t3tools/client-runtime";
 import type { EnvironmentId, VcsRef, ThreadId } from "@t3tools/contracts";
 import { LegendList, type LegendListRef } from "@legendapp/list/react";
-import { ChevronDownIcon } from "lucide-react";
+import { ChevronDownIcon, Trash2 } from "lucide-react";
 import {
   useCallback,
   useDeferredValue,
@@ -31,6 +31,16 @@ import {
   resolveEffectiveEnvMode,
   shouldIncludeBranchPickerItem,
 } from "./BranchToolbar.logic";
+import { useSettings } from "../hooks/useSettings";
+import {
+  AlertDialog,
+  AlertDialogClose,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogPopup,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
 import { Button } from "./ui/button";
 import {
   Combobox,
@@ -62,6 +72,15 @@ const EMPTY_REFS: ReadonlyArray<VcsRef> = [];
 
 function toBranchActionErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "An error occurred.";
+}
+
+function isGitCommandError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "_tag" in error &&
+    (error as { _tag?: unknown })._tag === "GitCommandError"
+  );
 }
 
 function getBranchTriggerLabel(input: {
@@ -200,6 +219,9 @@ export function BranchToolbarBranchSelector({
   const [isBranchMenuOpen, setIsBranchMenuOpen] = useState(false);
   const [branchQuery, setBranchQuery] = useState("");
   const deferredBranchQuery = useDeferredValue(branchQuery);
+  const deleteRemoteBranchOnDelete = useSettings((s) => s.deleteRemoteBranchOnDelete);
+  const [pendingDelete, setPendingDelete] = useState<VcsRef | null>(null);
+  const [forceDeleteTarget, setForceDeleteTarget] = useState<VcsRef | null>(null);
 
   const branchStatusQuery = useVcsStatus({ environmentId, cwd: branchCwd });
   const trimmedBranchQuery = branchQuery.trim();
@@ -392,6 +414,48 @@ export function BranchToolbarBranchSelector({
     });
   };
 
+  const deleteBranch = (ref: VcsRef, force: boolean) => {
+    const api = readEnvironmentApi(environmentId);
+    if (!api || !branchCwd) return;
+
+    runBranchAction(async () => {
+      try {
+        const result = await api.vcs.deleteBranch({
+          cwd: branchCwd,
+          refName: ref.name,
+          isRemote: ref.isRemote,
+          remoteName: ref.remoteName,
+          force,
+          deleteRemote: deleteRemoteBranchOnDelete,
+        });
+        setPendingDelete(null);
+        setForceDeleteTarget(null);
+        toastManager.add(
+          stackedThreadToast({
+            type: "success",
+            title: `Deleted ref "${ref.name}".`,
+            ...(result.deletedRemote ? { description: "Remote branch also deleted." } : {}),
+          }),
+        );
+      } catch (error) {
+        if (!force && isGitCommandError(error)) {
+          setPendingDelete(null);
+          setForceDeleteTarget(ref);
+          return;
+        }
+        setPendingDelete(null);
+        setForceDeleteTarget(null);
+        toastManager.add(
+          stackedThreadToast({
+            type: "error",
+            title: "Failed to delete ref.",
+            description: toBranchActionErrorMessage(error),
+          }),
+        );
+      }
+    });
+  };
+
   useEffect(() => {
     if (
       effectiveEnvMode !== "worktree" ||
@@ -557,86 +621,170 @@ export function BranchToolbarBranchSelector({
     return (
       <ComboboxItem
         hideIndicator
+        className="group"
         key={itemValue}
         index={index}
         value={itemValue}
         onClick={() => selectBranch(refName)}
       >
         <div className="flex w-full items-center justify-between gap-2">
-          <span className="truncate">{itemValue}</span>
-          {badge && <span className="shrink-0 text-[10px] text-muted-foreground/45">{badge}</span>}
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="truncate">{itemValue}</span>
+            {badge && (
+              <span className="shrink-0 text-[10px] text-muted-foreground/45">{badge}</span>
+            )}
+          </span>
+          <div className="flex shrink-0 items-center gap-1.5">
+            {refName.current ? (
+              <span className="size-7 sm:size-6" aria-hidden />
+            ) : (
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                className="opacity-0 group-hover:opacity-100"
+                aria-label={`Delete branch ${refName.name}`}
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  event.preventDefault();
+                  setForceDeleteTarget(null);
+                  setPendingDelete(refName);
+                }}
+              >
+                <Trash2 />
+              </Button>
+            )}
+          </div>
         </div>
       </ComboboxItem>
     );
   }
 
   return (
-    <Combobox
-      items={branchPickerItems}
-      filteredItems={filteredBranchPickerItems}
-      autoHighlight
-      virtualized={shouldVirtualizeBranchList}
-      onItemHighlighted={(_value, eventDetails) => {
-        if (!isBranchMenuOpen || eventDetails.index < 0 || eventDetails.reason !== "keyboard") {
-          return;
-        }
-        branchListRef.current?.scrollIndexIntoView?.({
-          index: eventDetails.index,
-          animated: false,
-        });
-      }}
-      onOpenChange={handleOpenChange}
-      open={isBranchMenuOpen}
-      value={resolvedActiveBranch}
-    >
-      <ComboboxTrigger
-        render={<Button variant="ghost" size="xs" />}
-        className={cn("min-w-0 text-muted-foreground/70 hover:text-foreground/80", className)}
-        disabled={isInitialBranchesLoadPending || isBranchActionPending}
+    <>
+      <Combobox
+        items={branchPickerItems}
+        filteredItems={filteredBranchPickerItems}
+        autoHighlight
+        virtualized={shouldVirtualizeBranchList}
+        onItemHighlighted={(_value, eventDetails) => {
+          if (!isBranchMenuOpen || eventDetails.index < 0 || eventDetails.reason !== "keyboard") {
+            return;
+          }
+          branchListRef.current?.scrollIndexIntoView?.({
+            index: eventDetails.index,
+            animated: false,
+          });
+        }}
+        onOpenChange={handleOpenChange}
+        open={isBranchMenuOpen}
+        value={resolvedActiveBranch}
       >
-        <span className="min-w-0 max-w-[240px] truncate">{triggerLabel}</span>
-        <ChevronDownIcon className="shrink-0" />
-      </ComboboxTrigger>
-      <ComboboxPopup align="end" side="top" className="w-80">
-        <div className="border-b p-1">
-          <ComboboxInput
-            className="[&_input]:font-sans rounded-md"
-            inputClassName="ring-0"
-            placeholder="Search branches..."
-            showTrigger={false}
-            size="sm"
-            value={branchQuery}
-            onChange={(event) => setBranchQuery(event.target.value)}
-          />
-        </div>
-        <ComboboxEmpty>No branches found.</ComboboxEmpty>
-
-        {shouldVirtualizeBranchList ? (
-          <ComboboxListVirtualized>
-            <LegendList<string>
-              ref={branchListRef}
-              data={filteredBranchPickerItems}
-              keyExtractor={(item) => item}
-              renderItem={({ item, index }) => renderPickerItem(item, index)}
-              estimatedItemSize={28}
-              drawDistance={336}
-              onEndReached={() => {
-                if (hasNextPage && !isFetchingNextPage) {
-                  fetchNextBranchPage();
-                }
-              }}
-              style={{ maxHeight: "14rem" }}
+        <ComboboxTrigger
+          render={<Button variant="ghost" size="xs" />}
+          className={cn("min-w-0 text-muted-foreground/70 hover:text-foreground/80", className)}
+          disabled={isInitialBranchesLoadPending || isBranchActionPending}
+        >
+          <span className="min-w-0 max-w-[240px] truncate">{triggerLabel}</span>
+          <ChevronDownIcon className="shrink-0" />
+        </ComboboxTrigger>
+        <ComboboxPopup align="end" side="top" className="w-80">
+          <div className="border-b p-1">
+            <ComboboxInput
+              className="[&_input]:font-sans rounded-md"
+              inputClassName="ring-0"
+              placeholder="Search branches..."
+              showTrigger={false}
+              size="sm"
+              value={branchQuery}
+              onChange={(event) => setBranchQuery(event.target.value)}
             />
-          </ComboboxListVirtualized>
-        ) : (
-          <ComboboxList ref={setBranchListRef} className="max-h-56">
-            {filteredBranchPickerItems.map((itemValue, index) =>
-              renderPickerItem(itemValue, index),
-            )}
-          </ComboboxList>
-        )}
-        {branchStatusText ? <ComboboxStatus>{branchStatusText}</ComboboxStatus> : null}
-      </ComboboxPopup>
-    </Combobox>
+          </div>
+          <ComboboxEmpty>No branches found.</ComboboxEmpty>
+
+          {shouldVirtualizeBranchList ? (
+            <ComboboxListVirtualized>
+              <LegendList<string>
+                ref={branchListRef}
+                data={filteredBranchPickerItems}
+                keyExtractor={(item) => item}
+                renderItem={({ item, index }) => renderPickerItem(item, index)}
+                estimatedItemSize={28}
+                drawDistance={336}
+                onEndReached={() => {
+                  if (hasNextPage && !isFetchingNextPage) {
+                    fetchNextBranchPage();
+                  }
+                }}
+                style={{ maxHeight: "14rem" }}
+              />
+            </ComboboxListVirtualized>
+          ) : (
+            <ComboboxList ref={setBranchListRef} className="max-h-56">
+              {filteredBranchPickerItems.map((itemValue, index) =>
+                renderPickerItem(itemValue, index),
+              )}
+            </ComboboxList>
+          )}
+          {branchStatusText ? <ComboboxStatus>{branchStatusText}</ComboboxStatus> : null}
+        </ComboboxPopup>
+      </Combobox>
+
+      <AlertDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+      >
+        <AlertDialogPopup>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete branch &quot;{pendingDelete?.name}&quot;?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteRemoteBranchOnDelete
+                ? "This will delete the branch locally and its remote counterpart."
+                : "This will delete the branch locally."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (pendingDelete) deleteBranch(pendingDelete, false);
+              }}
+            >
+              Delete
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogPopup>
+      </AlertDialog>
+
+      <AlertDialog
+        open={forceDeleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setForceDeleteTarget(null);
+        }}
+      >
+        <AlertDialogPopup>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Force delete &quot;{forceDeleteTarget?.name}&quot;?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This branch may have unmerged commits that will be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (forceDeleteTarget) deleteBranch(forceDeleteTarget, true);
+              }}
+            >
+              Force delete
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogPopup>
+      </AlertDialog>
+    </>
   );
 }

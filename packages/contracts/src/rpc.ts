@@ -16,6 +16,8 @@ import {
   GitCommandError,
   VcsCreateRefInput,
   VcsCreateRefResult,
+  VcsDeleteBranchInput,
+  VcsDeleteBranchResult,
   VcsCreateWorktreeInput,
   VcsCreateWorktreeResult,
   VcsInitInput,
@@ -129,6 +131,7 @@ export const WS_METHODS = {
   vcsRemoveWorktree: "vcs.removeWorktree",
   vcsCreateRef: "vcs.createRef",
   vcsSwitchRef: "vcs.switchRef",
+  vcsDeleteBranch: "vcs.deleteBranch",
   vcsInit: "vcs.init",
 
   // Git workflow methods
@@ -367,6 +370,12 @@ export const WsVcsSwitchRefRpc = Rpc.make(WS_METHODS.vcsSwitchRef, {
   error: GitCommandError,
 });
 
+export const WsVcsDeleteBranchRpc = Rpc.make(WS_METHODS.vcsDeleteBranch, {
+  payload: VcsDeleteBranchInput,
+  success: VcsDeleteBranchResult,
+  error: GitCommandError,
+});
+
 export const WsVcsInitRpc = Rpc.make(WS_METHODS.vcsInit, {
   payload: VcsInitInput,
   error: VcsError,
@@ -540,6 +549,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsVcsRemoveWorktreeRpc,
   WsVcsCreateRefRpc,
   WsVcsSwitchRefRpc,
+  WsVcsDeleteBranchRpc,
   WsVcsInitRpc,
   WsReviewGetDiffPreviewRpc,
   WsTerminalOpenRpc,

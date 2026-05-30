@@ -178,6 +178,23 @@ export const VcsSwitchRefInput = Schema.Struct({
 });
 export type VcsSwitchRefInput = typeof VcsSwitchRefInput.Type;
 
+export const VcsDeleteBranchInput = Schema.Struct({
+  cwd: TrimmedNonEmptyStringSchema,
+  refName: TrimmedNonEmptyStringSchema,
+  isRemote: Schema.optional(Schema.Boolean),
+  remoteName: Schema.optional(TrimmedNonEmptyStringSchema),
+  force: Schema.optional(Schema.Boolean),
+  deleteRemote: Schema.optional(Schema.Boolean),
+});
+export type VcsDeleteBranchInput = typeof VcsDeleteBranchInput.Type;
+
+export const VcsDeleteBranchResult = Schema.Struct({
+  refName: TrimmedNonEmptyStringSchema,
+  deletedLocal: Schema.Boolean,
+  deletedRemote: Schema.Boolean,
+});
+export type VcsDeleteBranchResult = typeof VcsDeleteBranchResult.Type;
+
 export const VcsInitInput = Schema.Struct({
   cwd: TrimmedNonEmptyStringSchema,
   kind: Schema.optional(VcsDriverKind),

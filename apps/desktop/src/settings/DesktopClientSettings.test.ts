@@ -18,6 +18,7 @@ const clientSettings: ClientSettings = {
   confirmThreadArchive: true,
   confirmThreadDelete: false,
   diffFontFamily: "",
+  deleteRemoteBranchOnDelete: true,
   diffIgnoreWhitespace: true,
   diffWordWrap: true,
   dismissedProviderUpdateNotificationKeys: [],
