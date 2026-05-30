@@ -50,10 +50,22 @@ Long term maintainability is a core priority. If you add new functionality, firs
 
 ## Package Roles
 
+### Apps
+
 - `apps/server`: Node.js WebSocket server. Wraps Codex app-server (JSON-RPC over stdio), serves the React web app, and manages provider sessions.
 - `apps/web`: React/Vite UI. Owns session UX, conversation/event rendering, and client-side state. Connects to the server via WebSocket.
+- `apps/desktop`: Electron desktop shell (`@t3tools/desktop`). Hosts the web app in a native window and bridges to the server over IPC; Effect-based modules under `src/app`, with `backend`, `electron`, `ipc`, `ssh`, and `window` subsystems.
+- `apps/marketing`: Astro marketing site (`@t3tools/marketing`).
+
+### Packages
+
 - `packages/contracts`: Shared effect/Schema schemas and TypeScript contracts for provider events, WebSocket protocol, and model/session types. Keep this package schema-only — no runtime logic.
 - `packages/shared`: Shared runtime utilities consumed by both server and web. Uses explicit subpath exports (e.g. `@t3tools/shared/git`) — no barrel index.
+- `packages/client-runtime`: Client-side runtime utilities (`@t3tools/client-runtime`) — advertised-endpoint resolution, known-environment detection, and source-control discovery state shared by web/desktop.
+- `packages/effect-acp`: Effect bindings for the Agent Client Protocol (`effect-acp`) — the JSON-RPC client/agent/protocol layer the ACP runtime in `apps/server/src/provider/acp/` builds on.
+- `packages/effect-codex-app-server`: Effect bindings for the Codex app-server JSON-RPC transport (`effect-codex-app-server`) — client/protocol/schema used by the Codex provider.
+- `packages/ssh`: SSH utilities (`@t3tools/ssh`) — auth, command execution, config, and tunneling via subpath exports.
+- `packages/tailscale`: Tailscale integration helpers (`@t3tools/tailscale`).
 
 ## Provider Architecture
 
