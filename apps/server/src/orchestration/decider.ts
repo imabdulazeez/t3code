@@ -692,12 +692,12 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
         .at(-1);
       if (latestRevertedPlan) {
         return {
-          ...withEventBase({
+          ...(yield* withEventBase({
             aggregateKind: "thread",
             aggregateId: command.threadId,
             occurredAt: command.createdAt,
             commandId: command.commandId,
-          }),
+          })),
           type: "thread.proposed-plan-upserted",
           payload: {
             threadId: command.threadId,
@@ -728,12 +728,12 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
       const planId = `plan:${command.threadId}:promoted:${message.id}`;
       const existingPlan = thread.proposedPlans.find((entry) => entry.id === planId);
       return {
-        ...withEventBase({
+        ...(yield* withEventBase({
           aggregateKind: "thread",
           aggregateId: command.threadId,
           occurredAt: command.createdAt,
           commandId: command.commandId,
-        }),
+        })),
         type: "thread.proposed-plan-upserted",
         payload: {
           threadId: command.threadId,
@@ -765,12 +765,12 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
         });
       }
       return {
-        ...withEventBase({
+        ...(yield* withEventBase({
           aggregateKind: "thread",
           aggregateId: command.threadId,
           occurredAt: command.createdAt,
           commandId: command.commandId,
-        }),
+        })),
         type: "thread.proposed-plan-upserted",
         payload: {
           threadId: command.threadId,

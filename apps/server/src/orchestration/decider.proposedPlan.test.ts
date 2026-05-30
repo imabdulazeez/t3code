@@ -11,6 +11,7 @@ import {
   type OrchestrationReadModel,
 } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
+import * as NodeServices from "@effect/platform-node/NodeServices";
 import { describe, expect, it } from "vitest";
 
 import { decideOrchestrationCommand } from "./decider.ts";
@@ -215,7 +216,7 @@ describe("proposed plan promote command", () => {
       decideOrchestrationCommand({
         command: promoteCommand,
         readModel,
-      }),
+      }).pipe(Effect.provide(NodeServices.layer)),
     );
 
     const event = Array.isArray(decided) ? decided[0] : decided;
@@ -282,7 +283,7 @@ describe("proposed plan promote command", () => {
         decideOrchestrationCommand({
           command: promoteCommand,
           readModel,
-        }),
+        }).pipe(Effect.provide(NodeServices.layer)),
       ),
     ).rejects.toThrow("No assistant message available to promote");
   });
@@ -389,7 +390,7 @@ describe("proposed plan promote command", () => {
         decideOrchestrationCommand({
           command: promoteCommand,
           readModel,
-        }),
+        }).pipe(Effect.provide(NodeServices.layer)),
       ),
     ).rejects.toThrow("No assistant message available to promote");
   });
@@ -424,7 +425,7 @@ describe("proposed plan promote command", () => {
       decideOrchestrationCommand({
         command: promoteCommand,
         readModel,
-      }),
+      }).pipe(Effect.provide(NodeServices.layer)),
     );
 
     const event = Array.isArray(decided) ? decided[0] : decided;
