@@ -80,6 +80,7 @@ export const VcsRef = Schema.Struct({
   current: Schema.Boolean,
   isDefault: Schema.Boolean,
   worktreePath: TrimmedNonEmptyStringSchema.pipe(Schema.NullOr),
+  lastCommitAt: Schema.optional(Schema.NullOr(Schema.Int)),
 });
 export type VcsRef = typeof VcsRef.Type;
 

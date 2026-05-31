@@ -619,6 +619,8 @@ describe("wsApi", () => {
     const clientSettings = {
       autoCreatePrOnPush: true,
       autoOpenPlanSidebar: false,
+      branchListSortKey: "lastCommit" as const,
+      branchListSortDirection: "desc" as const,
       changedFilesExpandedByDefault: false,
       confirmThreadArchive: true,
       confirmThreadDelete: false,
@@ -688,6 +690,8 @@ describe("wsApi", () => {
     const clientSettings = {
       autoCreatePrOnPush: true,
       autoOpenPlanSidebar: false,
+      branchListSortKey: "lastCommit" as const,
+      branchListSortDirection: "desc" as const,
       changedFilesExpandedByDefault: false,
       confirmThreadArchive: true,
       confirmThreadDelete: false,

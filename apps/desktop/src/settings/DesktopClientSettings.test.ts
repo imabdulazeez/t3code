@@ -14,6 +14,8 @@ import * as DesktopClientSettings from "./DesktopClientSettings.ts";
 const clientSettings: ClientSettings = {
   autoCreatePrOnPush: true,
   autoOpenPlanSidebar: false,
+  branchListSortKey: "lastCommit",
+  branchListSortDirection: "desc",
   changedFilesExpandedByDefault: false,
   confirmThreadArchive: true,
   confirmThreadDelete: false,

@@ -17,6 +17,14 @@ export const SidebarProjectSortOrder = Schema.Literals(["updated_at", "created_a
 export type SidebarProjectSortOrder = typeof SidebarProjectSortOrder.Type;
 export const DEFAULT_SIDEBAR_PROJECT_SORT_ORDER: SidebarProjectSortOrder = "updated_at";
 
+export const BranchListSortKey = Schema.Literals(["alphabetical", "lastCommit"]);
+export type BranchListSortKey = typeof BranchListSortKey.Type;
+export const DEFAULT_BRANCH_LIST_SORT_KEY: BranchListSortKey = "lastCommit";
+
+export const BranchListSortDirection = Schema.Literals(["asc", "desc"]);
+export type BranchListSortDirection = typeof BranchListSortDirection.Type;
+export const DEFAULT_BRANCH_LIST_SORT_DIRECTION: BranchListSortDirection = "desc";
+
 export const SidebarThreadSortOrder = Schema.Literals(["updated_at", "created_at"]);
 export type SidebarThreadSortOrder = typeof SidebarThreadSortOrder.Type;
 export const DEFAULT_SIDEBAR_THREAD_SORT_ORDER: SidebarThreadSortOrder = "updated_at";
@@ -42,6 +50,12 @@ export const DEFAULT_SIDEBAR_THREAD_PREVIEW_COUNT: SidebarThreadPreviewCount = 6
 export const ClientSettingsSchema = Schema.Struct({
   autoCreatePrOnPush: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
   autoOpenPlanSidebar: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
+  branchListSortKey: BranchListSortKey.pipe(
+    Schema.withDecodingDefault(Effect.succeed(DEFAULT_BRANCH_LIST_SORT_KEY)),
+  ),
+  branchListSortDirection: BranchListSortDirection.pipe(
+    Schema.withDecodingDefault(Effect.succeed(DEFAULT_BRANCH_LIST_SORT_DIRECTION)),
+  ),
   changedFilesExpandedByDefault: Schema.Boolean.pipe(
     Schema.withDecodingDefault(Effect.succeed(false)),
   ),
@@ -521,6 +535,8 @@ export type ServerSettingsPatch = typeof ServerSettingsPatch.Type;
 export const ClientSettingsPatch = Schema.Struct({
   autoCreatePrOnPush: Schema.optionalKey(Schema.Boolean),
   autoOpenPlanSidebar: Schema.optionalKey(Schema.Boolean),
+  branchListSortKey: Schema.optionalKey(BranchListSortKey),
+  branchListSortDirection: Schema.optionalKey(BranchListSortDirection),
   changedFilesExpandedByDefault: Schema.optionalKey(Schema.Boolean),
   confirmThreadArchive: Schema.optionalKey(Schema.Boolean),
   confirmThreadDelete: Schema.optionalKey(Schema.Boolean),

@@ -2000,6 +2000,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
               isRemote: false,
               isDefault: refName.name === defaultBranch,
               worktreePath: worktreeMap.get(refName.name) ?? null,
+              lastCommitAt: branchLastCommit.get(refName.name) ?? null,
             });
       }).toSorted((a, b) => {
         const aPriority = a.current ? 0 : a.isDefault ? 1 : 2;
@@ -2027,12 +2028,14 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
                 remoteName?: string;
                 isDefault: boolean;
                 worktreePath: string | null;
+                lastCommitAt: number | null;
               } = {
                 name: refName.name,
                 current: false,
                 isRemote: true,
                 isDefault: false,
                 worktreePath: null,
+                lastCommitAt: branchLastCommit.get(refName.name) ?? null,
               };
               if (parsedRemoteRef) {
                 remoteBranch.remoteName = parsedRemoteRef.remoteName;

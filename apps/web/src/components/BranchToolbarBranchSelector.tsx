@@ -1,7 +1,13 @@
 import { scopeProjectRef, scopeThreadRef } from "@t3tools/client-runtime";
 import type { EnvironmentId, VcsRef, ThreadId } from "@t3tools/contracts";
 import { LegendList, type LegendListRef } from "@legendapp/list/react";
-import { ChevronDownIcon, Trash2 } from "lucide-react";
+import {
+  ArrowDownIcon,
+  ArrowDownWideNarrowIcon,
+  ArrowUpIcon,
+  ChevronDownIcon,
+  Trash2,
+} from "lucide-react";
 import {
   useCallback,
   useDeferredValue,
@@ -31,7 +37,9 @@ import {
   resolveEffectiveEnvMode,
   shouldIncludeBranchPickerItem,
 } from "./BranchToolbar.logic";
-import { useSettings } from "../hooks/useSettings";
+import { useSettings, useUpdateSettings } from "../hooks/useSettings";
+import { Group, GroupSeparator } from "./ui/group";
+import { Menu, MenuItem, MenuPopup, MenuTrigger } from "./ui/menu";
 import {
   AlertDialog,
   AlertDialogClose,
@@ -217,9 +225,14 @@ export function BranchToolbarBranchSelector({
   // Git ref queries
   // ---------------------------------------------------------------------------
   const [isBranchMenuOpen, setIsBranchMenuOpen] = useState(false);
+  const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
+  const isSortMenuOpenRef = useRef(false);
   const [branchQuery, setBranchQuery] = useState("");
   const deferredBranchQuery = useDeferredValue(branchQuery);
   const deleteRemoteBranchOnDelete = useSettings((s) => s.deleteRemoteBranchOnDelete);
+  const branchSortKey = useSettings((s) => s.branchListSortKey);
+  const branchSortDirection = useSettings((s) => s.branchListSortDirection);
+  const { updateSettings } = useUpdateSettings();
   const [pendingDelete, setPendingDelete] = useState<VcsRef | null>(null);
   const [forceDeleteTarget, setForceDeleteTarget] = useState<VcsRef | null>(null);
 
@@ -253,7 +266,25 @@ export function BranchToolbarBranchSelector({
     activeThreadBranch,
     currentGitBranch,
   });
-  const branchNames = useMemo(() => refs.map((refName) => refName.name), [refs]);
+  const branchNames = useMemo(() => {
+    const directionFactor = branchSortDirection === "desc" ? -1 : 1;
+    const sorted = [...refs].toSorted((a, b) => {
+      if (a.current !== b.current) {
+        return a.current ? -1 : 1;
+      }
+      let comparison: number;
+      if (branchSortKey === "alphabetical") {
+        comparison = a.name.localeCompare(b.name);
+      } else {
+        comparison = (a.lastCommitAt ?? 0) - (b.lastCommitAt ?? 0);
+      }
+      if (comparison !== 0) {
+        return comparison * directionFactor;
+      }
+      return a.name.localeCompare(b.name);
+    });
+    return sorted.map((refName) => refName.name);
+  }, [refs, branchSortKey, branchSortDirection]);
   const branchByName = useMemo(
     () => new Map(refs.map((refName) => [refName.name, refName] as const)),
     [refs],
@@ -473,6 +504,9 @@ export function BranchToolbarBranchSelector({
   // ---------------------------------------------------------------------------
   const handleOpenChange = useCallback(
     (open: boolean) => {
+      if (!open && isSortMenuOpenRef.current) {
+        return;
+      }
       setIsBranchMenuOpen(open);
       if (!open) {
         setBranchQuery("");
@@ -689,9 +723,9 @@ export function BranchToolbarBranchSelector({
           <ChevronDownIcon className="shrink-0" />
         </ComboboxTrigger>
         <ComboboxPopup align="end" side="top" className="w-80">
-          <div className="border-b p-1">
+          <div className="flex items-center gap-1 border-b p-1">
             <ComboboxInput
-              className="[&_input]:font-sans rounded-md"
+              className="[&_input]:font-sans min-w-0 flex-1 rounded-md"
               inputClassName="ring-0"
               placeholder="Search branches..."
               showTrigger={false}
@@ -699,6 +733,73 @@ export function BranchToolbarBranchSelector({
               value={branchQuery}
               onChange={(event) => setBranchQuery(event.target.value)}
             />
+            <Group aria-label="Sort branches">
+              <Menu
+                highlightItemOnHover={false}
+                open={isSortMenuOpen}
+                onOpenChange={(open) => {
+                  isSortMenuOpenRef.current = open;
+                  setIsSortMenuOpen(open);
+                }}
+              >
+                <MenuTrigger
+                  render={<Button size="icon-xs" variant="outline" aria-label="Sort branches" />}
+                  onPointerDown={(event) => event.stopPropagation()}
+                >
+                  <ArrowDownWideNarrowIcon className="size-3" />
+                </MenuTrigger>
+                <MenuPopup align="end">
+                  <MenuItem
+                    onClick={() =>
+                      updateSettings({
+                        branchListSortKey: "alphabetical",
+                        branchListSortDirection: "asc",
+                      })
+                    }
+                  >
+                    <span className="flex-1">Alphabetical</span>
+                    {branchSortKey === "alphabetical" && (
+                      <span className="ms-2 text-[10px] uppercase text-muted-foreground">
+                        Active
+                      </span>
+                    )}
+                  </MenuItem>
+                  <MenuItem
+                    onClick={() =>
+                      updateSettings({
+                        branchListSortKey: "lastCommit",
+                        branchListSortDirection: "asc",
+                      })
+                    }
+                  >
+                    <span className="flex-1">Last commit</span>
+                    {branchSortKey === "lastCommit" && (
+                      <span className="ms-2 text-[10px] uppercase text-muted-foreground">
+                        Active
+                      </span>
+                    )}
+                  </MenuItem>
+                </MenuPopup>
+              </Menu>
+              <GroupSeparator />
+              <Button
+                size="icon-xs"
+                variant="outline"
+                aria-label="Toggle sort direction"
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={() =>
+                  updateSettings({
+                    branchListSortDirection: branchSortDirection === "asc" ? "desc" : "asc",
+                  })
+                }
+              >
+                {branchSortDirection === "asc" ? (
+                  <ArrowUpIcon className="size-3" />
+                ) : (
+                  <ArrowDownIcon className="size-3" />
+                )}
+              </Button>
+            </Group>
           </div>
           <ComboboxEmpty>No branches found.</ComboboxEmpty>
 
