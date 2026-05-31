@@ -40,6 +40,7 @@ export function createEnvironmentApi(rpcClient: WsRpcClient): EnvironmentApi {
       createRef: rpcClient.vcs.createRef,
       switchRef: rpcClient.vcs.switchRef,
       deleteBranch: rpcClient.vcs.deleteBranch,
+      fetch: rpcClient.vcs.fetch,
       init: rpcClient.vcs.init,
     },
     git: {

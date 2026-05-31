@@ -13,6 +13,8 @@ import {
   type VcsDeleteBranchResult,
   type VcsCreateWorktreeInput,
   type VcsCreateWorktreeResult,
+  type VcsFetchInput,
+  type VcsFetchResult,
   type VcsListRefsInput,
   type VcsListRefsResult,
   type GitManagerServiceError,
@@ -72,6 +74,7 @@ export interface GitWorkflowServiceShape {
   readonly deleteBranch: (
     input: VcsDeleteBranchInput,
   ) => Effect.Effect<VcsDeleteBranchResult, GitCommandError>;
+  readonly fetch: (input: VcsFetchInput) => Effect.Effect<VcsFetchResult, GitCommandError>;
   readonly renameBranch: (input: {
     readonly cwd: string;
     readonly oldBranch: string;
@@ -314,6 +317,10 @@ export const make = Effect.fn("makeGitWorkflowService")(function* () {
     deleteBranch: (input) =>
       ensureGitCommand("GitWorkflowService.deleteBranch", input.cwd).pipe(
         Effect.andThen(git.deleteBranch(input)),
+      ),
+    fetch: (input) =>
+      ensureGitCommand("GitWorkflowService.fetch", input.cwd).pipe(
+        Effect.andThen(git.fetch(input)),
       ),
     renameBranch: (input) =>
       ensureGit("GitWorkflowService.renameBranch", input.cwd).pipe(

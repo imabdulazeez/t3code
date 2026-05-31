@@ -25,6 +25,10 @@ export const BranchListSortDirection = Schema.Literals(["asc", "desc"]);
 export type BranchListSortDirection = typeof BranchListSortDirection.Type;
 export const DEFAULT_BRANCH_LIST_SORT_DIRECTION: BranchListSortDirection = "desc";
 
+export const BranchRemoteSyncMode = Schema.Literals(["fetch", "prune"]);
+export type BranchRemoteSyncMode = typeof BranchRemoteSyncMode.Type;
+export const DEFAULT_BRANCH_REMOTE_SYNC_MODE: BranchRemoteSyncMode = "fetch";
+
 export const SidebarThreadSortOrder = Schema.Literals(["updated_at", "created_at"]);
 export type SidebarThreadSortOrder = typeof SidebarThreadSortOrder.Type;
 export const DEFAULT_SIDEBAR_THREAD_SORT_ORDER: SidebarThreadSortOrder = "updated_at";
@@ -55,6 +59,9 @@ export const ClientSettingsSchema = Schema.Struct({
   ),
   branchListSortDirection: BranchListSortDirection.pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_BRANCH_LIST_SORT_DIRECTION)),
+  ),
+  branchRemoteSyncMode: BranchRemoteSyncMode.pipe(
+    Schema.withDecodingDefault(Effect.succeed(DEFAULT_BRANCH_REMOTE_SYNC_MODE)),
   ),
   changedFilesExpandedByDefault: Schema.Boolean.pipe(
     Schema.withDecodingDefault(Effect.succeed(false)),
@@ -537,6 +544,7 @@ export const ClientSettingsPatch = Schema.Struct({
   autoOpenPlanSidebar: Schema.optionalKey(Schema.Boolean),
   branchListSortKey: Schema.optionalKey(BranchListSortKey),
   branchListSortDirection: Schema.optionalKey(BranchListSortDirection),
+  branchRemoteSyncMode: Schema.optionalKey(BranchRemoteSyncMode),
   changedFilesExpandedByDefault: Schema.optionalKey(Schema.Boolean),
   confirmThreadArchive: Schema.optionalKey(Schema.Boolean),
   confirmThreadDelete: Schema.optionalKey(Schema.Boolean),

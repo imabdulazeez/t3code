@@ -1126,6 +1126,12 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
             gitWorkflow.deleteBranch(input).pipe(Effect.tap(() => refreshGitStatus(input.cwd))),
             { "rpc.aggregate": "vcs" },
           ),
+        [WS_METHODS.vcsFetch]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.vcsFetch,
+            gitWorkflow.fetch(input).pipe(Effect.tap(() => refreshGitStatus(input.cwd))),
+            { "rpc.aggregate": "vcs" },
+          ),
         [WS_METHODS.vcsInit]: (input) =>
           observeRpcEffect(
             WS_METHODS.vcsInit,

@@ -5,6 +5,8 @@ import type {
   VcsDeleteBranchResult,
   VcsCreateWorktreeInput,
   VcsCreateWorktreeResult,
+  VcsFetchInput,
+  VcsFetchResult,
   VcsInitInput,
   VcsListRefsInput,
   VcsListRefsResult,
@@ -465,6 +467,7 @@ export interface EnvironmentApi {
     createRef: (input: VcsCreateRefInput) => Promise<VcsCreateRefResult>;
     switchRef: (input: VcsSwitchRefInput) => Promise<VcsSwitchRefResult>;
     deleteBranch: (input: VcsDeleteBranchInput) => Promise<VcsDeleteBranchResult>;
+    fetch: (input: VcsFetchInput) => Promise<VcsFetchResult>;
     init: (input: VcsInitInput) => Promise<void>;
     pull: (input: VcsPullInput) => Promise<VcsPullResult>;
     refreshStatus: (input: VcsStatusInput) => Promise<VcsStatusResult>;

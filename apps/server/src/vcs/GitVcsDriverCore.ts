@@ -2345,6 +2345,20 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     },
   );
 
+  const fetch: GitVcsDriver.GitVcsDriverShape["fetch"] = Effect.fn("fetch")(function* (input) {
+    const remoteName = yield* resolvePrimaryRemoteName(input.cwd);
+    yield* executeGit(
+      "GitVcsDriver.fetch",
+      input.cwd,
+      ["fetch", ...(input.prune ? ["--prune"] : []), remoteName],
+      {
+        timeoutMs: 30_000,
+        fallbackErrorMessage: "git fetch failed",
+      },
+    );
+    return { pruned: input.prune === true };
+  });
+
   const initRepo: GitVcsDriver.GitVcsDriverShape["initRepo"] = (input) =>
     executeGit("GitVcsDriver.initRepo", input.cwd, ["init"], {
       timeoutMs: 10_000,
@@ -2395,6 +2409,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     createRef,
     switchRef,
     deleteBranch,
+    fetch,
     initRepo,
     listLocalBranchNames,
   });

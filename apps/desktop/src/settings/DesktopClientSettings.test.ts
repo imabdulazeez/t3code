@@ -16,6 +16,7 @@ const clientSettings: ClientSettings = {
   autoOpenPlanSidebar: false,
   branchListSortKey: "lastCommit",
   branchListSortDirection: "desc",
+  branchRemoteSyncMode: "fetch",
   changedFilesExpandedByDefault: false,
   confirmThreadArchive: true,
   confirmThreadDelete: false,

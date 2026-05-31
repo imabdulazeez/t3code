@@ -196,6 +196,17 @@ export const VcsDeleteBranchResult = Schema.Struct({
 });
 export type VcsDeleteBranchResult = typeof VcsDeleteBranchResult.Type;
 
+export const VcsFetchInput = Schema.Struct({
+  cwd: TrimmedNonEmptyStringSchema,
+  prune: Schema.optional(Schema.Boolean),
+});
+export type VcsFetchInput = typeof VcsFetchInput.Type;
+
+export const VcsFetchResult = Schema.Struct({
+  pruned: Schema.Boolean,
+});
+export type VcsFetchResult = typeof VcsFetchResult.Type;
+
 export const VcsInitInput = Schema.Struct({
   cwd: TrimmedNonEmptyStringSchema,
   kind: Schema.optional(VcsDriverKind),

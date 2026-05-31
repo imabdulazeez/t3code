@@ -122,6 +122,7 @@ vi.mock("@t3tools/client-runtime", async (importOriginal) => {
       createRef: vi.fn(),
       switchRef: vi.fn(),
       deleteBranch: vi.fn(),
+      fetch: vi.fn(),
       init: vi.fn(),
     },
     git: {

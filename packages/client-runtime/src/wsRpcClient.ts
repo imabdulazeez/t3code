@@ -109,6 +109,7 @@ export interface WsRpcClient {
     readonly createRef: RpcUnaryMethod<typeof WS_METHODS.vcsCreateRef>;
     readonly switchRef: RpcUnaryMethod<typeof WS_METHODS.vcsSwitchRef>;
     readonly deleteBranch: RpcUnaryMethod<typeof WS_METHODS.vcsDeleteBranch>;
+    readonly fetch: RpcUnaryMethod<typeof WS_METHODS.vcsFetch>;
     readonly init: RpcUnaryMethod<typeof WS_METHODS.vcsInit>;
   };
   readonly git: {
@@ -250,6 +251,7 @@ export function createWsRpcClient(
       switchRef: (input) => transport.request((client) => client[WS_METHODS.vcsSwitchRef](input)),
       deleteBranch: (input) =>
         transport.request((client) => client[WS_METHODS.vcsDeleteBranch](input)),
+      fetch: (input) => transport.request((client) => client[WS_METHODS.vcsFetch](input)),
       init: (input) => transport.request((client) => client[WS_METHODS.vcsInit](input)),
     },
     git: {

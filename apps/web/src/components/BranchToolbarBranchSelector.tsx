@@ -6,6 +6,8 @@ import {
   ArrowDownWideNarrowIcon,
   ArrowUpIcon,
   ChevronDownIcon,
+  DownloadCloud,
+  Scissors,
   Trash2,
 } from "lucide-react";
 import {
@@ -227,9 +229,12 @@ export function BranchToolbarBranchSelector({
   const [isBranchMenuOpen, setIsBranchMenuOpen] = useState(false);
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
   const isSortMenuOpenRef = useRef(false);
+  const [isRemoteSyncMenuOpen, setIsRemoteSyncMenuOpen] = useState(false);
+  const isRemoteSyncMenuOpenRef = useRef(false);
   const [branchQuery, setBranchQuery] = useState("");
   const deferredBranchQuery = useDeferredValue(branchQuery);
   const deleteRemoteBranchOnDelete = useSettings((s) => s.deleteRemoteBranchOnDelete);
+  const branchRemoteSyncMode = useSettings((s) => s.branchRemoteSyncMode);
   const branchSortKey = useSettings((s) => s.branchListSortKey);
   const branchSortDirection = useSettings((s) => s.branchListSortDirection);
   const { updateSettings } = useUpdateSettings();
@@ -487,6 +492,31 @@ export function BranchToolbarBranchSelector({
     });
   };
 
+  const runRemoteSync = (mode: "fetch" | "prune") => {
+    const api = readEnvironmentApi(environmentId);
+    if (!api || !branchCwd || isBranchActionPending) return;
+
+    runBranchAction(async () => {
+      try {
+        await api.vcs.fetch({ cwd: branchCwd, prune: mode === "prune" });
+        toastManager.add(
+          stackedThreadToast({
+            type: "success",
+            title: mode === "prune" ? "Pruned remote-tracking branches." : "Fetched from remote.",
+          }),
+        );
+      } catch (error) {
+        toastManager.add(
+          stackedThreadToast({
+            type: "error",
+            title: mode === "prune" ? "Failed to prune." : "Failed to fetch.",
+            description: toBranchActionErrorMessage(error),
+          }),
+        );
+      }
+    });
+  };
+
   useEffect(() => {
     if (
       effectiveEnvMode !== "worktree" ||
@@ -504,7 +534,7 @@ export function BranchToolbarBranchSelector({
   // ---------------------------------------------------------------------------
   const handleOpenChange = useCallback(
     (open: boolean) => {
-      if (!open && isSortMenuOpenRef.current) {
+      if (!open && (isSortMenuOpenRef.current || isRemoteSyncMenuOpenRef.current)) {
         return;
       }
       setIsBranchMenuOpen(open);
@@ -799,6 +829,71 @@ export function BranchToolbarBranchSelector({
                   <ArrowDownIcon className="size-3" />
                 )}
               </Button>
+            </Group>
+            <Group aria-label="Sync with remote">
+              <Button
+                size="icon-xs"
+                variant="outline"
+                aria-label={branchRemoteSyncMode === "prune" ? "Prune remote" : "Fetch from remote"}
+                disabled={isBranchActionPending}
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={() => runRemoteSync(branchRemoteSyncMode)}
+              >
+                {branchRemoteSyncMode === "prune" ? (
+                  <Scissors className="size-3" />
+                ) : (
+                  <DownloadCloud className="size-3" />
+                )}
+              </Button>
+              <GroupSeparator />
+              <Menu
+                highlightItemOnHover={false}
+                open={isRemoteSyncMenuOpen}
+                onOpenChange={(open) => {
+                  isRemoteSyncMenuOpenRef.current = open;
+                  setIsRemoteSyncMenuOpen(open);
+                }}
+              >
+                <MenuTrigger
+                  render={
+                    <Button size="icon-xs" variant="outline" aria-label="Choose remote sync mode" />
+                  }
+                  disabled={isBranchActionPending}
+                  onPointerDown={(event) => event.stopPropagation()}
+                >
+                  <ChevronDownIcon className="size-3" />
+                </MenuTrigger>
+                <MenuPopup align="end">
+                  <MenuItem
+                    onClick={() => {
+                      updateSettings({ branchRemoteSyncMode: "fetch" });
+                      runRemoteSync("fetch");
+                    }}
+                  >
+                    <DownloadCloud className="size-3.5" />
+                    <span className="flex-1">Fetch</span>
+                    {branchRemoteSyncMode === "fetch" && (
+                      <span className="ms-2 text-[10px] uppercase text-muted-foreground">
+                        Active
+                      </span>
+                    )}
+                  </MenuItem>
+                  <MenuItem
+                    onClick={() => {
+                      updateSettings({ branchRemoteSyncMode: "prune" });
+                      runRemoteSync("prune");
+                    }}
+                  >
+                    <Scissors className="size-3.5" />
+                    <span className="flex-1">Prune</span>
+                    {branchRemoteSyncMode === "prune" && (
+                      <span className="ms-2 text-[10px] uppercase text-muted-foreground">
+                        Active
+                      </span>
+                    )}
+                  </MenuItem>
+                </MenuPopup>
+              </Menu>
             </Group>
           </div>
           <ComboboxEmpty>No branches found.</ComboboxEmpty>
