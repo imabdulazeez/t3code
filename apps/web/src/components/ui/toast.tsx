@@ -394,7 +394,10 @@ interface ToastProviderProps extends Toast.Provider.Props {
   position?: ToastPosition;
 }
 
-function useActiveThreadRefFromRoute(): ScopedThreadRef | null {
+function useActiveThreadAndProjectRefs(): {
+  activeThreadRef: ScopedThreadRef | null;
+  activeProjectRef: { environmentId: EnvironmentId; cwd: string } | null;
+} {
   const routeTarget = useParams({
     strict: false,
     select: (params) => resolveThreadRouteTarget(params),
@@ -403,7 +406,7 @@ function useActiveThreadRefFromRoute(): ScopedThreadRef | null {
     routeTarget?.kind === "draft" ? store.getDraftSession(routeTarget.draftId) : null,
   );
 
-  return useMemo(() => {
+  const activeThreadRef = useMemo(() => {
     if (routeTarget?.kind === "server") {
       return routeTarget.threadRef;
     }
@@ -415,6 +418,36 @@ function useActiveThreadRefFromRoute(): ScopedThreadRef | null {
     }
     return null;
   }, [activeDraftSession, routeTarget]);
+
+  const activeThreadSelector = useMemo(
+    () => createThreadSelectorByRef(activeThreadRef),
+    [activeThreadRef],
+  );
+  const activeThread = useStore(activeThreadSelector);
+
+  const projectRef = useMemo(() => {
+    if (activeThread) {
+      return { environmentId: activeThread.environmentId, projectId: activeThread.projectId };
+    }
+    if (activeDraftSession) {
+      return {
+        environmentId: activeDraftSession.environmentId,
+        projectId: activeDraftSession.projectId,
+      };
+    }
+    return null;
+  }, [activeThread, activeDraftSession]);
+
+  const activeProjectSelector = useMemo(() => createProjectSelectorByRef(projectRef), [projectRef]);
+  const activeProject = useStore(activeProjectSelector);
+
+  const activeProjectRef = useMemo(
+    () =>
+      activeProject ? { environmentId: activeProject.environmentId, cwd: activeProject.cwd } : null,
+    [activeProject],
+  );
+
+  return { activeThreadRef, activeProjectRef };
 }
 
 function ThreadToastVisibleAutoDismiss({
@@ -506,27 +539,7 @@ function ToastProvider({ children, position = "top-right", ...props }: ToastProv
 
 function Toasts({ position = "top-right" }: { position: ToastPosition }) {
   const { toasts } = Toast.useToastManager<ThreadToastData>();
-  const activeThreadRef = useActiveThreadRefFromRoute();
-  const activeThreadSelector = useMemo(
-    () => createThreadSelectorByRef(activeThreadRef),
-    [activeThreadRef],
-  );
-  const activeThread = useStore(activeThreadSelector);
-  const activeProjectSelector = useMemo(
-    () =>
-      createProjectSelectorByRef(
-        activeThread
-          ? { environmentId: activeThread.environmentId, projectId: activeThread.projectId }
-          : null,
-      ),
-    [activeThread],
-  );
-  const activeProject = useStore(activeProjectSelector);
-  const activeProjectRef = useMemo(
-    () =>
-      activeProject ? { environmentId: activeProject.environmentId, cwd: activeProject.cwd } : null,
-    [activeProject],
-  );
+  const { activeThreadRef, activeProjectRef } = useActiveThreadAndProjectRefs();
   const isTop = position.startsWith("top");
   const visibleToasts = toasts.filter((toast) =>
     shouldRenderThreadScopedToast(toast.data, activeThreadRef, activeProjectRef),
@@ -699,27 +712,7 @@ function AnchoredToastProvider({ children, ...props }: Toast.Provider.Props) {
 
 function AnchoredToasts() {
   const { toasts } = Toast.useToastManager<ThreadToastData>();
-  const activeThreadRef = useActiveThreadRefFromRoute();
-  const activeThreadSelector = useMemo(
-    () => createThreadSelectorByRef(activeThreadRef),
-    [activeThreadRef],
-  );
-  const activeThread = useStore(activeThreadSelector);
-  const activeProjectSelector = useMemo(
-    () =>
-      createProjectSelectorByRef(
-        activeThread
-          ? { environmentId: activeThread.environmentId, projectId: activeThread.projectId }
-          : null,
-      ),
-    [activeThread],
-  );
-  const activeProject = useStore(activeProjectSelector);
-  const activeProjectRef = useMemo(
-    () =>
-      activeProject ? { environmentId: activeProject.environmentId, cwd: activeProject.cwd } : null,
-    [activeProject],
-  );
+  const { activeThreadRef, activeProjectRef } = useActiveThreadAndProjectRefs();
 
   return (
     <Toast.Portal data-slot="toast-portal-anchored">
