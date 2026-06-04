@@ -5,7 +5,7 @@ import {
   TurnId,
   type OrchestrationThreadActivity,
 } from "@t3tools/contracts";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import {
   deriveCompletionDividerBeforeEntryId,
@@ -587,6 +587,7 @@ describe("findSidebarProposedPlan", () => {
       planMarkdown: "# Source plan",
       implementedAt: "2026-02-23T00:00:03.000Z",
       implementationThreadId: "thread-2",
+      revertedAt: null,
       createdAt: "2026-02-23T00:00:01.000Z",
       updatedAt: "2026-02-23T00:00:02.000Z",
     });

@@ -1,6 +1,6 @@
 import { terminalOwnerKey, threadTerminalOwnerRef } from "@t3tools/client-runtime";
 import { ThreadId } from "@t3tools/contracts";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { collectActiveTerminalOwnerKeys } from "./terminalUiStateCleanup";
 

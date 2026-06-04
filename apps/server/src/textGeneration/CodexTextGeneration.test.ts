@@ -7,7 +7,7 @@ import * as Path from "effect/Path";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import { createModelSelection } from "@t3tools/shared/model";
-import { expect } from "vitest";
+import { expect } from "vite-plus/test";
 
 import { CodexSettings, ProviderInstanceId, TextGenerationError } from "@t3tools/contracts";
 
@@ -277,7 +277,7 @@ it.layer(CodexTextGenerationTestLayer)("CodexTextGeneration", (it) => {
           });
 
           expect(generated.subject).toBe("Add important change");
-          expect(generated.branch).toBe("feature/fix/important-system-change");
+          expect(generated.branch).toBe("fix/important-system-change");
         }),
     ),
   );

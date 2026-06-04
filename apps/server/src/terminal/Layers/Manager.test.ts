@@ -23,7 +23,7 @@ import * as Ref from "effect/Ref";
 import * as Schedule from "effect/Schedule";
 import * as Scope from "effect/Scope";
 import { TestClock } from "effect/testing";
-import { expect } from "vitest";
+import { expect } from "vite-plus/test";
 
 import * as ProcessRunner from "../../processRunner.ts";
 import type { TerminalManagerShape } from "../Services/Manager.ts";
@@ -759,6 +759,7 @@ it.layer(
         readonly childCommand: string | null;
       } = { hasRunningSubprocess: false, childCommand: null };
       const { manager, getEvents } = yield* createManager(5, {
+        shellResolver: () => "/bin/zsh",
         subprocessInspector: () => Effect.succeed(inspect),
         subprocessPollIntervalMs: 20,
       });
@@ -786,7 +787,7 @@ it.layer(
             (event) =>
               event.type === "activity" &&
               event.hasRunningSubprocess === false &&
-              event.label === "Terminal 1",
+              event.label === "zsh",
           ),
         ),
         "1200 millis",
