@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { parse as parseYaml } from "yaml";
+import { fromYaml } from "@t3tools/shared/schemaYaml";
 import rootPackageJson from "../package.json" with { type: "json" };
 import desktopPackageJson from "../apps/desktop/package.json" with { type: "json" };
 import serverPackageJson from "../apps/server/package.json" with { type: "json" };
@@ -30,22 +30,25 @@ const LINUX_ICON_SIZES = [16, 22, 24, 32, 48, 64, 128, 256, 512] as const;
 const BuildPlatform = Schema.Literals(["mac", "linux", "win"]);
 const BuildArch = Schema.Literals(["arm64", "x64", "universal"]);
 
-interface WorkspaceConfig {
-  readonly catalog?: Record<string, string>;
-  readonly overrides?: Record<string, string>;
-}
+const WorkspaceConfig = Schema.Struct({
+  catalog: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  overrides: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  patchedDependencies: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+});
+type WorkspaceConfig = typeof WorkspaceConfig.Type;
 
 const RepoRoot = Effect.service(Path.Path).pipe(
   Effect.flatMap((path) => path.fromFileUrl(new URL("..", import.meta.url))),
 );
 const encodeJsonString = Schema.encodeEffect(Schema.UnknownFromJsonString);
+const decodeWorkspaceConfig = Schema.decodeEffect(fromYaml(WorkspaceConfig));
 
 const readWorkspaceConfig = Effect.fn("readWorkspaceConfig")(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const repoRoot = yield* RepoRoot;
   const workspaceYaml = yield* fs.readFileString(path.join(repoRoot, "pnpm-workspace.yaml"));
-  return parseYaml(workspaceYaml) as WorkspaceConfig;
+  return yield* decodeWorkspaceConfig(workspaceYaml);
 });
 
 interface DesktopBuildIconAssets {
@@ -265,6 +268,29 @@ interface StagePackageJson {
     readonly electron: string;
   };
   readonly overrides: Record<string, unknown>;
+  readonly pnpm?: {
+    readonly patchedDependencies?: Record<string, string>;
+  };
+}
+
+export function createStagePnpmConfig(
+  patchedDependencies: Record<string, string>,
+  dependencies: Record<string, unknown>,
+): StagePackageJson["pnpm"] | undefined {
+  const stagePatchedDependencies = Object.fromEntries(
+    Object.entries(patchedDependencies).filter(([patchKey]) =>
+      Object.hasOwn(dependencies, getPatchedDependencyPackageName(patchKey)),
+    ),
+  );
+
+  return Object.keys(stagePatchedDependencies).length > 0
+    ? { patchedDependencies: stagePatchedDependencies }
+    : undefined;
+}
+
+function getPatchedDependencyPackageName(patchKey: string): string {
+  const versionSeparator = patchKey.lastIndexOf("@");
+  return versionSeparator > 0 ? patchKey.slice(0, versionSeparator) : patchKey;
 }
 
 const AzureTrustedSigningOptionsConfig = Config.all({
@@ -605,6 +631,7 @@ const createBuildConfig = Effect.fn("createBuildConfig")(function* (
       t3codeBuildTimestamp: buildTimestamp,
     },
   };
+
   if (platform === "mac") {
     buildConfig.mac = {
       target: target === "dmg" ? [target, "zip"] : [target],
@@ -674,6 +701,7 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
   const workspaceConfig = yield* readWorkspaceConfig();
   const workspaceCatalog = workspaceConfig.catalog ?? {};
   const workspaceOverrides = workspaceConfig.overrides ?? {};
+  const workspacePatchedDependencies = workspaceConfig.patchedDependencies ?? {};
 
   const platformConfig = PLATFORM_CONFIG[options.platform];
   if (!platformConfig) {
@@ -695,7 +723,7 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
     try: () => resolveCatalogDependencies(workspaceOverrides, workspaceCatalog, "apps/desktop"),
     catch: (cause) =>
       new BuildScriptError({
-        message: "Could not resolve overrides from package.json.",
+        message: "Could not resolve overrides from pnpm-workspace.yaml.",
         cause,
       }),
   });
@@ -787,6 +815,11 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
   // @effect-diagnostics-next-line globalDateInEffect:off
   const buildTimestamp = formatBuildTimestamp(new Date());
 
+  const stageDependencies = {
+    ...stripWorkspaceDeps(resolvedServerDependencies),
+    ...resolvedDesktopRuntimeDependencies,
+  };
+  const stagePnpmConfig = createStagePnpmConfig(workspacePatchedDependencies, stageDependencies);
   const stagePackageJson: StagePackageJson = {
     name: "t3code",
     version: appVersion,
@@ -804,18 +837,20 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
       options.signed,
       buildTimestamp,
     ),
-    dependencies: {
-      ...stripWorkspaceDeps(resolvedServerDependencies),
-      ...resolvedDesktopRuntimeDependencies,
-    },
+    dependencies: stageDependencies,
     devDependencies: {
       electron: electronVersion,
     },
     overrides: resolvedOverrides,
+    ...(stagePnpmConfig ? { pnpm: stagePnpmConfig } : {}),
   };
 
   const stagePackageJsonString = yield* encodeJsonString(stagePackageJson);
   yield* fs.writeFileString(path.join(stageAppDir, "package.json"), `${stagePackageJsonString}\n`);
+
+  if (Object.keys(workspacePatchedDependencies).length > 0) {
+    yield* fs.copy(path.join(repoRoot, "patches"), path.join(stageAppDir, "patches"));
+  }
 
   yield* Effect.log("[desktop-artifact] Installing staged production dependencies...");
   yield* runCommand(
@@ -865,13 +900,13 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
   );
   yield* runCommand(
     ChildProcess.make({
-      cwd: stageAppDir,
+      cwd: repoRoot,
       env: buildEnv,
       // Windows needs shell mode to resolve .cmd shims.
       shell: process.platform === "win32",
-    })`vp dlx electron-builder ${platformConfig.cliFlag} --${options.arch} --publish never`,
+    })`vp exec --filter @t3tools/desktop -- electron-builder --projectDir ${stageAppDir} ${platformConfig.cliFlag} --${options.arch} --publish never`,
     {
-      label: `vp dlx electron-builder ${platformConfig.cliFlag} --${options.arch} --publish never`,
+      label: `vp exec --filter @t3tools/desktop -- electron-builder --projectDir ${stageAppDir} ${platformConfig.cliFlag} --${options.arch} --publish never`,
       verbose: options.verbose,
     },
   );
