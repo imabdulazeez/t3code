@@ -7,6 +7,6 @@ export const config: VercelConfig = {
     deploymentEnabled: false,
   },
   installCommand:
-    "npm install -g vite-plus && vp install --filter '@t3tools/contracts' --filter '@t3tools/client-runtime' --filter '@t3tools/scripts' --filter '@t3tools/web'",
+    "npm install -g vite-plus && vp install --filter '@t3tools/scripts...' --filter '@t3tools/web...'",
   rewrites: [routes.rewrite("/(.*)", "/index.html")],
 };
