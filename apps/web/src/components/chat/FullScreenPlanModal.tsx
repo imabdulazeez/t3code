@@ -28,8 +28,18 @@ export function useFullScreenPlan(): FullScreenPlanContextValue {
   return value;
 }
 
-export function FullScreenPlanProvider({ children }: { children: ReactNode }) {
+export function FullScreenPlanProvider({
+  children,
+  resetKey,
+}: {
+  children: ReactNode;
+  resetKey?: string;
+}) {
   const [payload, setPayload] = useState<FullScreenPlanPayload | null>(null);
+
+  useEffect(() => {
+    setPayload(null);
+  }, [resetKey]);
 
   const openFullScreenPlan = useCallback((next: FullScreenPlanPayload) => {
     setPayload(next);
