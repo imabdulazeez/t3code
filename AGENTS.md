@@ -42,8 +42,8 @@ Long term maintainability is a core priority. If you add new functionality, firs
 ### Packages
 
 - `packages/contracts`: Shared effect/Schema schemas and TypeScript contracts for provider events, WebSocket protocol, and model/session types. Keep this package schema-only — no runtime logic.
-- `packages/shared`: Shared runtime utilities consumed by both server and web. Uses explicit subpath exports (e.g. `@t3tools/shared/git`) — no barrel index.
-- `packages/client-runtime`: Client-side runtime utilities (`@t3tools/client-runtime`) — advertised-endpoint resolution, known-environment detection, and source-control discovery state shared by web/desktop.
+- `packages/shared`: Shared runtime utilities consumed by both server and client applications. Uses explicit subpath exports (e.g. `@t3tools/shared/git`) — no barrel index.
+- `packages/client-runtime`: Client-side runtime utilities (`@t3tools/client-runtime`) — advertised-endpoint resolution, known-environment detection, and source-control discovery state shared by web/desktop/mobile.
 - `packages/effect-acp`: Effect bindings for the Agent Client Protocol (`effect-acp`) — the JSON-RPC client/agent/protocol layer the ACP runtime in `apps/server/src/provider/acp/` builds on.
 - `packages/effect-codex-app-server`: Effect bindings for the Codex app-server JSON-RPC transport (`effect-codex-app-server`) — client/protocol/schema used by the Codex provider.
 - `packages/ssh`: SSH utilities (`@t3tools/ssh`) — auth, command execution, config, and tunneling via subpath exports.

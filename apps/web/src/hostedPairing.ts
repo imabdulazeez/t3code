@@ -8,7 +8,7 @@ export interface HostedPairingRequest {
   readonly label: string;
 }
 
-function configuredHostedAppUrl(): string {
+export function configuredHostedAppUrl(): string {
   return import.meta.env.VITE_HOSTED_APP_URL?.trim() || DEFAULT_HOSTED_APP_URL;
 }
 
