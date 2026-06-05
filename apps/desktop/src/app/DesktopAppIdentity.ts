@@ -53,7 +53,7 @@ const make = Effect.gen(function* () {
           Effect.map((parsed) =>
             Option.fromNullishOr(parsed.t3codeCommitHash).pipe(Option.flatMap(normalizeCommitHash)),
           ),
-          Effect.catch(() => Effect.succeed(Option.none<string>())),
+          Effect.orElseSucceed(() => Option.none<string>()),
         ),
     });
   });

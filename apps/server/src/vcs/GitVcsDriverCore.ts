@@ -894,7 +894,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
 
     const remoteNames = yield* runGitStdout("GitVcsDriver.listRemoteNames", cwd, ["remote"]).pipe(
       Effect.map(parseRemoteNames),
-      Effect.catch(() => Effect.succeed<ReadonlyArray<string>>([])),
+      Effect.orElseSucceed((): ReadonlyArray<string> => []),
     );
     return (
       parseUpstreamRefWithRemoteNames(upstreamRef, remoteNames) ??
@@ -1005,7 +1005,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     cwd: string,
     branchName: string,
   ) {
-    const remoteNames = yield* listRemoteNames(cwd).pipe(Effect.catch(() => Effect.succeed([])));
+    const remoteNames = yield* listRemoteNames(cwd).pipe(Effect.orElseSucceed(() => []));
     const parsedRemoteRef = parseRemoteRefWithRemoteNames(branchName, remoteNames);
     return parsedRemoteRef?.branchName ?? branchName;
   });
@@ -1051,7 +1051,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       return pushDefaultRemote;
     }
 
-    return yield* resolvePrimaryRemoteName(cwd).pipe(Effect.catch(() => Effect.succeed(null)));
+    return yield* resolvePrimaryRemoteName(cwd).pipe(Effect.orElseSucceed(() => null));
   });
 
   const ensureRemote: GitVcsDriver.GitVcsDriverShape["ensureRemote"] = Effect.fn("ensureRemote")(
@@ -1099,7 +1099,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     ).pipe(Effect.map((stdout) => stdout.trim()));
 
     const primaryRemoteName = yield* resolvePrimaryRemoteName(cwd).pipe(
-      Effect.catch(() => Effect.succeed(null)),
+      Effect.orElseSucceed(() => null),
     );
     const defaultBranch =
       primaryRemoteName === null ? null : yield* resolveDefaultBranchName(cwd, primaryRemoteName);
@@ -1240,7 +1240,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
               allowNonZeroExit: true,
             },
           ),
-          originRemoteExists(cwd).pipe(Effect.catch(() => Effect.succeed(false))),
+          originRemoteExists(cwd).pipe(Effect.orElseSucceed(() => false)),
         ],
         { concurrency: "unbounded" },
       );
@@ -1285,9 +1285,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
 
     const fallbackAheadCount =
       !upstreamRef && refName
-        ? yield* computeAheadCountAgainstBase(cwd, refName).pipe(
-            Effect.catch(() => Effect.succeed(0)),
-          )
+        ? yield* computeAheadCountAgainstBase(cwd, refName).pipe(Effect.orElseSucceed(() => 0))
         : null;
 
     if (fallbackAheadCount !== null) {
@@ -1303,9 +1301,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       aheadOfDefaultCount =
         fallbackAheadCount !== null
           ? fallbackAheadCount
-          : yield* computeAheadCountAgainstBase(cwd, refName).pipe(
-              Effect.catch(() => Effect.succeed(0)),
-            );
+          : yield* computeAheadCountAgainstBase(cwd, refName).pipe(Effect.orElseSucceed(() => 0));
     }
 
     const stagedEntries = parseNumstatEntries(stagedNumstatStdout);
@@ -1503,11 +1499,11 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       }
 
       const comparableBaseBranch = yield* resolveBaseBranchForNoUpstream(cwd, branch).pipe(
-        Effect.catch(() => Effect.succeed(null)),
+        Effect.orElseSucceed(() => null),
       );
       if (comparableBaseBranch) {
         const publishRemoteName = yield* resolvePushRemoteName(cwd, branch).pipe(
-          Effect.catch(() => Effect.succeed(null)),
+          Effect.orElseSucceed(() => null),
         );
         if (!publishRemoteName) {
           return {
@@ -1517,7 +1513,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
         }
 
         const hasRemoteBranch = yield* remoteBranchExists(cwd, publishRemoteName, branch).pipe(
-          Effect.catch(() => Effect.succeed(false)),
+          Effect.orElseSucceed(() => false),
         );
         if (hasRemoteBranch) {
           return {
@@ -1554,7 +1550,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     }
 
     const currentUpstream = yield* resolveCurrentUpstream(cwd).pipe(
-      Effect.catch(() => Effect.succeed(null)),
+      Effect.orElseSucceed(() => null),
     );
     if (currentUpstream) {
       yield* runGit("GitVcsDriver.pushCurrentBranch.pushUpstream", cwd, [
@@ -1725,7 +1721,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       input.baseRef ??
       (branch
         ? yield* resolveBaseBranchForNoUpstream(input.cwd, branch).pipe(
-            Effect.catch(() => Effect.succeed(null)),
+            Effect.orElseSucceed(() => null),
           )
         : null);
 
@@ -1738,18 +1734,16 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
         appendTruncationMarker: true,
       },
     ).pipe(
-      Effect.catch(() =>
-        Effect.succeed({
-          exitCode: 0,
-          stdout: "",
-          stderr: "",
-          stdoutTruncated: false,
-          stderrTruncated: false,
-        }),
-      ),
+      Effect.orElseSucceed(() => ({
+        exitCode: 0,
+        stdout: "",
+        stderr: "",
+        stdoutTruncated: false,
+        stderrTruncated: false,
+      })),
     );
     const dirtyUntracked = yield* readUntrackedReviewDiffs(input.cwd).pipe(
-      Effect.catch(() => Effect.succeed({ diff: "", truncated: false })),
+      Effect.orElseSucceed(() => ({ diff: "", truncated: false })),
     );
     const dirtyDiff = [dirtyTrackedResult.stdout.trimEnd(), dirtyUntracked.diff.trimEnd()]
       .filter((diff) => diff.length > 0)
@@ -1766,15 +1760,13 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
               appendTruncationMarker: true,
             },
           ).pipe(
-            Effect.catch(() =>
-              Effect.succeed({
-                exitCode: 0,
-                stdout: "",
-                stderr: "",
-                stdoutTruncated: false,
-                stderrTruncated: false,
-              }),
-            ),
+            Effect.orElseSucceed(() => ({
+              exitCode: 0,
+              stdout: "",
+              stderr: "",
+              stdoutTruncated: false,
+              stderrTruncated: false,
+            })),
           )
         : null;
     const baseDiff = baseResult?.stdout ?? "";
@@ -1836,7 +1828,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
   const listRefs: GitVcsDriver.GitVcsDriverShape["listRefs"] = Effect.fn("listRefs")(
     function* (input) {
       const branchRecencyPromise = readBranchRecency(input.cwd).pipe(
-        Effect.catch(() => Effect.succeed(new Map<string, number>())),
+        Effect.orElseSucceed(() => new Map<string, number>()),
       );
       const localBranchResult = yield* executeGit(
         "GitVcsDriver.listRefs.branchNoColor",
@@ -1979,7 +1971,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
             const candidatePath = line.slice("worktree ".length);
             const exists = yield* fileSystem.stat(candidatePath).pipe(
               Effect.map(() => true),
-              Effect.catch(() => Effect.succeed(false)),
+              Effect.orElseSucceed(() => false),
             );
             currentPath = exists ? candidatePath : null;
           } else if (line.startsWith("branch refs/heads/") && currentPath) {

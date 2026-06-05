@@ -160,7 +160,7 @@ function readSettings(
         onSome: (raw) =>
           decodeDesktopSettingsJson(raw).pipe(
             Effect.map(normalizeDesktopSettingsDocument),
-            Effect.catch(() => Effect.succeed(defaultSettings)),
+            Effect.orElseSucceed(() => defaultSettings),
           ),
       }),
     ),
