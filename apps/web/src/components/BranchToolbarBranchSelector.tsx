@@ -469,7 +469,7 @@ export function BranchToolbarBranchSelector({
         toastManager.add(
           stackedThreadToast({
             type: "success",
-            title: `Deleted ref "${ref.name}".`,
+            title: `Deleted branch "${ref.name}".`,
             ...(result.deletedRemote ? { description: "Remote branch also deleted." } : {}),
           }),
         );
