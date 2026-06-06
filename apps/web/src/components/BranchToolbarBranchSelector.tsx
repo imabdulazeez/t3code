@@ -464,6 +464,9 @@ export function BranchToolbarBranchSelector({
           force,
           deleteRemote: deleteRemoteBranchOnDelete,
         });
+        if (ref.isRemote || result.deletedRemote) {
+          await api.vcs.fetch({ cwd: branchCwd, prune: true }).catch(() => undefined);
+        }
         setPendingDelete(null);
         setForceDeleteTarget(null);
         toastManager.add(
