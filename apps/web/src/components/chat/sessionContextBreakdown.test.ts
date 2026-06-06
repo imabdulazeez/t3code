@@ -1,5 +1,5 @@
 import { EventId, MessageId, type OrchestrationThreadActivity } from "@t3tools/contracts";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "@effect/vitest";
 
 import type { ChatMessage } from "~/types";
 import { estimateSessionContextBreakdown } from "./sessionContextBreakdown";
