@@ -4,7 +4,7 @@
 
 **This repository is a fork.** Upstream is [`pingdotgg/t3code`](https://github.com/pingdotgg/t3code) (`upstream/main`); this fork lives at [`imabdulazeez/t3code`](https://github.com/imabdulazeez/t3code) (`origin`). The fork is periodically synced with upstream and re-applies its own additions on top. For detailed fork-specific changes, refer to [FORK-CHANGES.md](./FORK-CHANGES.md).
 
-> **IMPORTANT:** When making any change to this fork, update the table in [FORK-CHANGES.md](./FORK-CHANGES.md) in the same change. Add a new row (or amend an existing one) describing the change, the files touched, and the key changes. Amending an existing row, and combining similar changes is preferred, rather than appending rows unnecessarily. Keeping that table current is mandatory.
+> **IMPORTANT:** When making any deviating changes to this fork, update the table in [FORK-CHANGES.md](./FORK-CHANGES.md) in the same change. Add a new row (or amend an existing one) describing the change, the files touched, and the key changes. Amending an existing row, and combining similar changes is preferred whenever possible, rather than appending rows unnecessarily. Keeping that table current is mandatory. Do not add upstream changes to the FORK-CHANGES.md file unless the incoming upstream changes had to be changed/modified to support the fork changes. Simple upstream changes are not required to be added
 
 ## Task Completion Requirements
 
