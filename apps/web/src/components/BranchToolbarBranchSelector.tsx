@@ -354,11 +354,17 @@ export function BranchToolbarBranchSelector({
   // ---------------------------------------------------------------------------
   // Branch actions
   // ---------------------------------------------------------------------------
-  const runBranchAction = (action: () => Promise<void>) => {
+  const runBranchAction = (
+    action: () => Promise<void>,
+    options?: { readonly preserveLoadedRefs?: boolean },
+  ) => {
     startBranchActionTransition(async () => {
       await action().catch(() => undefined);
       await vcsRefManager
-        .load(branchRefTarget, undefined, { limit: 100, preserveLoadedRefs: true })
+        .load(branchRefTarget, undefined, {
+          limit: 100,
+          preserveLoadedRefs: options?.preserveLoadedRefs ?? true,
+        })
         .catch(() => undefined);
     });
   };
@@ -506,7 +512,7 @@ export function BranchToolbarBranchSelector({
           }),
         );
       }
-    });
+    }, { preserveLoadedRefs: false });
   };
 
   const runRemoteSync = (mode: "fetch" | "prune") => {
