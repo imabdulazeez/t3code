@@ -474,6 +474,15 @@ export function BranchToolbarBranchSelector({
     const api = readEnvironmentApi(environmentId);
     if (!api || !branchCwd) return;
 
+    setPendingDelete(null);
+    setForceDeleteTarget(null);
+
+    const toastId = toastManager.add({
+      type: "loading",
+      title: `Deleting branch "${ref.name}"...`,
+      timeout: 0,
+    });
+
     runBranchAction(async () => {
       try {
         const result = await api.vcs.deleteBranch({
@@ -487,9 +496,8 @@ export function BranchToolbarBranchSelector({
         if (ref.isRemote || result.deletedRemote) {
           await api.vcs.fetch({ cwd: branchCwd, prune: true }).catch(() => undefined);
         }
-        setPendingDelete(null);
-        setForceDeleteTarget(null);
-        toastManager.add(
+        toastManager.update(
+          toastId,
           stackedThreadToast({
             type: "success",
             title: `Deleted branch "${ref.name}".`,
@@ -498,13 +506,12 @@ export function BranchToolbarBranchSelector({
         );
       } catch (error) {
         if (!force && isGitCommandError(error)) {
-          setPendingDelete(null);
+          toastManager.close(toastId);
           setForceDeleteTarget(ref);
           return;
         }
-        setPendingDelete(null);
-        setForceDeleteTarget(null);
-        toastManager.add(
+        toastManager.update(
+          toastId,
           stackedThreadToast({
             type: "error",
             title: "Failed to delete ref.",
