@@ -35,6 +35,44 @@ export function sanitizeBranchFragment(raw: string): string {
   return branchFragment.length > 0 ? branchFragment : "update";
 }
 
+// eslint-disable-next-line no-control-regex
+const GIT_BRANCH_DISALLOWED_CHARS = /[\x00-\x20\x7f~^:?*[\\]/;
+
+export function validateGitBranchName(rawName: string): string | null {
+  const name = rawName.trim();
+  if (name.length === 0) {
+    return "Branch name cannot be empty.";
+  }
+  if (GIT_BRANCH_DISALLOWED_CHARS.test(name)) {
+    return "Branch name cannot contain spaces or any of these characters: ~ ^ : ? * [ \\";
+  }
+  if (name.includes("..")) {
+    return "Branch name cannot contain '..'.";
+  }
+  if (name.includes("@{")) {
+    return "Branch name cannot contain '@{'.";
+  }
+  if (name === "@") {
+    return "Branch name cannot be '@'.";
+  }
+  if (name.includes("//")) {
+    return "Branch name cannot contain consecutive slashes.";
+  }
+  if (name.startsWith("/") || name.endsWith("/")) {
+    return "Branch name cannot start or end with '/'.";
+  }
+  if (name.startsWith("-")) {
+    return "Branch name cannot start with '-'.";
+  }
+  if (name.endsWith(".")) {
+    return "Branch name cannot end with '.'.";
+  }
+  if (name.split("/").some((segment) => segment.startsWith(".") || segment.endsWith(".lock"))) {
+    return "Branch name path components cannot start with '.' or end with '.lock'.";
+  }
+  return null;
+}
+
 const AUTO_FEATURE_BRANCH_FALLBACK = "feature/update";
 
 /**

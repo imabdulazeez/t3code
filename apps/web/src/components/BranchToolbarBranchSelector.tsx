@@ -27,6 +27,7 @@ import { useVcsStatus } from "../lib/vcsStatusState";
 import { useVcsRefs, vcsRefManager } from "../lib/vcsRefState";
 import { newCommandId } from "../lib/utils";
 import { cn } from "../lib/utils";
+import { validateGitBranchName } from "@t3tools/shared/git";
 import { parsePullRequestReference } from "../pullRequestReference";
 import { getSourceControlPresentation } from "../sourceControlPresentation";
 import { useStore } from "../store";
@@ -301,6 +302,7 @@ export function BranchToolbarBranchSelector({
   const checkoutPullRequestItemValue =
     prReference && onCheckoutPullRequestRequest ? `__checkout_pull_request__:${prReference}` : null;
   const canCreateBranch = !isSelectingWorktreeBase && trimmedBranchQuery.length > 0;
+  const createBranchNameError = canCreateBranch ? validateGitBranchName(trimmedBranchQuery) : null;
   const hasExactBranchMatch = branchByName.has(trimmedBranchQuery);
   const createBranchItemValue = canCreateBranch
     ? `__create_new_branch__:${trimmedBranchQuery}`
@@ -422,6 +424,18 @@ export function BranchToolbarBranchSelector({
     const name = rawName.trim();
     const api = readEnvironmentApi(environmentId);
     if (!api || !branchCwd || !name || isBranchActionPending) return;
+
+    const validationError = validateGitBranchName(name);
+    if (validationError) {
+      toastManager.add(
+        stackedThreadToast({
+          type: "error",
+          title: "Invalid branch name.",
+          description: validationError,
+        }),
+      );
+      return;
+    }
 
     setIsBranchMenuOpen(false);
     onComposerFocusRequest?.();
@@ -666,7 +680,12 @@ export function BranchToolbarBranchSelector({
           value={itemValue}
           onClick={() => createRef(trimmedBranchQuery)}
         >
-          <span className="truncate">Create new branch &quot;{trimmedBranchQuery}&quot;</span>
+          <span className="flex min-w-0 flex-col items-start">
+            <span className="truncate">Create new branch &quot;{trimmedBranchQuery}&quot;</span>
+            {createBranchNameError ? (
+              <span className="truncate text-destructive text-xs">{createBranchNameError}</span>
+            ) : null}
+          </span>
         </ComboboxItem>
       );
     }
