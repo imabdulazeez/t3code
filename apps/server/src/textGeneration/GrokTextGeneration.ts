@@ -6,7 +6,7 @@ import { ChildProcessSpawner } from "effect/unstable/process";
 import type * as EffectAcpErrors from "effect-acp/errors";
 
 import { type GrokSettings, type ModelSelection } from "@t3tools/contracts";
-import { sanitizeBranchFragment, sanitizeFeatureBranchName } from "@t3tools/shared/git";
+import { sanitizeBranchFragment } from "@t3tools/shared/git";
 import { extractJsonObject } from "@t3tools/shared/schemaJson";
 
 import { TextGenerationError } from "@t3tools/contracts";
@@ -191,7 +191,7 @@ export const makeGrokTextGeneration = Effect.fn("makeGrokTextGeneration")(functi
       subject: sanitizeCommitSubject(generated.subject),
       body: generated.body.trim(),
       ...("branch" in generated && typeof generated.branch === "string"
-        ? { branch: sanitizeFeatureBranchName(generated.branch) }
+        ? { branch: sanitizeBranchFragment(generated.branch) }
         : {}),
     };
   });

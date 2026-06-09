@@ -12,7 +12,7 @@ import {
 } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { describe, expect, it } from "@effect/vitest";
+import { expect, it } from "@effect/vitest";
 
 import { decideOrchestrationCommand } from "./decider.ts";
 import { createEmptyReadModel, projectEvent } from "./projector.ts";
@@ -24,43 +24,39 @@ const asThreadId = (value: string): ThreadId => ThreadId.make(value);
 const asMessageId = (value: string): MessageId => MessageId.make(value);
 const asTurnId = (value: string): TurnId => TurnId.make(value);
 
-async function seedReadModelWithProject(): Promise<OrchestrationReadModel> {
+const seedReadModelWithProject = Effect.gen(function* () {
   const now = "2026-01-01T00:00:00.000Z";
   const initial = createEmptyReadModel(now);
-  return await Effect.runPromise(
-    projectEvent(initial, {
-      sequence: 1,
-      eventId: asEventId("evt-project-create"),
-      aggregateKind: "project",
-      aggregateId: asProjectId("project-proposedplan"),
-      type: "project.created",
-      occurredAt: now,
-      commandId: asCommandId("cmd-project-create"),
-      causationEventId: null,
-      correlationId: asCommandId("cmd-project-create"),
-      metadata: {},
-      payload: {
-        projectId: asProjectId("project-proposedplan"),
-        title: "Project ProposedPlan",
-        workspaceRoot: "/tmp/project-proposedplan",
-        defaultModelSelection: null,
-        scripts: [],
-        createdAt: now,
-        updatedAt: now,
-      },
-    }),
-  );
-}
+  return yield* projectEvent(initial, {
+    sequence: 1,
+    eventId: asEventId("evt-project-create"),
+    aggregateKind: "project",
+    aggregateId: asProjectId("project-proposedplan"),
+    type: "project.created",
+    occurredAt: now,
+    commandId: asCommandId("cmd-project-create"),
+    causationEventId: null,
+    correlationId: asCommandId("cmd-project-create"),
+    metadata: {},
+    payload: {
+      projectId: asProjectId("project-proposedplan"),
+      title: "Project ProposedPlan",
+      workspaceRoot: "/tmp/project-proposedplan",
+      defaultModelSelection: null,
+      scripts: [],
+      createdAt: now,
+      updatedAt: now,
+    },
+  });
+});
 
-async function seedReadModelWithThreadAndMessages(
-  projectReadModel: OrchestrationReadModel,
-): Promise<OrchestrationReadModel> {
-  const now = "2026-01-01T00:00:00.000Z";
-  let readModel = projectReadModel;
-  let sequence = projectReadModel.snapshotSequence + 1;
+const seedReadModelWithThreadAndMessages = (projectReadModel: OrchestrationReadModel) =>
+  Effect.gen(function* () {
+    const now = "2026-01-01T00:00:00.000Z";
+    let readModel = projectReadModel;
+    let sequence = projectReadModel.snapshotSequence + 1;
 
-  readModel = await Effect.runPromise(
-    projectEvent(readModel, {
+    readModel = yield* projectEvent(readModel, {
       sequence,
       eventId: asEventId("evt-thread-create"),
       aggregateKind: "thread",
@@ -86,12 +82,10 @@ async function seedReadModelWithThreadAndMessages(
         createdAt: now,
         updatedAt: now,
       },
-    }),
-  );
-  sequence += 1;
+    });
+    sequence += 1;
 
-  readModel = await Effect.runPromise(
-    projectEvent(readModel, {
+    readModel = yield* projectEvent(readModel, {
       sequence,
       eventId: asEventId("evt-message-sent-1"),
       aggregateKind: "thread",
@@ -113,12 +107,10 @@ async function seedReadModelWithThreadAndMessages(
         createdAt: now,
         updatedAt: now,
       },
-    }),
-  );
-  sequence += 1;
+    });
+    sequence += 1;
 
-  readModel = await Effect.runPromise(
-    projectEvent(readModel, {
+    readModel = yield* projectEvent(readModel, {
       sequence,
       eventId: asEventId("evt-message-sent-2"),
       aggregateKind: "thread",
@@ -140,12 +132,10 @@ async function seedReadModelWithThreadAndMessages(
         createdAt: now,
         updatedAt: now,
       },
-    }),
-  );
-  sequence += 1;
+    });
+    sequence += 1;
 
-  readModel = await Effect.runPromise(
-    projectEvent(readModel, {
+    readModel = yield* projectEvent(readModel, {
       sequence,
       eventId: asEventId("evt-message-sent-3"),
       aggregateKind: "thread",
@@ -167,12 +157,10 @@ async function seedReadModelWithThreadAndMessages(
         createdAt: now,
         updatedAt: now,
       },
-    }),
-  );
-  sequence += 1;
+    });
+    sequence += 1;
 
-  readModel = await Effect.runPromise(
-    projectEvent(readModel, {
+    readModel = yield* projectEvent(readModel, {
       sequence,
       eventId: asEventId("evt-message-sent-4"),
       aggregateKind: "thread",
@@ -194,56 +182,53 @@ async function seedReadModelWithThreadAndMessages(
         createdAt: now,
         updatedAt: now,
       },
+    });
+
+    return readModel;
+  });
+
+it.layer(NodeServices.layer)("proposed plan promote command", (it) => {
+  it.effect("promotes the latest eligible assistant message", () =>
+    Effect.gen(function* () {
+      const projectReadModel = yield* seedReadModelWithProject;
+      const readModel = yield* seedReadModelWithThreadAndMessages(projectReadModel);
+
+      const promoteCommand: OrchestrationCommand = {
+        type: "thread.proposed-plan.promote",
+        commandId: asCommandId("cmd-promote"),
+        threadId: asThreadId("thread-proposedplan"),
+        createdAt: "2026-01-01T00:00:01.000Z",
+      };
+
+      const decided = yield* decideOrchestrationCommand({
+        command: promoteCommand,
+        readModel,
+      });
+
+      const event = Array.isArray(decided) ? decided[0] : decided;
+      expect(event).toBeDefined();
+      expect(event.type).toBe("thread.proposed-plan-upserted");
+      expect(event.aggregateKind).toBe("thread");
+      expect(event.aggregateId).toBe(asThreadId("thread-proposedplan"));
+
+      if (event.type === "thread.proposed-plan-upserted") {
+        const plan = event.payload.proposedPlan;
+        expect(plan.planMarkdown).toBe(
+          "Updated plan:\n1. Do this first\n2. Then that\n3. Finally this",
+        );
+        expect(plan.turnId).toBe(asTurnId("turn-2"));
+        expect(plan.id).toMatch(/^plan:thread-proposedplan:promoted:msg-assistant-2$/);
+      }
     }),
   );
 
-  return readModel;
-}
+  it.effect("returns error when no eligible assistant message exists", () =>
+    Effect.gen(function* () {
+      const projectReadModel = yield* seedReadModelWithProject;
+      const now = "2026-01-01T00:00:00.000Z";
 
-describe("proposed plan promote command", () => {
-  it("promotes the latest eligible assistant message", async () => {
-    const projectReadModel = await seedReadModelWithProject();
-    const readModel = await seedReadModelWithThreadAndMessages(projectReadModel);
-
-    const promoteCommand: OrchestrationCommand = {
-      type: "thread.proposed-plan.promote",
-      commandId: asCommandId("cmd-promote"),
-      threadId: asThreadId("thread-proposedplan"),
-      createdAt: "2026-01-01T00:00:01.000Z",
-    };
-
-    const decided = await Effect.runPromise(
-      decideOrchestrationCommand({
-        command: promoteCommand,
-        readModel,
-      }).pipe(Effect.provide(NodeServices.layer)),
-    );
-
-    const event = Array.isArray(decided) ? decided[0] : decided;
-    expect(event).toBeDefined();
-    expect(event.type).toBe("thread.proposed-plan-upserted");
-    expect(event.aggregateKind).toBe("thread");
-    expect(event.aggregateId).toBe(asThreadId("thread-proposedplan"));
-
-    if (event.type === "thread.proposed-plan-upserted") {
-      const plan = event.payload.proposedPlan;
-      expect(plan.planMarkdown).toBe(
-        "Updated plan:\n1. Do this first\n2. Then that\n3. Finally this",
-      );
-      expect(plan.turnId).toBe(asTurnId("turn-2"));
-      expect(plan.id).toMatch(/^plan:thread-proposedplan:promoted:msg-assistant-2$/);
-    }
-  });
-
-  it("returns error when no eligible assistant message exists", async () => {
-    const projectReadModel = await seedReadModelWithProject();
-    let readModel = projectReadModel;
-    let sequence = projectReadModel.snapshotSequence + 1;
-    const now = "2026-01-01T00:00:00.000Z";
-
-    readModel = await Effect.runPromise(
-      projectEvent(readModel, {
-        sequence,
+      const readModel = yield* projectEvent(projectReadModel, {
+        sequence: projectReadModel.snapshotSequence + 1,
         eventId: asEventId("evt-thread-create"),
         aggregateKind: "thread",
         aggregateId: asThreadId("thread-empty"),
@@ -268,34 +253,33 @@ describe("proposed plan promote command", () => {
           createdAt: now,
           updatedAt: now,
         },
-      }),
-    );
+      });
 
-    const promoteCommand: OrchestrationCommand = {
-      type: "thread.proposed-plan.promote",
-      commandId: asCommandId("cmd-promote-empty"),
-      threadId: asThreadId("thread-empty"),
-      createdAt: "2026-01-01T00:00:01.000Z",
-    };
+      const promoteCommand: OrchestrationCommand = {
+        type: "thread.proposed-plan.promote",
+        commandId: asCommandId("cmd-promote-empty"),
+        threadId: asThreadId("thread-empty"),
+        createdAt: "2026-01-01T00:00:01.000Z",
+      };
 
-    await expect(
-      Effect.runPromise(
+      const error = yield* Effect.flip(
         decideOrchestrationCommand({
           command: promoteCommand,
           readModel,
-        }).pipe(Effect.provide(NodeServices.layer)),
-      ),
-    ).rejects.toThrow("No assistant message available to promote");
-  });
+        }),
+      );
+      expect(error.message).toContain("No assistant message available to promote");
+    }),
+  );
 
-  it("returns error when no assistant message has non-empty text", async () => {
-    const projectReadModel = await seedReadModelWithProject();
-    let readModel = projectReadModel;
-    let sequence = projectReadModel.snapshotSequence + 1;
-    const now = "2026-01-01T00:00:00.000Z";
+  it.effect("returns error when no assistant message has non-empty text", () =>
+    Effect.gen(function* () {
+      const projectReadModel = yield* seedReadModelWithProject;
+      let readModel = projectReadModel;
+      let sequence = projectReadModel.snapshotSequence + 1;
+      const now = "2026-01-01T00:00:00.000Z";
 
-    readModel = await Effect.runPromise(
-      projectEvent(readModel, {
+      readModel = yield* projectEvent(readModel, {
         sequence,
         eventId: asEventId("evt-thread-create-2"),
         aggregateKind: "thread",
@@ -321,12 +305,10 @@ describe("proposed plan promote command", () => {
           createdAt: now,
           updatedAt: now,
         },
-      }),
-    );
-    sequence += 1;
+      });
+      sequence += 1;
 
-    readModel = await Effect.runPromise(
-      projectEvent(readModel, {
+      readModel = yield* projectEvent(readModel, {
         sequence,
         eventId: asEventId("evt-message-sent-user"),
         aggregateKind: "thread",
@@ -348,12 +330,10 @@ describe("proposed plan promote command", () => {
           createdAt: now,
           updatedAt: now,
         },
-      }),
-    );
-    sequence += 1;
+      });
+      sequence += 1;
 
-    readModel = await Effect.runPromise(
-      projectEvent(readModel, {
+      readModel = yield* projectEvent(readModel, {
         sequence,
         eventId: asEventId("evt-message-sent-assistant-empty"),
         aggregateKind: "thread",
@@ -375,71 +355,70 @@ describe("proposed plan promote command", () => {
           createdAt: now,
           updatedAt: now,
         },
-      }),
-    );
+      });
 
-    const promoteCommand: OrchestrationCommand = {
-      type: "thread.proposed-plan.promote",
-      commandId: asCommandId("cmd-promote-empty-text"),
-      threadId: asThreadId("thread-empty-messages"),
-      createdAt: "2026-01-01T00:00:02.000Z",
-    };
+      const promoteCommand: OrchestrationCommand = {
+        type: "thread.proposed-plan.promote",
+        commandId: asCommandId("cmd-promote-empty-text"),
+        threadId: asThreadId("thread-empty-messages"),
+        createdAt: "2026-01-01T00:00:02.000Z",
+      };
 
-    await expect(
-      Effect.runPromise(
+      const error = yield* Effect.flip(
         decideOrchestrationCommand({
           command: promoteCommand,
           readModel,
-        }).pipe(Effect.provide(NodeServices.layer)),
-      ),
-    ).rejects.toThrow("No assistant message available to promote");
-  });
+        }),
+      );
+      expect(error.message).toContain("No assistant message available to promote");
+    }),
+  );
 
-  it("picks M1 when a revert retains only turn T1 (M2 from T2 has been pruned)", async () => {
-    const projectReadModel = await seedReadModelWithProject();
-    const fullReadModel = await seedReadModelWithThreadAndMessages(projectReadModel);
+  it.effect("picks M1 when a revert retains only turn T1 (M2 from T2 has been pruned)", () =>
+    Effect.gen(function* () {
+      const projectReadModel = yield* seedReadModelWithProject;
+      const fullReadModel = yield* seedReadModelWithThreadAndMessages(projectReadModel);
 
-    const fullThread = fullReadModel.threads.find(
-      (t) => t.id === asThreadId("thread-proposedplan"),
-    );
-    if (!fullThread) throw new Error("expected seeded thread");
+      const fullThread = fullReadModel.threads.find(
+        (t) => t.id === asThreadId("thread-proposedplan"),
+      );
+      if (!fullThread) throw new Error("expected seeded thread");
 
-    const retainedMessages = fullThread.messages.filter(
-      (entry) => entry.turnId === asTurnId("turn-1"),
-    );
-    const readModel: OrchestrationReadModel = {
-      ...fullReadModel,
-      threads: fullReadModel.threads.map((entry) =>
-        entry.id === fullThread.id ? { ...entry, messages: retainedMessages } : entry,
-      ),
-    };
+      const retainedMessages = fullThread.messages.filter(
+        (entry) => entry.turnId === asTurnId("turn-1"),
+      );
+      const readModel: OrchestrationReadModel = {
+        ...fullReadModel,
+        threads: fullReadModel.threads.map((entry) =>
+          entry.id === fullThread.id ? { ...entry, messages: retainedMessages } : entry,
+        ),
+      };
 
-    const promoteCommand: OrchestrationCommand = {
-      type: "thread.proposed-plan.promote",
-      commandId: asCommandId("cmd-promote-after-revert"),
-      threadId: asThreadId("thread-proposedplan"),
-      createdAt: "2026-01-01T00:00:02.000Z",
-    };
+      const promoteCommand: OrchestrationCommand = {
+        type: "thread.proposed-plan.promote",
+        commandId: asCommandId("cmd-promote-after-revert"),
+        threadId: asThreadId("thread-proposedplan"),
+        createdAt: "2026-01-01T00:00:02.000Z",
+      };
 
-    const decided = await Effect.runPromise(
-      decideOrchestrationCommand({
+      const decided = yield* decideOrchestrationCommand({
         command: promoteCommand,
         readModel,
-      }).pipe(Effect.provide(NodeServices.layer)),
-    );
+      });
 
-    const event = Array.isArray(decided) ? decided[0] : decided;
-    expect(event).toBeDefined();
-    expect(event.type).toBe("thread.proposed-plan-upserted");
+      const event = Array.isArray(decided) ? decided[0] : decided;
+      expect(event).toBeDefined();
+      expect(event.type).toBe("thread.proposed-plan-upserted");
 
-    if (event.type === "thread.proposed-plan-upserted") {
-      expect(event.payload.proposedPlan.id).toBe(
-        "plan:thread-proposedplan:promoted:msg-assistant-1",
-      );
-      expect(event.payload.proposedPlan.turnId).toBe(asTurnId("turn-1"));
-      expect(event.payload.proposedPlan.planMarkdown).toBe(
-        "Here's a plan:\n1. Do this\n2. Then that",
-      );
-    }
-  });
+      if (event.type === "thread.proposed-plan-upserted") {
+        expect(event.payload.proposedPlan.id).toBe(
+          "plan:thread-proposedplan:promoted:msg-assistant-1",
+        );
+        expect(event.payload.proposedPlan.turnId).toBe(asTurnId("turn-1"));
+        expect(event.payload.proposedPlan.planMarkdown).toBe(
+          "Here's a plan:\n1. Do this\n2. Then that",
+        );
+      }
+    }),
+  );
 });

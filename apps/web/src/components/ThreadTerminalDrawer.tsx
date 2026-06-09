@@ -269,12 +269,6 @@ interface TerminalViewportProps {
   keybindings: ResolvedKeybindingsConfig;
 }
 
-interface TerminalLaunchLocation {
-  readonly cwd: string;
-  readonly worktreePath?: string | null;
-  readonly runtimeEnv?: Record<string, string>;
-}
-
 export function TerminalViewport({
   ownerRef,
   terminalId,
@@ -804,6 +798,8 @@ export interface TerminalDrawerCreateOption {
   onCreate: () => void;
 }
 
+const EMPTY_CREATE_OPTIONS: TerminalDrawerCreateOption[] = [];
+
 interface ThreadTerminalDrawerProps {
   sections: TerminalDrawerSection[];
   createOptions?: TerminalDrawerCreateOption[] | undefined;
@@ -1033,7 +1029,7 @@ function TerminalCreateMenuButton({
 
 export default function ThreadTerminalDrawer({
   sections,
-  createOptions = [],
+  createOptions = EMPTY_CREATE_OPTIONS,
   activeSectionId,
   onActiveSectionChange,
   onCloseDrawer,
@@ -1198,7 +1194,6 @@ export default function ThreadTerminalDrawer({
   const onNewTerminalAction = () => {
     activeSection.onNewTerminal();
   };
-  const newTerminalCreateOptions = createOptions.length > 0 ? createOptions : [];
 
   return (
     <aside
@@ -1234,7 +1229,7 @@ export default function ThreadTerminalDrawer({
             )}
             <TerminalCreateMenuButton
               className="p-1 text-foreground/90 transition-colors hover:bg-accent"
-              options={newTerminalCreateOptions}
+              options={createOptions}
               onFallbackCreate={onNewTerminalAction}
               label={newTerminalActionLabel}
             >
@@ -1345,7 +1340,7 @@ export default function ThreadTerminalDrawer({
                   )}
                   <TerminalCreateMenuButton
                     className="inline-flex h-full items-center border-l border-border/70 px-1 text-foreground/90 transition-colors hover:bg-accent/70"
-                    options={newTerminalCreateOptions}
+                    options={createOptions}
                     onFallbackCreate={onNewTerminalAction}
                     label={newTerminalActionLabel}
                   >

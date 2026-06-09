@@ -483,43 +483,46 @@ export function BranchToolbarBranchSelector({
       timeout: 0,
     });
 
-    runBranchAction(async () => {
-      try {
-        const result = await api.vcs.deleteBranch({
-          cwd: branchCwd,
-          refName: ref.name,
-          isRemote: ref.isRemote,
-          remoteName: ref.remoteName,
-          force,
-          deleteRemote: deleteRemoteBranchOnDelete,
-        });
-        if (ref.isRemote || result.deletedRemote) {
-          await api.vcs.fetch({ cwd: branchCwd, prune: true }).catch(() => undefined);
+    runBranchAction(
+      async () => {
+        try {
+          const result = await api.vcs.deleteBranch({
+            cwd: branchCwd,
+            refName: ref.name,
+            isRemote: ref.isRemote,
+            remoteName: ref.remoteName,
+            force,
+            deleteRemote: deleteRemoteBranchOnDelete,
+          });
+          if (ref.isRemote || result.deletedRemote) {
+            await api.vcs.fetch({ cwd: branchCwd, prune: true }).catch(() => undefined);
+          }
+          toastManager.update(
+            toastId,
+            stackedThreadToast({
+              type: "success",
+              title: `Deleted branch "${ref.name}".`,
+              ...(result.deletedRemote ? { description: "Remote branch also deleted." } : {}),
+            }),
+          );
+        } catch (error) {
+          if (!force && isGitCommandError(error)) {
+            toastManager.close(toastId);
+            setForceDeleteTarget(ref);
+            return;
+          }
+          toastManager.update(
+            toastId,
+            stackedThreadToast({
+              type: "error",
+              title: "Failed to delete ref.",
+              description: toBranchActionErrorMessage(error),
+            }),
+          );
         }
-        toastManager.update(
-          toastId,
-          stackedThreadToast({
-            type: "success",
-            title: `Deleted branch "${ref.name}".`,
-            ...(result.deletedRemote ? { description: "Remote branch also deleted." } : {}),
-          }),
-        );
-      } catch (error) {
-        if (!force && isGitCommandError(error)) {
-          toastManager.close(toastId);
-          setForceDeleteTarget(ref);
-          return;
-        }
-        toastManager.update(
-          toastId,
-          stackedThreadToast({
-            type: "error",
-            title: "Failed to delete ref.",
-            description: toBranchActionErrorMessage(error),
-          }),
-        );
-      }
-    }, { preserveLoadedRefs: false });
+      },
+      { preserveLoadedRefs: false },
+    );
   };
 
   const runRemoteSync = (mode: "fetch" | "prune") => {
