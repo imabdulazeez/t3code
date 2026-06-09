@@ -3517,6 +3517,29 @@ export default function ChatView(props: ChatViewProps) {
     setActivePendingUserInputQuestionIndex,
   ]);
 
+  const onDismissActivePendingUserInput = useCallback(async () => {
+    const api = readEnvironmentApi(environmentId);
+    if (!api || !activeThread) return;
+    if (activePendingUserInput) {
+      const requestId = activePendingUserInput.requestId;
+      setRespondingUserInputRequestIds((existing) => existing.filter((id) => id !== requestId));
+      setPendingUserInputAnswersByRequestId((existing) => {
+        const { [requestId]: _removed, ...rest } = existing;
+        return rest;
+      });
+      setPendingUserInputQuestionIndexByRequestId((existing) => {
+        const { [requestId]: _removed, ...rest } = existing;
+        return rest;
+      });
+    }
+    await api.orchestration.dispatchCommand({
+      type: "thread.turn.interrupt",
+      commandId: newCommandId(),
+      threadId: activeThread.id,
+      createdAt: new Date().toISOString(),
+    });
+  }, [activePendingUserInput, activeThread, environmentId]);
+
   const onPreviousActivePendingUserInputQuestion = useCallback(() => {
     if (!activePendingProgress) {
       return;
@@ -4290,6 +4313,7 @@ export default function ChatView(props: ChatViewProps) {
                     onRespondToApproval={onRespondToApproval}
                     onSelectActivePendingUserInputOption={onSelectActivePendingUserInputOption}
                     onAdvanceActivePendingUserInput={onAdvanceActivePendingUserInput}
+                    onDismissPendingUserInput={onDismissActivePendingUserInput}
                     onPreviousActivePendingUserInputQuestion={
                       onPreviousActivePendingUserInputQuestion
                     }

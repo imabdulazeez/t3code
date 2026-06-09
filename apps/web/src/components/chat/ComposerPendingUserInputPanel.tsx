@@ -5,7 +5,7 @@ import {
   derivePendingUserInputProgress,
   type PendingUserInputDraftAnswer,
 } from "../../pendingUserInput";
-import { CheckIcon } from "lucide-react";
+import { CheckIcon, XIcon } from "lucide-react";
 import { cn } from "~/lib/utils";
 
 interface PendingUserInputPanelProps {
@@ -15,6 +15,7 @@ interface PendingUserInputPanelProps {
   questionIndex: number;
   onToggleOption: (questionId: string, optionLabel: string) => void;
   onAdvance: () => void;
+  onDismiss: () => void;
 }
 
 export const ComposerPendingUserInputPanel = memo(function ComposerPendingUserInputPanel({
@@ -24,6 +25,7 @@ export const ComposerPendingUserInputPanel = memo(function ComposerPendingUserIn
   questionIndex,
   onToggleOption,
   onAdvance,
+  onDismiss,
 }: PendingUserInputPanelProps) {
   if (pendingUserInputs.length === 0) return null;
   const activePrompt = pendingUserInputs[0];
@@ -38,6 +40,7 @@ export const ComposerPendingUserInputPanel = memo(function ComposerPendingUserIn
       questionIndex={questionIndex}
       onToggleOption={onToggleOption}
       onAdvance={onAdvance}
+      onDismiss={onDismiss}
     />
   );
 });
@@ -49,6 +52,7 @@ const ComposerPendingUserInputCard = memo(function ComposerPendingUserInputCard(
   questionIndex,
   onToggleOption,
   onAdvance,
+  onDismiss,
 }: {
   prompt: PendingUserInput;
   isResponding: boolean;
@@ -56,6 +60,7 @@ const ComposerPendingUserInputCard = memo(function ComposerPendingUserInputCard(
   questionIndex: number;
   onToggleOption: (questionId: string, optionLabel: string) => void;
   onAdvance: () => void;
+  onDismiss: () => void;
 }) {
   const progress = derivePendingUserInputProgress(prompt.questions, answers, questionIndex);
   const activeQuestion = progress.activeQuestion;
@@ -125,7 +130,7 @@ const ComposerPendingUserInputCard = memo(function ComposerPendingUserInputCard(
 
   return (
     <div className="px-4 py-3 sm:px-5">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           {prompt.questions.length > 1 ? (
             <span className="flex h-5 items-center rounded-md bg-muted/60 px-1.5 text-[10px] font-medium tabular-nums text-muted-foreground/60">
@@ -136,6 +141,18 @@ const ComposerPendingUserInputCard = memo(function ComposerPendingUserInputCard(
             {activeQuestion.header}
           </span>
         </div>
+        <button
+          type="button"
+          disabled={isResponding}
+          onClick={() => onDismiss()}
+          aria-label="Dismiss question"
+          className={cn(
+            "flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/50 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            isResponding && "opacity-50 cursor-not-allowed",
+          )}
+        >
+          <XIcon className="size-3.5" />
+        </button>
       </div>
       <p className="mt-1.5 text-sm text-foreground/90">{activeQuestion.question}</p>
       {activeQuestion.multiSelect ? (
