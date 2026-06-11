@@ -1619,7 +1619,18 @@ export const makeGitManager = Effect.fn("makeGitManager")(function* () {
       );
     }
 
-    const preferredBranch = suggestion.branch ?? sanitizeBranchFragment(suggestion.subject);
+    const currentBranchLower = branch?.toLowerCase();
+    const suggestedBranchLower = suggestion.branch?.toLowerCase();
+    const echoesCurrentBranch =
+      currentBranchLower !== undefined &&
+      suggestedBranchLower !== undefined &&
+      (suggestedBranchLower === currentBranchLower ||
+        suggestedBranchLower.endsWith(`/${currentBranchLower}`) ||
+        currentBranchLower.endsWith(`/${suggestedBranchLower}`));
+    const preferredBranch =
+      suggestion.branch && !echoesCurrentBranch
+        ? suggestion.branch
+        : sanitizeBranchFragment(suggestion.subject);
     const existingBranchNames = yield* gitCore.listLocalBranchNames(cwd);
     const resolvedBranch = resolveAutoFeatureBranchName(existingBranchNames, preferredBranch);
 

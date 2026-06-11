@@ -1945,14 +1945,14 @@ export default function GitActionsControl({
           }
         }}
       >
-        <DialogPopup className="max-w-xl">
+        <DialogPopup className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>
               {pendingDefaultBranchActionCopy?.title ?? "Run action on default branch?"}
             </DialogTitle>
             <DialogDescription>{pendingDefaultBranchActionCopy?.description}</DialogDescription>
           </DialogHeader>
-          <DialogFooter className="sm:flex-wrap sm:items-center">
+          <DialogFooter className="sm:flex-nowrap sm:items-center">
             <Button
               className="w-full sm:mr-auto sm:w-auto"
               variant="outline"
@@ -1962,7 +1962,7 @@ export default function GitActionsControl({
               Abort
             </Button>
             <Button
-              className="min-h-8 w-full max-w-full whitespace-normal py-1.5 leading-snug sm:min-h-7 sm:w-auto"
+              className="w-full whitespace-nowrap sm:w-auto"
               variant="outline"
               size="sm"
               onClick={continuePendingDefaultBranchAction}
@@ -1970,7 +1970,7 @@ export default function GitActionsControl({
               {pendingDefaultBranchActionCopy?.continueLabel ?? "Continue"}
             </Button>
             <Button
-              className="min-h-8 w-full max-w-full whitespace-normal py-1.5 leading-snug sm:min-h-7 sm:w-auto"
+              className="w-full whitespace-nowrap sm:w-auto"
               size="sm"
               onClick={checkoutFeatureBranchAndContinuePendingAction}
             >

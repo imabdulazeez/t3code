@@ -20,12 +20,18 @@ function policyInstruction(instruction: string | undefined): ReadonlyArray<strin
 function buildPromptSections(input: {
   instructions: ReadonlyArray<string>;
   instructionsOverride: string | undefined;
+  requiredInstructions?: ReadonlyArray<string>;
   contractLine: string;
   contextLines: ReadonlyArray<string>;
 }): string {
   const override = input.instructionsOverride?.trim();
   const instructionLines = override ? [override] : input.instructions;
-  return [...instructionLines, input.contractLine, ...input.contextLines].join("\n");
+  return [
+    ...instructionLines,
+    ...(input.requiredInstructions ?? []),
+    input.contractLine,
+    ...input.contextLines,
+  ].join("\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -49,11 +55,14 @@ export function buildCommitMessagePrompt(input: CommitMessagePromptInput) {
     "Rules:",
     "- subject must be imperative, <= 72 chars, and no trailing period",
     "- body can be empty string or short bullet points",
-    ...(wantsBranch
-      ? ["- branch must be a short semantic git branch fragment for this change"]
-      : []),
     "- capture the primary user-visible or developer-visible change",
   ];
+
+  const requiredInstructions = wantsBranch
+    ? [
+        "- branch must be a short semantic git branch fragment for this change; never reuse the current branch name or a remote ref like origin/<branch>",
+      ]
+    : [];
 
   const contractLine = wantsBranch
     ? "Return a JSON object with keys: subject, body, branch."
@@ -74,6 +83,7 @@ export function buildCommitMessagePrompt(input: CommitMessagePromptInput) {
   const prompt = buildPromptSections({
     instructions,
     instructionsOverride: input.instructionsOverride,
+    requiredInstructions,
     contractLine,
     contextLines,
   });
