@@ -1101,6 +1101,13 @@ export const makeGitManager = Effect.fn("makeGitManager")(function* () {
       return defaultFromProvider;
     }
 
+    const localFallback = yield* gitCore
+      .resolveBaseBranchForNoUpstream(cwd, branch)
+      .pipe(Effect.orElseSucceed(() => null));
+    if (localFallback) {
+      return localFallback;
+    }
+
     return "main";
   });
 

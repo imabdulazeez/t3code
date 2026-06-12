@@ -202,6 +202,10 @@ export interface GitVcsDriverShape {
   readonly getReviewDiffPreview: (
     input: ReviewDiffPreviewInput,
   ) => Effect.Effect<ReviewDiffPreviewResult, GitCommandError>;
+  readonly resolveBaseBranchForNoUpstream: (
+    cwd: string,
+    refName: string,
+  ) => Effect.Effect<string | null, GitCommandError>;
   readonly readConfigValue: (
     cwd: string,
     key: string,

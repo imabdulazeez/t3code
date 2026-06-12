@@ -2480,6 +2480,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     pullCurrentBranch,
     readRangeContext,
     getReviewDiffPreview,
+    resolveBaseBranchForNoUpstream,
     readConfigValue,
     listRefs,
     createWorktree,
