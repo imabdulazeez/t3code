@@ -106,6 +106,16 @@ const toastCornerOrbClass = cn(
   "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background",
 );
 
+/** Pill revealed beside the close orb on hover/focus when several toasts are stacked. */
+const toastClearAllClass = cn(
+  "inline-flex h-6 shrink-0 cursor-pointer items-center whitespace-nowrap rounded-full border border-border/60 bg-popover/92 px-2.5 text-xs font-medium text-muted-foreground shadow-sm outline-none backdrop-blur-sm",
+  "pointer-events-none -translate-x-1 opacity-0 transition-[color,background-color,box-shadow,opacity,transform]",
+  "group-hover/toast-dismiss:pointer-events-auto group-hover/toast-dismiss:translate-x-0 group-hover/toast-dismiss:opacity-100",
+  "group-focus-within/toast-dismiss:pointer-events-auto group-focus-within/toast-dismiss:translate-x-0 group-focus-within/toast-dismiss:opacity-100",
+  "hover:bg-popover hover:text-foreground",
+  "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background",
+);
+
 function handleToastDismissClick(
   manager: typeof toastManager | typeof anchoredToastManager,
   toastId: ToastId,
@@ -113,6 +123,16 @@ function handleToastDismissClick(
 ) {
   onClose?.();
   manager.close(toastId);
+}
+
+function handleClearAllToastsClick(
+  manager: typeof toastManager | typeof anchoredToastManager,
+  toasts: { id: ToastId; data?: ThreadToastData | undefined }[],
+) {
+  for (const toast of toasts) {
+    toast.data?.onClose?.();
+    manager.close(toast.id);
+  }
 }
 
 function CopyErrorButton({ text }: { text: string }) {
@@ -676,7 +696,27 @@ function Toasts({ position }: { position: ToastPosition }) {
                 dismissAfterVisibleMs={toast.data?.dismissAfterVisibleMs}
                 toastId={toast.id}
               />
-              <div className={toastCornerDismissClass}>
+              <div
+                className={cn(
+                  toastCornerDismissClass,
+                  "group/toast-dismiss flex items-center gap-1",
+                )}
+              >
+                {visibleIndex === 0 && visibleToastLayout.items.length > 1 ? (
+                  <button
+                    className={toastClearAllClass}
+                    data-slot="toast-clear-all"
+                    onClick={() =>
+                      handleClearAllToastsClick(
+                        toastManager,
+                        visibleToastLayout.items.map((item) => item.toast),
+                      )
+                    }
+                    type="button"
+                  >
+                    Clear all
+                  </button>
+                ) : null}
                 <button
                   aria-label="Dismiss notification"
                   className={toastCornerOrbClass}
