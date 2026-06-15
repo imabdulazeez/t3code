@@ -1008,23 +1008,36 @@ const PersistentThreadTerminalPanel = memo(function PersistentThreadTerminalPane
       ? scopeProjectRef(draftThread.environmentId, draftThread.projectId)
       : null;
   const project = useStore(useMemo(() => createProjectSelectorByRef(projectRef), [projectRef]));
-  const knownTerminalSessions = useKnownTerminalSessions({
+  const isProjectScope = surface.scope === "project";
+  const knownThreadSessions = useKnownTerminalSessions({
     environmentId: threadRef.environmentId,
     threadId: threadRef.threadId,
   });
+  const knownProjectSessions = useProjectKnownTerminalSessions({
+    environmentId: project?.environmentId ?? null,
+    projectId: project?.id ?? null,
+  });
+  const knownTerminalSessions = isProjectScope ? knownProjectSessions : knownThreadSessions;
   const ownerRef = useMemo(
-    () => threadTerminalOwnerRef(threadRef.environmentId, threadRef.threadId),
-    [threadRef.environmentId, threadRef.threadId],
+    () =>
+      isProjectScope && project
+        ? projectTerminalOwnerRef(project.environmentId, project.id)
+        : threadTerminalOwnerRef(threadRef.environmentId, threadRef.threadId),
+    [isProjectScope, project, threadRef.environmentId, threadRef.threadId],
   );
   const renameTerminal = useTerminalUiStateStore((state) => state.renameTerminal);
   const terminalSummary =
     knownTerminalSessions.find((session) => session.target.terminalId === surface.activeTerminalId)
       ?.state.summary ?? null;
   const threadWorktreePath = serverThread?.worktreePath ?? draftThread?.worktreePath ?? null;
-  const worktreePath =
-    launchContext?.worktreePath ?? terminalSummary?.worktreePath ?? threadWorktreePath;
-  const cwd = useMemo(
-    () =>
+  const worktreePath = isProjectScope
+    ? null
+    : (launchContext?.worktreePath ?? terminalSummary?.worktreePath ?? threadWorktreePath);
+  const cwd = useMemo(() => {
+    if (isProjectScope) {
+      return project?.cwd ?? null;
+    }
+    return (
       launchContext?.cwd ??
       terminalSummary?.cwd ??
       (project
@@ -1032,18 +1045,18 @@ const PersistentThreadTerminalPanel = memo(function PersistentThreadTerminalPane
             project: { cwd: project.cwd },
             worktreePath,
           })
-        : null),
-    [launchContext?.cwd, project, terminalSummary?.cwd, worktreePath],
-  );
+        : null)
+    );
+  }, [isProjectScope, launchContext?.cwd, project, terminalSummary?.cwd, worktreePath]);
   const runtimeEnv = useMemo(
     () =>
       project
         ? projectScriptRuntimeEnv({
             project: { cwd: project.cwd },
-            worktreePath,
+            ...(isProjectScope ? {} : { worktreePath }),
           })
         : {},
-    [project, worktreePath],
+    [isProjectScope, project, worktreePath],
   );
   const terminalLabelsById = useMemo(() => {
     const labels = new Map<string, string>();
@@ -1064,11 +1077,11 @@ const PersistentThreadTerminalPanel = memo(function PersistentThreadTerminalPane
       mode="panel"
       sections={[
         {
-          id: "chat",
-          label: "Chat Terminals",
+          id: surface.scope,
+          label: isProjectScope ? "Project Terminals" : "Chat Terminals",
           ownerRef,
           cwd,
-          worktreePath,
+          ...(worktreePath != null ? { worktreePath } : {}),
           runtimeEnv,
           terminalIds: surface.terminalIds,
           activeTerminalId: surface.activeTerminalId,
@@ -1086,7 +1099,7 @@ const PersistentThreadTerminalPanel = memo(function PersistentThreadTerminalPane
           onAddTerminalContext,
         },
       ]}
-      activeSectionId="chat"
+      activeSectionId={surface.scope}
       onActiveSectionChange={() => undefined}
       onCloseDrawer={() => undefined}
       height={400}
@@ -1411,6 +1424,19 @@ export default function ChatView(props: ChatViewProps) {
     environmentId: activeProject?.environmentId ?? null,
     projectId: activeProject?.id ?? null,
   });
+  const activeProjectKnownSessions = useProjectKnownTerminalSessions({
+    environmentId: activeProject?.environmentId ?? null,
+    projectId: activeProject?.id ?? null,
+  });
+  const activeProjectKnownTerminalIds = useMemo(
+    () => [
+      ...new Set([
+        ...activeProjectKnownSessions.map((session) => session.target.terminalId),
+        ...projectTerminalState.terminalIds,
+      ]),
+    ],
+    [activeProjectKnownSessions, projectTerminalState.terminalIds],
+  );
   const defaultTerminalScopeByProjectId = useTerminalUiStateStore(
     (s) => s.defaultTerminalScopeByProjectId,
   );
@@ -2568,39 +2594,69 @@ export default function ChatView(props: ChatViewProps) {
       terminalUiState.terminalIds.length,
     ],
   );
-  const addTerminalSurface = useCallback(() => {
-    if (!activeThreadRef || !activeThreadOwnerRef || !activeThreadId || !activeProject) return;
-    const api = readEnvironmentApi(activeThreadRef.environmentId);
-    const cwd = gitCwd ?? activeProject.cwd;
-    if (!api || !cwd) return;
-    const panelIds = selectThreadRightPanelState(
-      useRightPanelStore.getState().byThreadKey,
-      activeThreadRef,
-    ).surfaces.flatMap((surface) => (surface.kind === "terminal" ? surface.terminalIds : []));
-    const terminalId = nextTerminalId([...activeKnownTerminalIds, ...panelIds]);
-    useRightPanelStore.getState().openTerminal(activeThreadRef, terminalId);
-    setTerminalFocusRequestId((value) => value + 1);
-    void api.terminal
-      .open({
+  const resolveTerminalScopeTarget = useCallback(
+    (scope: ProjectScriptScope) => {
+      if (!activeProject) return null;
+      if (scope === "project") {
+        if (!projectTerminalOwner) return null;
+        return {
+          owner: projectTerminalOwner.owner,
+          cwd: activeProject.cwd,
+          worktreePath: null as string | null,
+          env: projectScriptRuntimeEnv({ project: { cwd: activeProject.cwd } }),
+        };
+      }
+      if (!activeThreadOwnerRef) return null;
+      const cwd = gitCwd ?? activeProject.cwd;
+      return {
         owner: activeThreadOwnerRef.owner,
-        terminalId,
         cwd,
-        ...(activeThreadWorktreePath != null ? { worktreePath: activeThreadWorktreePath } : {}),
+        worktreePath: activeThreadWorktreePath ?? null,
         env: projectScriptRuntimeEnv({
           project: { cwd: activeProject.cwd },
           worktreePath: activeThreadWorktreePath,
         }),
-      })
-      .catch(() => undefined);
-  }, [
-    activeKnownTerminalIds,
-    activeProject,
-    activeThreadId,
-    activeThreadOwnerRef,
-    activeThreadRef,
-    activeThreadWorktreePath,
-    gitCwd,
-  ]);
+      };
+    },
+    [activeProject, activeThreadOwnerRef, activeThreadWorktreePath, gitCwd, projectTerminalOwner],
+  );
+  const addTerminalSurface = useCallback(
+    (scope: ProjectScriptScope = "chat") => {
+      if (!activeThreadRef || !activeThreadId || !activeProject) return;
+      const target = resolveTerminalScopeTarget(scope);
+      if (!target) return;
+      const api = readEnvironmentApi(activeThreadRef.environmentId);
+      if (!api) return;
+      const panelIds = selectThreadRightPanelState(
+        useRightPanelStore.getState().byThreadKey,
+        activeThreadRef,
+      ).surfaces.flatMap((surface) => (surface.kind === "terminal" ? surface.terminalIds : []));
+      const terminalId = nextTerminalId([
+        ...activeKnownTerminalIds,
+        ...activeProjectKnownTerminalIds,
+        ...panelIds,
+      ]);
+      useRightPanelStore.getState().openTerminal(activeThreadRef, terminalId, scope);
+      setTerminalFocusRequestId((value) => value + 1);
+      void api.terminal
+        .open({
+          owner: target.owner,
+          terminalId,
+          cwd: target.cwd,
+          ...(target.worktreePath != null ? { worktreePath: target.worktreePath } : {}),
+          env: target.env,
+        })
+        .catch(() => undefined);
+    },
+    [
+      activeKnownTerminalIds,
+      activeProject,
+      activeProjectKnownTerminalIds,
+      activeThreadId,
+      activeThreadRef,
+      resolveTerminalScopeTarget,
+    ],
+  );
   const splitPanelTerminal = useCallback(
     (direction: "horizontal" | "vertical" = "horizontal") => {
       if (
@@ -2614,36 +2670,36 @@ export default function ChatView(props: ChatViewProps) {
         return;
       }
       const api = readEnvironmentApi(activeThreadRef.environmentId);
-      const cwd = gitCwd ?? activeProject.cwd;
-      if (!api || !cwd) return;
-      const terminalId = nextTerminalId([...activeKnownTerminalIds, ...panelTerminalIds]);
+      const target = resolveTerminalScopeTarget(activeRightPanelSurface.scope);
+      if (!api || !target) return;
+      const terminalId = nextTerminalId([
+        ...activeKnownTerminalIds,
+        ...activeProjectKnownTerminalIds,
+        ...panelTerminalIds,
+      ]);
       useRightPanelStore
         .getState()
         .splitTerminal(activeThreadRef, activeRightPanelSurface.id, terminalId, direction);
       setTerminalFocusRequestId((value) => value + 1);
       void api.terminal
         .open({
-          owner: activeThreadOwnerRef.owner,
+          owner: target.owner,
           terminalId,
-          cwd,
-          ...(activeThreadWorktreePath != null ? { worktreePath: activeThreadWorktreePath } : {}),
-          env: projectScriptRuntimeEnv({
-            project: { cwd: activeProject.cwd },
-            worktreePath: activeThreadWorktreePath,
-          }),
+          cwd: target.cwd,
+          ...(target.worktreePath != null ? { worktreePath: target.worktreePath } : {}),
+          env: target.env,
         })
         .catch(() => undefined);
     },
     [
       activeKnownTerminalIds,
-      activeProject,
+      activeProjectKnownTerminalIds,
       activeRightPanelSurface,
       activeThreadId,
       activeThreadOwnerRef,
       activeThreadRef,
-      activeThreadWorktreePath,
-      gitCwd,
       panelTerminalIds,
+      resolveTerminalScopeTarget,
     ],
   );
   const splitPanelTerminalVertical = useCallback(() => {
@@ -2662,12 +2718,16 @@ export default function ChatView(props: ChatViewProps) {
   );
   const closePanelTerminal = useCallback(
     (terminalId: string) => {
-      if (!activeThreadRef || !activeThreadOwnerRef || activeRightPanelSurface?.kind !== "terminal")
-        return;
+      if (!activeThreadRef || activeRightPanelSurface?.kind !== "terminal") return;
+      const owner =
+        activeRightPanelSurface.scope === "project"
+          ? (projectTerminalOwner?.owner ?? null)
+          : (activeThreadOwnerRef?.owner ?? null);
+      if (!owner) return;
       const api = readEnvironmentApi(activeThreadRef.environmentId);
       void api?.terminal
         .close({
-          owner: activeThreadOwnerRef.owner,
+          owner,
           terminalId,
           deleteHistory: true,
         })
@@ -2677,7 +2737,7 @@ export default function ChatView(props: ChatViewProps) {
         .closeTerminal(activeThreadRef, activeRightPanelSurface.id, terminalId);
       setTerminalFocusRequestId((value) => value + 1);
     },
-    [activeRightPanelSurface, activeThreadOwnerRef, activeThreadRef],
+    [activeRightPanelSurface, activeThreadOwnerRef, activeThreadRef, projectTerminalOwner],
   );
   const selectTerminalScope = useCallback(
     (scope: ProjectScriptScope) => {
@@ -5128,6 +5188,7 @@ export default function ChatView(props: ChatViewProps) {
             onAddContext={addContextSurface}
             browserAvailable={isPreviewSupportedInRuntime()}
             diffAvailable={isServerThread && isGitRepo}
+            projectTerminalAvailable={Boolean(activeProject && projectTerminalOwner)}
           >
             {activeRightPanelSurface?.kind === "preview" ? (
               <Suspense fallback={null}>
@@ -5149,7 +5210,7 @@ export default function ChatView(props: ChatViewProps) {
                 onAddTerminalContext={addTerminalContextToDraft}
                 onSplitTerminal={splitPanelTerminal}
                 onSplitTerminalVertical={splitPanelTerminalVertical}
-                onNewTerminal={addTerminalSurface}
+                onNewTerminal={() => addTerminalSurface(activeRightPanelSurface.scope)}
                 onActiveTerminalChange={activatePanelTerminal}
                 onCloseTerminal={closePanelTerminal}
                 splitShortcutLabel={splitTerminalShortcutLabel ?? undefined}
@@ -5189,6 +5250,7 @@ export default function ChatView(props: ChatViewProps) {
               onAddContext={addContextSurface}
               browserAvailable={isPreviewSupportedInRuntime()}
               diffAvailable={isServerThread && isGitRepo}
+              projectTerminalAvailable={Boolean(activeProject && projectTerminalOwner)}
             >
               {activeRightPanelSurface?.kind === "preview" ? (
                 <Suspense fallback={null}>
@@ -5210,7 +5272,7 @@ export default function ChatView(props: ChatViewProps) {
                   onAddTerminalContext={addTerminalContextToDraft}
                   onSplitTerminal={splitPanelTerminal}
                   onSplitTerminalVertical={splitPanelTerminalVertical}
-                  onNewTerminal={addTerminalSurface}
+                  onNewTerminal={() => addTerminalSurface(activeRightPanelSurface.scope)}
                   onActiveTerminalChange={activatePanelTerminal}
                   onCloseTerminal={closePanelTerminal}
                   splitShortcutLabel={splitTerminalShortcutLabel ?? undefined}

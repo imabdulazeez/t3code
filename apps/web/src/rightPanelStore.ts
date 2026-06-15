@@ -8,7 +8,11 @@
  * singleton surfaces.
  */
 import { scopedThreadKey } from "@t3tools/client-runtime";
-import type { ScopedThreadRef } from "@t3tools/contracts";
+import {
+  DEFAULT_PROJECT_SCRIPT_SCOPE,
+  type ProjectScriptScope,
+  type ScopedThreadRef,
+} from "@t3tools/contracts";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
@@ -23,6 +27,7 @@ export type RightPanelSurface =
   | {
       id: `terminal:${string}`;
       kind: "terminal";
+      scope: ProjectScriptScope;
       resourceId: string;
       terminalIds: string[];
       activeTerminalId: string;
@@ -33,7 +38,7 @@ export type RightPanelSurface =
   | { id: "plan"; kind: "plan" };
 
 const RIGHT_PANEL_STORAGE_KEY = "t3code:right-panel-state:v2";
-const RIGHT_PANEL_STORAGE_VERSION = 5;
+const RIGHT_PANEL_STORAGE_VERSION = 6;
 
 export interface ThreadRightPanelState {
   isOpen: boolean;
@@ -45,7 +50,7 @@ interface RightPanelStoreState {
   byThreadKey: Record<string, ThreadRightPanelState>;
   open: (ref: ScopedThreadRef, kind: Exclude<RightPanelKind, "terminal">) => void;
   openBrowser: (ref: ScopedThreadRef, tabId: string | null) => void;
-  openTerminal: (ref: ScopedThreadRef, terminalId: string) => void;
+  openTerminal: (ref: ScopedThreadRef, terminalId: string, scope: ProjectScriptScope) => void;
   splitTerminal: (
     ref: ScopedThreadRef,
     surfaceId: string,
@@ -88,9 +93,10 @@ const browserSurface = (tabId: string | null): RightPanelSurface =>
     ? { id: `browser:${tabId}`, kind: "preview", resourceId: tabId }
     : { id: "browser:new", kind: "preview", resourceId: null };
 
-const terminalSurface = (terminalId: string): RightPanelSurface => ({
+const terminalSurface = (terminalId: string, scope: ProjectScriptScope): RightPanelSurface => ({
   id: `terminal:${terminalId}`,
   kind: "terminal",
+  scope,
   resourceId: terminalId,
   terminalIds: [terminalId],
   activeTerminalId: terminalId,
@@ -166,9 +172,15 @@ export function migratePersistedRightPanelState(persistedState: unknown): {
                       terminalIds.includes(surface.activeTerminalId)
                         ? surface.activeTerminalId
                         : (terminalIds[0] ?? surface.resourceId);
+                    const scope: ProjectScriptScope =
+                      "scope" in surface &&
+                      (surface.scope === "chat" || surface.scope === "project")
+                        ? surface.scope
+                        : DEFAULT_PROJECT_SCRIPT_SCOPE;
                     return [
                       {
                         ...surface,
+                        scope,
                         terminalIds: terminalIds.length > 0 ? terminalIds : [surface.resourceId],
                         activeTerminalId,
                       },
@@ -216,10 +228,10 @@ export const useRightPanelStore = create<RightPanelStoreState>()(
             return upsertSurface({ ...current, surfaces: withoutPlaceholder }, surface);
           }),
         })),
-      openTerminal: (ref, terminalId) =>
+      openTerminal: (ref, terminalId, scope) =>
         set((state) => ({
           byThreadKey: updateThread(state.byThreadKey, scopedThreadKey(ref), (current) =>
-            upsertSurface(current, terminalSurface(terminalId)),
+            upsertSurface(current, terminalSurface(terminalId, scope)),
           ),
         })),
       splitTerminal: (ref, surfaceId, terminalId, direction = "horizontal") =>

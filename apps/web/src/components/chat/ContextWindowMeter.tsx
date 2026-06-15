@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { cn } from "~/lib/utils";
 import { type ContextWindowSnapshot, formatContextWindowTokens } from "~/lib/contextWindow";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
@@ -18,6 +19,7 @@ export function ContextWindowMeter(props: {
   providerDisplayName?: string | null;
 }) {
   const { usage, onOpenContextTab, providerDisplayName } = props;
+  const [open, setOpen] = useState(false);
   const usedPercentage = formatPercentage(usage.usedPercentage);
   const normalizedPercentage = Math.max(0, Math.min(100, usage.usedPercentage ?? 0));
   const radius = 9.75;
@@ -29,7 +31,7 @@ export function ContextWindowMeter(props: {
   const usageColor = isOverloaded ? "var(--color-red-500)" : "var(--color-blue-500)";
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         openOnHover
         delay={150}
@@ -37,7 +39,10 @@ export function ContextWindowMeter(props: {
         render={
           <button
             type="button"
-            onClick={onOpenContextTab}
+            onClick={() => {
+              setOpen(false);
+              onOpenContextTab?.();
+            }}
             className={cn(
               "inline-flex size-6 cursor-pointer items-center justify-center rounded-full border border-transparent text-muted-foreground outline-none transition-colors",
               "hover:bg-accent data-[pressed]:bg-accent",

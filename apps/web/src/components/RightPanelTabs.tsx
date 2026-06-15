@@ -1,4 +1,4 @@
-import type { PreviewSessionSnapshot } from "@t3tools/contracts";
+import type { PreviewSessionSnapshot, ProjectScriptScope } from "@t3tools/contracts";
 import { getTerminalLabel } from "@t3tools/shared/terminalLabels";
 import { BarChart3, ClipboardList, FileDiff, Globe2, Plus, TerminalSquare, X } from "lucide-react";
 import { type ReactNode, useState } from "react";
@@ -21,21 +21,87 @@ interface RightPanelTabsProps {
   onActivate: (surface: RightPanelSurface) => void;
   onCloseSurface: (surface: RightPanelSurface) => void;
   onAddBrowser: () => void;
-  onAddTerminal: () => void;
+  onAddTerminal: (scope: ProjectScriptScope) => void;
   onAddDiff: () => void;
   onAddContext: () => void;
   browserAvailable: boolean;
   diffAvailable: boolean;
+  projectTerminalAvailable: boolean;
   children: ReactNode;
+}
+
+const TERMINAL_SCOPE_COPY: Record<ProjectScriptScope, string> = {
+  chat: "Start a shell scoped to this chat.",
+  project: "Start a shell for this project.",
+};
+
+function TerminalScopeToggle({
+  scope,
+  onScopeChange,
+}: {
+  scope: ProjectScriptScope;
+  onScopeChange: (scope: ProjectScriptScope) => void;
+}) {
+  return (
+    <div className="inline-flex rounded-md border border-border/80 p-0.5">
+      {(["chat", "project"] as const).map((value) => (
+        <button
+          key={value}
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onScopeChange(value);
+          }}
+          className={cn(
+            "rounded px-2 py-0.5 text-xs font-medium capitalize transition",
+            scope === value
+              ? "bg-accent text-foreground"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          {value}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function TerminalSurfaceCard({
+  projectTerminalAvailable,
+  onAddTerminal,
+}: {
+  projectTerminalAvailable: boolean;
+  onAddTerminal: (scope: ProjectScriptScope) => void;
+}) {
+  const [scope, setScope] = useState<ProjectScriptScope>("chat");
+  return (
+    <button
+      type="button"
+      onClick={() => onAddTerminal(scope)}
+      className="flex min-h-28 flex-col items-start rounded-lg border border-border/80 bg-card/40 p-4 text-left transition hover:border-border hover:bg-accent/60"
+    >
+      <div className="mb-3 flex w-full items-center justify-between gap-2">
+        <TerminalSquare className="size-5" />
+        {projectTerminalAvailable ? (
+          <TerminalScopeToggle scope={scope} onScopeChange={setScope} />
+        ) : null}
+      </div>
+      <span className="text-sm font-medium">Terminal</span>
+      <span className="mt-1 text-xs leading-relaxed text-muted-foreground">
+        {TERMINAL_SCOPE_COPY[scope]}
+      </span>
+    </button>
+  );
 }
 
 function RightPanelEmptyState(props: {
   onAddBrowser: () => void;
-  onAddTerminal: () => void;
+  onAddTerminal: (scope: ProjectScriptScope) => void;
   onAddDiff: () => void;
   onAddContext: () => void;
   browserAvailable: boolean;
   diffAvailable: boolean;
+  projectTerminalAvailable: boolean;
 }) {
   const actions = [
     {
@@ -44,13 +110,6 @@ function RightPanelEmptyState(props: {
       icon: Globe2,
       available: props.browserAvailable,
       onClick: props.onAddBrowser,
-    },
-    {
-      label: "Terminal",
-      description: "Start a shell in this workspace.",
-      icon: TerminalSquare,
-      available: true,
-      onClick: props.onAddTerminal,
     },
     {
       label: "Diff",
@@ -78,7 +137,29 @@ function RightPanelEmptyState(props: {
           </p>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          {actions.map((action) => {
+          {actions.slice(0, 1).map((action) => {
+            const Icon = action.icon;
+            return (
+              <button
+                key={action.label}
+                type="button"
+                disabled={!action.available}
+                onClick={action.onClick}
+                className="flex min-h-28 flex-col items-start rounded-lg border border-border/80 bg-card/40 p-4 text-left transition hover:border-border hover:bg-accent/60 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Icon className="mb-3 size-5" />
+                <span className="text-sm font-medium">{action.label}</span>
+                <span className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  {action.description}
+                </span>
+              </button>
+            );
+          })}
+          <TerminalSurfaceCard
+            projectTerminalAvailable={props.projectTerminalAvailable}
+            onAddTerminal={props.onAddTerminal}
+          />
+          {actions.slice(1).map((action) => {
             const Icon = action.icon;
             return (
               <button
@@ -238,10 +319,23 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
               <Globe2 />
               Browser
             </MenuItem>
-            <MenuItem onClick={props.onAddTerminal}>
-              <TerminalSquare />
-              Terminal
-            </MenuItem>
+            {props.projectTerminalAvailable ? (
+              <>
+                <MenuItem onClick={() => props.onAddTerminal("chat")}>
+                  <TerminalSquare />
+                  Chat terminal
+                </MenuItem>
+                <MenuItem onClick={() => props.onAddTerminal("project")}>
+                  <TerminalSquare />
+                  Project terminal
+                </MenuItem>
+              </>
+            ) : (
+              <MenuItem onClick={() => props.onAddTerminal("chat")}>
+                <TerminalSquare />
+                Terminal
+              </MenuItem>
+            )}
             <MenuItem onClick={props.onAddDiff} disabled={!props.diffAvailable}>
               <FileDiff />
               Diff
@@ -262,6 +356,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
             onAddContext={props.onAddContext}
             browserAvailable={props.browserAvailable}
             diffAvailable={props.diffAvailable}
+            projectTerminalAvailable={props.projectTerminalAvailable}
           />
         ) : (
           props.children

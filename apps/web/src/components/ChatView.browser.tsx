@@ -2165,7 +2165,9 @@ describe("ChatView timeline estimator parity (full app)", () => {
       const terminalItem = await waitForElement(
         () =>
           Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).find(
-            (item) => item.textContent?.trim() === "Terminal",
+            (item) =>
+              item.textContent?.trim() === "Chat terminal" ||
+              item.textContent?.trim() === "Terminal",
           ) ?? null,
         "Unable to find Terminal panel menu item.",
       );
