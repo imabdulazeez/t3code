@@ -12,6 +12,7 @@ import * as Electron from "electron";
 import { formatBuildTimestamp } from "@t3tools/shared/buildTimestamp";
 
 import * as NetService from "@t3tools/shared/Net";
+import { HostProcessArchitecture, HostProcessPlatform } from "@t3tools/shared/hostProcess";
 import { resolveRemoteT3CliPackageSpec } from "@t3tools/ssh/command";
 import type { RemoteT3RunnerOptions } from "@t3tools/ssh/tunnel";
 import serverPackageJson from "../../server/package.json" with { type: "json" };
@@ -45,12 +46,16 @@ import * as DesktopShellEnvironment from "./shell/DesktopShellEnvironment.ts";
 import * as DesktopSshEnvironment from "./ssh/DesktopSshEnvironment.ts";
 import * as DesktopSshPasswordPrompts from "./ssh/DesktopSshPasswordPrompts.ts";
 import * as DesktopState from "./app/DesktopState.ts";
+import * as PreviewBrowserSession from "./preview/BrowserSession.ts";
+import * as PreviewManager from "./preview/Manager.ts";
 import * as DesktopWindow from "./window/DesktopWindow.ts";
 
 const desktopEnvironmentLayer = Layer.unwrap(
   Effect.gen(function* () {
     const electronApp = yield* Effect.service(ElectronApp.ElectronApp);
     const metadata = yield* electronApp.metadata;
+    const platform = yield* HostProcessPlatform;
+    const processArch = yield* HostProcessArchitecture;
     let buildTimestamp = process.env.T3CODE_BUILD_TIMESTAMP;
     if (!buildTimestamp && metadata.isPackaged) {
       const path = yield* Path.Path;
@@ -73,8 +78,8 @@ const desktopEnvironmentLayer = Layer.unwrap(
     return DesktopEnvironment.layer({
       dirname: __dirname,
       homeDirectory: NodeOS.homedir(),
-      platform: process.platform,
-      processArch: process.arch,
+      platform,
+      processArch,
       buildTimestamp,
       ...metadata,
     });
@@ -141,7 +146,15 @@ const desktopServerExposureLayer = DesktopServerExposure.layer.pipe(
   Layer.provideMerge(desktopFoundationLayer),
 );
 
-const desktopWindowLayer = DesktopWindow.layer.pipe(Layer.provideMerge(desktopServerExposureLayer));
+const desktopPreviewLayer = PreviewManager.layer.pipe(
+  Layer.provideMerge(PreviewBrowserSession.layer),
+  Layer.provideMerge(desktopFoundationLayer),
+);
+
+const desktopWindowLayer = DesktopWindow.layer.pipe(
+  Layer.provideMerge(desktopServerExposureLayer),
+  Layer.provideMerge(desktopPreviewLayer),
+);
 
 const desktopBackendLayer = DesktopBackendManager.layer.pipe(
   Layer.provideMerge(DesktopAppIdentity.layer),

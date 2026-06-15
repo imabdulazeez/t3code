@@ -802,6 +802,7 @@ export interface TerminalDrawerCreateOption {
 const EMPTY_CREATE_OPTIONS: TerminalDrawerCreateOption[] = [];
 
 interface ThreadTerminalDrawerProps {
+  mode?: "drawer" | "panel";
   sections: TerminalDrawerSection[];
   createOptions?: TerminalDrawerCreateOption[] | undefined;
   activeSectionId: ProjectScriptScope;
@@ -812,6 +813,7 @@ interface ThreadTerminalDrawerProps {
   onHeightChange: (height: number) => void;
   keybindings: ResolvedKeybindingsConfig;
   splitShortcutLabel?: string | undefined;
+  splitVerticalShortcutLabel?: string | undefined;
   newShortcutLabel?: string | undefined;
   closeShortcutLabel?: string | undefined;
 }
@@ -1029,6 +1031,7 @@ function TerminalCreateMenuButton({
 }
 
 export default function ThreadTerminalDrawer({
+  mode = "drawer",
   sections,
   createOptions = EMPTY_CREATE_OPTIONS,
   activeSectionId,
@@ -1198,16 +1201,20 @@ export default function ThreadTerminalDrawer({
 
   return (
     <aside
-      className="thread-terminal-drawer relative flex min-w-0 shrink-0 flex-col overflow-hidden border-t border-border/80 bg-background"
-      style={{ height: `${drawerHeight}px` }}
+      className={`thread-terminal-drawer relative flex min-w-0 flex-col overflow-hidden bg-background ${
+        mode === "panel" ? "h-full flex-1" : "shrink-0 border-t border-border/80"
+      }`}
+      style={mode === "panel" ? undefined : { height: `${drawerHeight}px` }}
     >
-      <div
-        className="absolute inset-x-0 top-0 z-20 h-1.5 cursor-row-resize"
-        onPointerDown={handleResizePointerDown}
-        onPointerMove={handleResizePointerMove}
-        onPointerUp={handleResizePointerEnd}
-        onPointerCancel={handleResizePointerEnd}
-      />
+      {mode === "drawer" ? (
+        <div
+          className="absolute inset-x-0 top-0 z-20 h-1.5 cursor-row-resize"
+          onPointerDown={handleResizePointerDown}
+          onPointerMove={handleResizePointerMove}
+          onPointerUp={handleResizePointerEnd}
+          onPointerCancel={handleResizePointerEnd}
+        />
+      ) : null}
 
       {!hasTerminalSidebar && (
         <div className="pointer-events-none absolute right-2 top-2 z-20">

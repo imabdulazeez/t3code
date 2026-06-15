@@ -35,6 +35,14 @@ export function sanitizeBranchFragment(raw: string): string {
   return branchFragment.length > 0 ? branchFragment : "update";
 }
 
+export function sanitizeFeatureBranchName(raw: string): string {
+  const sanitized = sanitizeBranchFragment(raw);
+  if (sanitized.includes("/")) {
+    return sanitized.startsWith("feature/") ? sanitized : `feature/${sanitized}`;
+  }
+  return `feature/${sanitized}`;
+}
+
 // eslint-disable-next-line no-control-regex
 const GIT_BRANCH_DISALLOWED_CHARS = /[\x00-\x20\x7f~^:?*[\\]/;
 

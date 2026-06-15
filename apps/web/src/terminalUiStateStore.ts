@@ -216,6 +216,7 @@ function normalizeTerminalGroups(
     nextGroups.push({
       id: assignUniqueGroupId(baseGroupId, usedGroupIds),
       terminalIds: groupTerminalIds,
+      ...(group.splitDirection === "vertical" ? { splitDirection: "vertical" as const } : {}),
     });
   }
 
@@ -245,6 +246,11 @@ function terminalGroupsEqual(left: ThreadTerminalGroup[], right: ThreadTerminalG
     const rightGroup = right[index];
     if (!leftGroup || !rightGroup) return false;
     if (leftGroup.id !== rightGroup.id) return false;
+    if (
+      (leftGroup.splitDirection ?? "horizontal") !== (rightGroup.splitDirection ?? "horizontal")
+    ) {
+      return false;
+    }
     if (!arraysEqual(leftGroup.terminalIds, rightGroup.terminalIds)) return false;
   }
   return true;
@@ -331,6 +337,7 @@ function copyTerminalGroups(groups: ThreadTerminalGroup[]): ThreadTerminalGroup[
   return groups.map((group) => ({
     id: group.id,
     terminalIds: [...group.terminalIds],
+    ...(group.splitDirection === "vertical" ? { splitDirection: "vertical" as const } : {}),
   }));
 }
 
@@ -338,6 +345,7 @@ function upsertTerminalIntoGroups(
   state: ThreadTerminalUiState,
   terminalId: string,
   mode: "split" | "new",
+  splitDirection: "horizontal" | "vertical" = "horizontal",
 ): ThreadTerminalUiState {
   const normalized = normalizeThreadTerminalUiState(state);
   const effectiveMode: "split" | "new" = normalized.terminalIds.length === 0 ? "new" : mode;
@@ -413,6 +421,11 @@ function upsertTerminalIntoGroups(
       destinationGroup.terminalIds.push(terminalId);
     }
   }
+  if (splitDirection === "vertical") {
+    destinationGroup.splitDirection = "vertical";
+  } else {
+    delete destinationGroup.splitDirection;
+  }
 
   return normalizeThreadTerminalUiState({
     ...normalized,
@@ -447,8 +460,9 @@ function setThreadTerminalHeight(
 function splitThreadTerminal(
   state: ThreadTerminalUiState,
   terminalId: string,
+  direction: "horizontal" | "vertical" = "horizontal",
 ): ThreadTerminalUiState {
-  return upsertTerminalIntoGroups(state, terminalId, "split");
+  return upsertTerminalIntoGroups(state, terminalId, "split", direction);
 }
 
 function newThreadTerminal(
@@ -687,6 +701,7 @@ interface TerminalUiStateStoreState {
   setTerminalOpen: (ownerRef: TerminalOwnerRef, open: boolean) => void;
   setTerminalHeight: (ownerRef: TerminalOwnerRef, height: number) => void;
   splitTerminal: (ownerRef: TerminalOwnerRef, terminalId: string) => void;
+  splitTerminalVertical: (ownerRef: TerminalOwnerRef, terminalId: string) => void;
   newTerminal: (ownerRef: TerminalOwnerRef, terminalId: string) => void;
   ensureTerminal: (
     ownerRef: TerminalOwnerRef,
@@ -788,6 +803,13 @@ export const useTerminalUiStateStore = create<TerminalUiStateStoreState>()(
               clearLocallyClosedTerminal(terminalUiStateKey(ownerRef), terminalId);
             }
             return splitThreadTerminal(state, terminalId);
+          }),
+        splitTerminalVertical: (ownerRef, terminalId) =>
+          updateTerminal(ownerRef, (state) => {
+            if (isUsableOwnerRef(ownerRef) && isValidTerminalId(terminalId)) {
+              clearLocallyClosedTerminal(terminalUiStateKey(ownerRef), terminalId);
+            }
+            return splitThreadTerminal(state, terminalId, "vertical");
           }),
         newTerminal: (ownerRef, terminalId) =>
           updateTerminal(ownerRef, (state) => {

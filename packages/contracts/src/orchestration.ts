@@ -202,6 +202,17 @@ export const ProjectScript = Schema.Struct({
   defaultScope: ProjectScriptScope.pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_PROJECT_SCRIPT_SCOPE)),
   ),
+  /**
+   * URL to open in the in-app browser preview when this script runs (or
+   * when the user explicitly requests a preview). Optional; only honored on
+   * the desktop build.
+   */
+  previewUrl: Schema.optional(TrimmedNonEmptyString),
+  /**
+   * When true, automatically open the preview panel pointed at `previewUrl`
+   * the moment this script starts. Ignored without `previewUrl` or on web.
+   */
+  autoOpenPreview: Schema.optional(Schema.Boolean),
 });
 export type ProjectScript = typeof ProjectScript.Type;
 
