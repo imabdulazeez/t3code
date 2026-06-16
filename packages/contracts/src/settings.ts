@@ -53,7 +53,7 @@ export const DEFAULT_SIDEBAR_THREAD_PREVIEW_COUNT: SidebarThreadPreviewCount = 6
 
 export const ClientSettingsSchema = Schema.Struct({
   autoCreatePrOnPush: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
-  autoOpenPlanSidebar: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
+  autoOpenPlanSidebar: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   branchListSortKey: BranchListSortKey.pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_BRANCH_LIST_SORT_KEY)),
   ),
@@ -72,11 +72,11 @@ export const ClientSettingsSchema = Schema.Struct({
   diffFontFamily: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
   diffIgnoreWhitespace: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
   diffWordWrap: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
+  hideUnavailableProviders: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
+  terminalFontFamily: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
   dismissedProviderUpdateNotificationKeys: Schema.Array(TrimmedNonEmptyString).pipe(
     Schema.withDecodingDefault(Effect.succeed([])),
   ),
-  hideUnavailableProviders: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
-  terminalFontFamily: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
   // Model favorites. Historically keyed by provider kind, now
   // widened to `ProviderInstanceId` so users can favorite a specific model
   // on a custom provider instance (e.g. "Codex Personal · gpt-5") without
