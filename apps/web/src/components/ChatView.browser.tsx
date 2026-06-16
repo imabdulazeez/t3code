@@ -59,7 +59,7 @@ import {
   resetSavedEnvironmentRuntimeStoreForTests,
   useSavedEnvironmentRegistryStore,
   useSavedEnvironmentRuntimeStore,
-} from "../environments/runtime";
+} from "../environments/runtime/catalog";
 import {
   INLINE_TERMINAL_CONTEXT_PLACEHOLDER,
   removeInlineTerminalContextPlaceholder,
@@ -843,10 +843,7 @@ function createSnapshotWithSecondaryProject(options?: {
           id: "thread-secondary-project" as ThreadId,
           projectId: SECOND_PROJECT_ID,
           title: "Release checklist",
-          modelSelection: {
-            instanceId: ProviderInstanceId.make("codex"),
-            model: "gpt-5",
-          },
+          modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5" },
           interactionMode: "default",
           runtimeMode: "full-access",
           branch: "release/docs-portal",
@@ -878,10 +875,7 @@ function createSnapshotWithSecondaryProject(options?: {
           id: ARCHIVED_SECONDARY_THREAD_ID,
           projectId: SECOND_PROJECT_ID,
           title: "Archived Docs Notes",
-          modelSelection: {
-            instanceId: ProviderInstanceId.make("codex"),
-            model: "gpt-5",
-          },
+          modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5" },
           interactionMode: "default",
           runtimeMode: "full-access",
           branch: "release/docs-archive",
@@ -916,10 +910,7 @@ function createSnapshotWithSecondaryProject(options?: {
         id: SECOND_PROJECT_ID,
         title: "Docs Portal",
         workspaceRoot: "/repo/clients/docs-portal",
-        defaultModelSelection: {
-          instanceId: ProviderInstanceId.make("codex"),
-          model: "gpt-5",
-        },
+        defaultModelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5" },
         scripts: [],
         createdAt: NOW_ISO,
         updatedAt: NOW_ISO,
@@ -2130,6 +2121,487 @@ describe("ChatView timeline estimator parity (full app)", () => {
     }
   });
 
+  it("keeps panel toggles fixed and can maximize the right panel", async () => {
+    const mounted = await mountChatView({
+      viewport: WIDE_FOOTER_VIEWPORT,
+      snapshot: createSnapshotForTargetUser({
+        targetMessageId: "msg-user-maximize-right-panel" as MessageId,
+        targetText: "maximize right panel",
+      }),
+    });
+
+    try {
+      const terminalToggle = await waitForElement(
+        () =>
+          document.querySelector<HTMLButtonElement>('button[aria-label="Toggle terminal drawer"]'),
+        "Unable to find terminal drawer toggle.",
+      );
+      const rightPanelToggle = await waitForElement(
+        () => document.querySelector<HTMLButtonElement>('button[aria-label="Toggle right panel"]'),
+        "Unable to find right panel toggle.",
+      );
+      const terminalScopeSelector = await waitForElement(
+        () =>
+          document.querySelector<HTMLButtonElement>(
+            'button[aria-label="Choose default terminal scope"]',
+          ),
+        "Unable to find terminal scope selector.",
+      );
+      const chatHeader = await waitForElement(
+        () => document.querySelector<HTMLElement>("[data-chat-header]"),
+        "Unable to find chat header.",
+      );
+      const panelLayoutControls = await waitForElement(
+        () => document.querySelector<HTMLElement>("[data-panel-layout-controls]"),
+        "Unable to find panel layout controls.",
+      );
+      expect(chatHeader.getBoundingClientRect().height).toBe(52);
+      expect(panelLayoutControls.getBoundingClientRect().height).toBe(52);
+      expect(panelLayoutControls.getBoundingClientRect().top).toBe(
+        chatHeader.getBoundingClientRect().top,
+      );
+      expect(
+        window.getComputedStyle(panelLayoutControls).getPropertyValue("-webkit-app-region"),
+      ).toBe("no-drag");
+      expect(chatHeader.classList.contains("drag-region")).toBe(false);
+      expect(chatHeader.contains(panelLayoutControls)).toBe(true);
+      expect(window.innerWidth - panelLayoutControls.getBoundingClientRect().right).toBe(12);
+      const initialTerminalRect = terminalToggle.getBoundingClientRect();
+      const initialTerminalSelectorRect = terminalScopeSelector.getBoundingClientRect();
+      const initialRightPanelRect = rightPanelToggle.getBoundingClientRect();
+      const initialControlRects = [
+        initialTerminalRect,
+        initialTerminalSelectorRect,
+        initialRightPanelRect,
+      ];
+      expect(document.querySelector('button[aria-label="Maximize panel"]')).toBeNull();
+      expect(initialControlRects.every((rect) => rect.width === 28 && rect.height === 28)).toBe(
+        true,
+      );
+      expect(initialControlRects.every((rect) => rect.top === initialControlRects[0]?.top)).toBe(
+        true,
+      );
+      expect(initialTerminalSelectorRect.left - initialTerminalRect.right).toBeGreaterThanOrEqual(
+        -1,
+      );
+      expect(initialTerminalSelectorRect.left - initialTerminalRect.right).toBeLessThanOrEqual(1);
+      expect(initialRightPanelRect.left - initialTerminalSelectorRect.right).toBe(8);
+
+      document.documentElement.classList.add("wco");
+      expect(panelLayoutControls.getBoundingClientRect().height).toBe(52);
+      expect(panelLayoutControls.getBoundingClientRect().top).toBe(
+        chatHeader.getBoundingClientRect().top,
+      );
+      expect(window.innerWidth - panelLayoutControls.getBoundingClientRect().right).toBe(12);
+      document.documentElement.classList.remove("wco");
+
+      rightPanelToggle.click();
+
+      const maximizeButton = await waitForElement(
+        () => document.querySelector<HTMLButtonElement>('button[aria-label="Maximize panel"]'),
+        "Unable to find maximize panel button.",
+      );
+      const rightPanelTabbar = await waitForElement(
+        () => document.querySelector<HTMLElement>("[data-right-panel-tabbar]"),
+        "Unable to find right panel tab bar.",
+      );
+      const rightPanelTabList = await waitForElement(
+        () => document.querySelector<HTMLElement>("[data-right-panel-tab-list]"),
+        "Unable to find right panel tab list.",
+      );
+      const maximizeRect = maximizeButton.getBoundingClientRect();
+      const rightPanelTabbarRect = rightPanelTabbar.getBoundingClientRect();
+      const openPanelLayoutControls = await waitForElement(
+        () => document.querySelector<HTMLElement>("[data-panel-layout-controls]"),
+        "Unable to find open panel layout controls.",
+      );
+      const openTerminalToggle = await waitForElement(
+        () =>
+          document.querySelector<HTMLButtonElement>('button[aria-label="Toggle terminal drawer"]'),
+        "Unable to find open panel terminal toggle.",
+      );
+      const openTerminalScopeSelector = await waitForElement(
+        () =>
+          document.querySelector<HTMLButtonElement>(
+            'button[aria-label="Choose default terminal scope"]',
+          ),
+        "Unable to find open panel terminal scope selector.",
+      );
+      const openRightPanelToggle = await waitForElement(
+        () => document.querySelector<HTMLButtonElement>('button[aria-label="Toggle right panel"]'),
+        "Unable to find open panel right panel toggle.",
+      );
+      expect(document.querySelector('button[aria-label="Add panel surface"]')).toBeNull();
+      expect(rightPanelTabbarRect.height).toBe(52);
+      expect(rightPanelTabbarRect.top).toBe(chatHeader.getBoundingClientRect().top);
+      expect(chatHeader.contains(openPanelLayoutControls)).toBe(false);
+      expect(
+        window.getComputedStyle(rightPanelTabbar).getPropertyValue("-webkit-app-region"),
+      ).not.toBe("drag");
+      expect(rightPanelTabList.classList.contains("drag-region")).toBe(false);
+      expect(window.getComputedStyle(maximizeButton).getPropertyValue("-webkit-app-region")).toBe(
+        "no-drag",
+      );
+      expect(
+        window.getComputedStyle(openTerminalToggle).getPropertyValue("-webkit-app-region"),
+      ).toBe("no-drag");
+      expect(
+        window.getComputedStyle(openRightPanelToggle).getPropertyValue("-webkit-app-region"),
+      ).toBe("no-drag");
+      expect(maximizeRect.width).toBe(28);
+      expect(maximizeRect.height).toBe(28);
+      expect(maximizeRect.top).toBe(initialTerminalRect.top);
+      expect(initialTerminalRect.left - maximizeRect.right).toBe(8);
+      expect(openTerminalToggle.getBoundingClientRect().left).toBeCloseTo(
+        initialTerminalRect.left,
+        1,
+      );
+      expect(openTerminalScopeSelector.getBoundingClientRect().left).toBeCloseTo(
+        initialTerminalSelectorRect.left,
+        1,
+      );
+      expect(openRightPanelToggle.getBoundingClientRect().left).toBeCloseTo(
+        initialRightPanelRect.left,
+        1,
+      );
+
+      useRightPanelStore.getState().openFile(THREAD_REF, "components.json");
+      const fileTabIcon = await waitForElement(
+        () =>
+          document.querySelector<SVGElement>(
+            '[data-right-panel-tabbar] [data-pierre-icon][data-icon-token="json"]',
+          ),
+        "Unable to find the Pierre file icon in the file tab.",
+      );
+      expect(fileTabIcon.closest("button")?.textContent).toContain("components.json");
+
+      document.documentElement.classList.add("wco");
+      expect(rightPanelTabbar.getBoundingClientRect().height).toBe(
+        openPanelLayoutControls.getBoundingClientRect().height,
+      );
+      expect(rightPanelTabbar.getBoundingClientRect().top).toBe(
+        openPanelLayoutControls.getBoundingClientRect().top,
+      );
+      document.documentElement.classList.remove("wco");
+
+      maximizeButton.click();
+
+      await vi.waitFor(() => {
+        const chatColumn = document.querySelector<HTMLElement>(
+          '[data-chat-column-maximized-away="true"]',
+        );
+        const panel = document.querySelector<HTMLElement>(
+          '[data-preview-panel-mode="inline"][data-preview-panel-maximized="true"]',
+        );
+        expect(chatColumn?.getBoundingClientRect().width).toBe(0);
+        expect(panel?.getBoundingClientRect().width).toBeGreaterThan(1_000);
+        expect(
+          document.querySelector<HTMLButtonElement>('button[aria-label="Restore panel size"]'),
+        ).not.toBeNull();
+        expect(
+          document
+            .querySelector<HTMLButtonElement>('button[aria-label="Toggle terminal drawer"]')
+            ?.getBoundingClientRect().left,
+        ).toBeCloseTo(initialTerminalRect.left, 1);
+        expect(
+          document
+            .querySelector<HTMLButtonElement>('button[aria-label="Toggle right panel"]')
+            ?.getBoundingClientRect().left,
+        ).toBeCloseTo(initialRightPanelRect.left, 1);
+      });
+    } finally {
+      await mounted.cleanup();
+    }
+  });
+
+  it("loads file previews from the active thread worktree", async () => {
+    const worktreePath = "/repo/worktrees/file-preview-thread";
+    const snapshot = createSnapshotForTargetUser({
+      targetMessageId: "msg-user-worktree-file-preview" as MessageId,
+      targetText: "open the worktree file preview",
+    });
+    const targetThread = snapshot.threads.find((thread) => thread.id === THREAD_ID);
+    if (!targetThread) {
+      throw new Error("Missing target thread fixture.");
+    }
+
+    const mounted = await mountChatView({
+      viewport: DEFAULT_VIEWPORT,
+      snapshot: {
+        ...snapshot,
+        threads: snapshot.threads.map((thread) =>
+          thread.id === THREAD_ID ? { ...thread, worktreePath } : thread,
+        ),
+      },
+      resolveRpc: (body) => {
+        if (body._tag === WS_METHODS.projectsListEntries) {
+          return { entries: [{ path: "src/index.ts", kind: "file" }], truncated: false };
+        }
+        if (body._tag === WS_METHODS.projectsReadFile) {
+          return {
+            relativePath: "src/index.ts",
+            contents: "export const worktree = true;\n",
+            byteLength: 30,
+            truncated: false,
+          };
+        }
+        return undefined;
+      },
+    });
+
+    try {
+      useRightPanelStore.getState().open(THREAD_REF, "files");
+      await waitForElement(
+        () => document.querySelector<HTMLElement>("[data-file-browser-panel]"),
+        "Unable to find the worktree file explorer.",
+      );
+
+      useRightPanelStore.getState().openFile(THREAD_REF, "src/index.ts");
+      await waitForElement(
+        () => document.querySelector<HTMLElement>(".file-preview-virtualizer"),
+        "Unable to find the worktree file preview.",
+      );
+
+      const listRequest = wsRequests.find(
+        (request) => request._tag === WS_METHODS.projectsListEntries,
+      );
+      const readRequest = wsRequests.find(
+        (request) => request._tag === WS_METHODS.projectsReadFile,
+      );
+      expect(listRequest).toMatchObject({ cwd: worktreePath });
+      expect(readRequest).toMatchObject({ cwd: worktreePath, relativePath: "src/index.ts" });
+    } finally {
+      await mounted.cleanup();
+    }
+  });
+
+  it("scrolls file tabs and preserves the workspace explorer across file previews", async () => {
+    const workspaceEntries = [
+      { path: "src", kind: "directory" as const },
+      { path: "src/index.ts", kind: "file" as const },
+      { path: "src/router.ts", kind: "file" as const },
+      { path: "src/store.ts", kind: "file" as const },
+      { path: "src/styles.css", kind: "file" as const },
+      { path: "src/large.ts", kind: "file" as const },
+      { path: "e2e", kind: "directory" as const },
+      { path: "e2e/test-results", kind: "directory" as const },
+      {
+        path: "e2e/test-results/playwright-integration-results",
+        kind: "directory" as const,
+      },
+      {
+        path: "e2e/test-results/playwright-integration-results/chromium-desktop-project",
+        kind: "directory" as const,
+      },
+      {
+        path: "e2e/test-results/playwright-integration-results/chromium-desktop-project/.last-run.json",
+        kind: "file" as const,
+      },
+      { path: "README.md", kind: "file" as const },
+      { path: "AGENTS.md", kind: "file" as const },
+      { path: "package.json", kind: "file" as const },
+      { path: "tsconfig.json", kind: "file" as const },
+    ];
+    const mounted = await mountChatView({
+      viewport: WIDE_FOOTER_VIEWPORT,
+      snapshot: createSnapshotForTargetUser({
+        targetMessageId: "msg-user-file-tabs-and-tree-state" as MessageId,
+        targetText: "keep file tabs readable and preserve tree state",
+      }),
+      resolveRpc: (body) => {
+        if (body._tag === WS_METHODS.projectsListEntries) {
+          return { entries: workspaceEntries, truncated: false };
+        }
+        if (body._tag === WS_METHODS.projectsReadFile) {
+          const relativePath =
+            typeof body.relativePath === "string" ? body.relativePath : "file.ts";
+          const contents =
+            relativePath === "src/large.ts"
+              ? Array.from(
+                  { length: 5_000 },
+                  (_, index) => `export const line${index + 1} = ${index + 1};`,
+                ).join("\n")
+              : `// ${relativePath}\n`;
+          return {
+            relativePath,
+            contents,
+            byteLength: new TextEncoder().encode(contents).byteLength,
+            truncated: false,
+          };
+        }
+        return undefined;
+      },
+    });
+
+    try {
+      useRightPanelStore.getState().open(THREAD_REF, "files");
+
+      const explorer = await waitForElement(
+        () => document.querySelector<HTMLElement>("[data-file-browser-panel]"),
+        "Unable to find the workspace file explorer.",
+      );
+
+      for (const entry of workspaceEntries) {
+        if (entry.kind === "file") {
+          useRightPanelStore.getState().openFile(THREAD_REF, entry.path);
+        }
+      }
+
+      const tabList = await waitForElement(
+        () => document.querySelector<HTMLElement>("[data-right-panel-tab-list]"),
+        "Unable to find the right panel tab list.",
+      );
+      const tabViewport = await waitForElement(
+        () => tabList.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]'),
+        "Unable to find the right panel tab viewport.",
+      );
+
+      await vi.waitFor(() => {
+        const fileTabs = Array.from(tabList.querySelectorAll<HTMLElement>("[data-active-tab]"));
+        expect(fileTabs.length).toBe(
+          workspaceEntries.filter((entry) => entry.kind === "file").length,
+        );
+        expect(tabViewport.scrollWidth).toBeGreaterThan(tabViewport.clientWidth);
+        expect(tabViewport.scrollLeft).toBeGreaterThan(0);
+        expect(tabList.querySelector('[data-slot="scroll-area-scrollbar"]')).toBeNull();
+        expect(
+          fileTabs.every((tab) => {
+            const width = tab.getBoundingClientRect().width;
+            return width >= 100 && width <= 176;
+          }),
+        ).toBe(true);
+        expect(document.querySelector<HTMLElement>("[data-file-browser-panel]")).toBe(explorer);
+      });
+
+      useRightPanelStore.getState().openFile(THREAD_REF, "src/index.ts");
+      await vi.waitFor(() => {
+        expect(document.querySelector<HTMLElement>("[data-file-browser-panel]")).toBe(explorer);
+      });
+
+      useRightPanelStore
+        .getState()
+        .openFile(
+          THREAD_REF,
+          "e2e/test-results/playwright-integration-results/chromium-desktop-project/.last-run.json",
+        );
+      await mounted.setContainerSize({ width: 800, height: WIDE_FOOTER_VIEWPORT.height });
+      const breadcrumbs = await waitForElement(
+        () => document.querySelector<HTMLElement>("[data-file-breadcrumbs]"),
+        "Unable to find the responsive file breadcrumbs.",
+      );
+      const fileSubheader = breadcrumbs.closest<HTMLElement>("[data-surface-subheader]");
+      const breadcrumbViewport = await waitForElement(
+        () => breadcrumbs.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]'),
+        "Unable to find the file breadcrumb viewport.",
+      );
+      const currentCrumb = await waitForElement(
+        () =>
+          Array.from(
+            breadcrumbs.querySelectorAll<HTMLElement>("[data-current-file-crumb='true']"),
+          ).find((crumb) => crumb.textContent === ".last-run.json") ?? null,
+        "Unable to find the current file breadcrumb.",
+      );
+      const explorerToggle = await waitForElement(
+        () => document.querySelector<HTMLButtonElement>('button[aria-label="Hide file explorer"]'),
+        "Unable to find the file explorer toggle.",
+      );
+
+      await vi.waitFor(() => {
+        const viewportRect = breadcrumbViewport.getBoundingClientRect();
+        const currentCrumbRect = currentCrumb.getBoundingClientRect();
+        expect(breadcrumbViewport.scrollWidth).toBeGreaterThan(breadcrumbViewport.clientWidth);
+        expect(breadcrumbViewport.scrollLeft).toBeGreaterThan(0);
+        expect(breadcrumbs.querySelector('[data-slot="scroll-area-scrollbar"]')).toBeNull();
+        expect(currentCrumbRect.right).toBeLessThanOrEqual(viewportRect.right + 1);
+        expect(viewportRect.right).toBeLessThan(explorerToggle.getBoundingClientRect().left);
+        expect(explorerToggle.getAttribute("aria-pressed")).toBe("true");
+        expect(explorerToggle.getBoundingClientRect().width).toBe(28);
+        expect(explorerToggle.getBoundingClientRect().height).toBe(28);
+        expect(fileSubheader?.getBoundingClientRect().height).toBe(40);
+        expect(window.getComputedStyle(fileSubheader!).borderTopWidth).toBe("0px");
+        expect(window.getComputedStyle(fileSubheader!).borderBottomWidth).toBe("1px");
+      });
+
+      const fileSearchButton = await waitForElement(
+        () =>
+          document.querySelector<HTMLButtonElement>('button[aria-label="Search workspace files"]'),
+        "Unable to find the workspace file search button.",
+      );
+      fileSearchButton.click();
+      const fileTree = await waitForElement(
+        () => document.querySelector<HTMLElement>("file-tree-container"),
+        "Unable to find the file tree host.",
+      );
+      const fileSearchInput = await waitForElement(
+        () =>
+          fileTree.shadowRoot?.querySelector<HTMLInputElement>("[data-file-tree-search-input]") ??
+          null,
+        "Unable to find the file tree search input.",
+      );
+      fileSearchInput.focus();
+      const searchKeyEvent = new KeyboardEvent("keydown", {
+        key: "r",
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+      });
+      fileSearchInput.dispatchEvent(searchKeyEvent);
+      await waitForLayout();
+      expect(searchKeyEvent.defaultPrevented).toBe(false);
+      expect(fileTree.shadowRoot?.activeElement).toBe(fileSearchInput);
+      expect(useComposerDraftStore.getState().draftsByThreadKey[THREAD_KEY]?.prompt ?? "").toBe("");
+
+      useRightPanelStore.getState().openFile(THREAD_REF, "src/large.ts");
+      const codeVirtualizer = await waitForElement(
+        () => document.querySelector<HTMLElement>(".file-preview-virtualizer"),
+        "Unable to find the virtualized file preview.",
+      );
+      expect(codeVirtualizer.querySelector("diffs-container")).not.toBeNull();
+      expect(codeVirtualizer.classList.contains("overflow-auto")).toBe(true);
+    } finally {
+      await mounted.cleanup();
+    }
+  });
+
+  it("removes persisted file tabs when a draft workspace no longer exists", async () => {
+    const orphanedDraftId = DraftId.make("draft-orphaned-file-panel");
+    const orphanedThreadId = "thread-orphaned-file-panel" as ThreadId;
+    const orphanedThreadRef = scopeThreadRef(LOCAL_ENVIRONMENT_ID, orphanedThreadId);
+    useComposerDraftStore.getState().setProjectDraftThreadId(
+      {
+        environmentId: LOCAL_ENVIRONMENT_ID,
+        projectId: "project-deleted" as ProjectId,
+      },
+      orphanedDraftId,
+      { threadId: orphanedThreadId },
+    );
+    useRightPanelStore.getState().openFile(orphanedThreadRef, "conductor.json");
+
+    const mounted = await mountChatView({
+      viewport: WIDE_FOOTER_VIEWPORT,
+      snapshot: createSnapshotForTargetUser({
+        targetMessageId: "msg-user-orphaned-file-panel" as MessageId,
+        targetText: "orphaned persisted file panel",
+      }),
+      initialPath: `/draft/${orphanedDraftId}`,
+    });
+
+    try {
+      await vi.waitFor(() => {
+        expect(
+          selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, orphanedThreadRef),
+        ).toEqual({
+          isOpen: false,
+          activeSurfaceId: null,
+          surfaces: [],
+        });
+        expect(document.querySelector("[data-right-panel-tabbar]")).toBeNull();
+      });
+    } finally {
+      await mounted.cleanup();
+    }
+  });
+
   it("keeps multiple terminal panel surfaces separate from the bottom drawer", async () => {
     const mounted = await mountChatView({
       viewport: WIDE_FOOTER_VIEWPORT,
@@ -2146,11 +2618,10 @@ describe("ChatView timeline estimator parity (full app)", () => {
       );
       rightPanelToggle.click();
 
-      const addSurface = await waitForElement(
-        () => document.querySelector<HTMLButtonElement>('button[aria-label="Add panel surface"]'),
-        "Unable to find add panel surface button.",
-      );
-      expect(document.body.textContent).toContain("Open a surface");
+      await vi.waitFor(() => {
+        expect(document.body.textContent).toContain("Open a surface");
+      });
+      expect(document.querySelector('button[aria-label="Add panel surface"]')).toBeNull();
       expect(
         selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, THREAD_REF),
       ).toEqual({
@@ -2160,18 +2631,14 @@ describe("ChatView timeline estimator parity (full app)", () => {
       });
       expect(wsRequests.some((request) => request._tag === WS_METHODS.terminalOpen)).toBe(false);
 
-      addSurface.click();
-
-      const terminalItem = await waitForElement(
+      const emptyStateTerminalButton = await waitForElement(
         () =>
-          Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).find(
-            (item) =>
-              item.textContent?.trim() === "Chat terminal" ||
-              item.textContent?.trim() === "Terminal",
+          Array.from(document.querySelectorAll<HTMLButtonElement>("button")).find((button) =>
+            button.textContent?.includes("Start a shell in this workspace."),
           ) ?? null,
-        "Unable to find Terminal panel menu item.",
+        "Unable to find the empty-state Terminal button.",
       );
-      terminalItem.click();
+      emptyStateTerminalButton.click();
 
       await vi.waitFor(() => {
         expect(
@@ -2181,11 +2648,17 @@ describe("ChatView timeline estimator parity (full app)", () => {
         ).toEqual(["term-1"]);
       });
 
+      const addSurface = await waitForElement(
+        () => document.querySelector<HTMLButtonElement>('button[aria-label="Add panel surface"]'),
+        "Unable to find add panel surface button beside the tabs.",
+      );
       addSurface.click();
       const secondTerminalItem = await waitForElement(
         () =>
           Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).find(
-            (item) => item.textContent?.trim() === "Terminal",
+            (item) =>
+              item.textContent?.trim() === "Chat terminal" ||
+              item.textContent?.trim() === "Terminal",
           ) ?? null,
         "Unable to find Terminal panel menu item.",
       );
@@ -2214,7 +2687,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
           );
           expect(attachRequest).toMatchObject({
             _tag: WS_METHODS.terminalAttach,
-            threadId: THREAD_ID,
+            owner: THREAD_OWNER,
             terminalId: "term-2",
             cwd: "/repo/project",
           });
@@ -2670,7 +3143,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
       const runButton = await waitForElement(
         () =>
           Array.from(document.querySelectorAll("button")).find(
-            (button) => button.title === "Run Lint",
+            (button) => button.getAttribute("aria-label") === "Run Lint",
           ) as HTMLButtonElement | null,
         "Unable to find Run Lint button.",
       );
@@ -2745,7 +3218,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
       const runButton = await waitForElement(
         () =>
           Array.from(document.querySelectorAll("button")).find(
-            (button) => button.title === "Run Lint",
+            (button) => button.getAttribute("aria-label") === "Run Lint",
           ) as HTMLButtonElement | null,
         "Unable to find Run Lint button.",
       );
@@ -3040,11 +3513,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
                 type?: string;
                 bootstrap?: {
                   createThread?: { projectId?: string };
-                  prepareWorktree?: {
-                    projectCwd?: string;
-                    baseBranch?: string;
-                    branch?: string;
-                  };
+                  prepareWorktree?: { projectCwd?: string; baseBranch?: string; branch?: string };
                   runSetupScript?: boolean;
                 };
               }
@@ -3112,9 +3581,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
                   slug: "claude-opus-4-7",
                   name: "Claude Opus 4.7",
                   isCustom: false,
-                  capabilities: createModelCapabilities({
-                    optionDescriptors: [],
-                  }),
+                  capabilities: createModelCapabilities({ optionDescriptors: [] }),
                 },
               ],
               slashCommands: [],
@@ -3135,9 +3602,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
                   slug: "claude-opus-4-7",
                   name: "Claude Opus 4.7",
                   isCustom: false,
-                  capabilities: createModelCapabilities({
-                    optionDescriptors: [],
-                  }),
+                  capabilities: createModelCapabilities({ optionDescriptors: [] }),
                 },
               ],
               slashCommands: [],
@@ -3274,11 +3739,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
                 type?: string;
                 bootstrap?: {
                   createThread?: { projectId?: string };
-                  prepareWorktree?: {
-                    projectCwd?: string;
-                    baseBranch?: string;
-                    branch?: string;
-                  };
+                  prepareWorktree?: { projectCwd?: string; baseBranch?: string; branch?: string };
                   runSetupScript?: boolean;
                 };
               }
@@ -3400,16 +3861,10 @@ describe("ChatView timeline estimator parity (full app)", () => {
       ...snapshotWithSecondThread,
       threads: snapshotWithSecondThread.threads.map((thread) => {
         if (thread.id === THREAD_ID) {
-          return Object.assign({}, thread, {
-            session: null,
-            title: "Thread alpha",
-          });
+          return Object.assign({}, thread, { session: null, title: "Thread alpha" });
         }
         if (thread.id === secondThreadId) {
-          return Object.assign({}, thread, {
-            session: null,
-            title: "Thread beta",
-          });
+          return Object.assign({}, thread, { session: null, title: "Thread beta" });
         }
         return thread;
       }),
@@ -4022,10 +4477,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
     try {
       useComposerDraftStore.getState().setPrompt(THREAD_REF, "selected");
       await waitForComposerText("selected");
-      await setComposerSelectionByTextOffsets({
-        start: 0,
-        end: "selected".length,
-      });
+      await setComposerSelectionByTextOffsets({ start: 0, end: "selected".length });
       await pressComposerKey("(");
       await waitForComposerText("(selected)");
 
@@ -4098,10 +4550,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
 
     try {
       await waitForComposerText("quoted");
-      await setComposerSelectionByTextOffsets({
-        start: 0,
-        end: "quoted".length,
-      });
+      await setComposerSelectionByTextOffsets({ start: 0, end: "quoted".length });
       await pressComposerKey("«");
       await waitForComposerText("«quoted»");
     } finally {
@@ -4122,10 +4571,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
 
     try {
       await waitForComposerText("quoted");
-      await setComposerSelectionByTextOffsets({
-        start: 0,
-        end: "quoted".length,
-      });
+      await setComposerSelectionByTextOffsets({ start: 0, end: "quoted".length });
       const composerEditor = await waitForComposerEditor();
       composerEditor.focus();
       composerEditor.dispatchEvent(
@@ -4233,7 +4679,6 @@ describe("ChatView timeline estimator parity (full app)", () => {
             {
               path: "path/to/package.json",
               kind: "file",
-              parentPath: "path/to",
             },
           ],
           truncated: false,
@@ -5685,12 +6130,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
           if (body.partialPath === "~/Development/codex/") {
             return {
               parentPath: "~/Development/codex/",
-              entries: [
-                {
-                  name: "Codex.app",
-                  fullPath: "~/Development/codex/Codex.app",
-                },
-              ],
+              entries: [{ name: "Codex.app", fullPath: "~/Development/codex/Codex.app" }],
             };
           }
 
@@ -5855,9 +6295,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
 
       await vi.waitFor(
         () => {
-          expect(remoteBrowseMock).toHaveBeenCalledWith({
-            partialPath: "~/workspaces/",
-          });
+          expect(remoteBrowseMock).toHaveBeenCalledWith({ partialPath: "~/workspaces/" });
         },
         { timeout: 8_000, interval: 16 },
       );
@@ -5865,9 +6303,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
       await page.getByPlaceholder(ADD_PROJECT_SUBMENU_PLACEHOLDER).fill("~/workspaces/");
       await vi.waitFor(
         () => {
-          expect(remoteBrowseMock).toHaveBeenCalledWith({
-            partialPath: "~/workspaces/",
-          });
+          expect(remoteBrowseMock).toHaveBeenCalledWith({ partialPath: "~/workspaces/" });
         },
         { timeout: 8_000, interval: 16 },
       );
@@ -5959,9 +6395,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
 
       await vi.waitFor(
         () => {
-          expect(pickFolder).toHaveBeenCalledWith({
-            initialPath: "~/Applications",
-          });
+          expect(pickFolder).toHaveBeenCalledWith({ initialPath: "~/Applications" });
         },
         { timeout: 8_000, interval: 16 },
       );
@@ -6239,9 +6673,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
   it("creates a new thread from project search when no active project thread exists", async () => {
     const mounted = await mountChatView({
       viewport: DEFAULT_VIEWPORT,
-      snapshot: createSnapshotWithSecondaryProject({
-        includeSecondaryThread: false,
-      }),
+      snapshot: createSnapshotWithSecondaryProject({ includeSecondaryThread: false }),
       configureFixture: (nextFixture) => {
         nextFixture.serverConfig = {
           ...nextFixture.serverConfig,
@@ -6810,10 +7242,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
         threads: snapshot.threads.map((thread) =>
           thread.id === THREAD_ID
             ? Object.assign({}, thread, {
-                modelSelection: {
-                  instanceId: ProviderInstanceId.make("codex"),
-                  model: "gpt-5.4",
-                },
+                modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5.4" },
               })
             : thread,
         ),
@@ -6871,11 +7300,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
                   isCustom: false,
                   capabilities: createModelCapabilities({
                     optionDescriptors: [
-                      {
-                        id: "fastMode",
-                        label: "Fast Mode",
-                        type: "boolean" as const,
-                      },
+                      { id: "fastMode", label: "Fast Mode", type: "boolean" as const },
                     ],
                   }),
                 },
@@ -6885,11 +7310,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
                   isCustom: false,
                   capabilities: createModelCapabilities({
                     optionDescriptors: [
-                      {
-                        id: "fastMode",
-                        label: "Fast Mode",
-                        type: "boolean" as const,
-                      },
+                      { id: "fastMode", label: "Fast Mode", type: "boolean" as const },
                     ],
                   }),
                 },
@@ -6899,11 +7320,7 @@ describe("ChatView timeline estimator parity (full app)", () => {
                   isCustom: false,
                   capabilities: createModelCapabilities({
                     optionDescriptors: [
-                      {
-                        id: "fastMode",
-                        label: "Fast Mode",
-                        type: "boolean" as const,
-                      },
+                      { id: "fastMode", label: "Fast Mode", type: "boolean" as const },
                     ],
                   }),
                 },

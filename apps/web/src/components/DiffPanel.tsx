@@ -28,8 +28,8 @@ import { openInPreferredEditor } from "../editorPreferences";
 import { useCheckpointDiff } from "~/lib/checkpointDiffState";
 import { useVcsStatus } from "~/lib/vcsStatusState";
 import { cn } from "~/lib/utils";
+import { openDiffFilePrimaryAction } from "../diffFileActions";
 import { readLocalApi } from "../localApi";
-import { resolvePathLinkTarget } from "../terminal-links";
 import { parseDiffRouteSearch, stripDiffSearchParams } from "../diffRouteSearch";
 import { useTheme } from "../hooks/useTheme";
 import {
@@ -390,16 +390,22 @@ export default function DiffPanel({ mode = "inline" }: DiffPanelProps) {
     }
   }, [allCollapsed, renderableFiles]);
 
-  const openDiffFileInEditor = useCallback(
+  const openDiffFile = useCallback(
     (filePath: string) => {
-      const api = readLocalApi();
-      if (!api) return;
-      const targetPath = activeCwd ? resolvePathLinkTarget(filePath, activeCwd) : filePath;
-      void openInPreferredEditor(api, targetPath).catch((error) => {
-        console.warn("Failed to open diff file in editor.", error);
+      openDiffFilePrimaryAction({
+        threadRef: routeThreadRef,
+        filePath,
+        activeCwd,
+        openInEditor: (targetPath) => {
+          const api = readLocalApi();
+          if (!api) return;
+          void openInPreferredEditor(api, targetPath).catch((error) => {
+            console.warn("Failed to open diff file in editor.", error);
+          });
+        },
       });
     },
-    [activeCwd],
+    [activeCwd, routeThreadRef],
   );
   const toggleDiffFileCollapsed = useCallback((fileKey: string) => {
     setCollapsedDiffFileKeys((current) => {
@@ -758,7 +764,7 @@ export default function DiffPanel({ mode = "inline" }: DiffPanelProps) {
                           return node.hasAttribute("data-title");
                         });
                         if (!clickedHeader) return;
-                        openDiffFileInEditor(filePath);
+                        openDiffFile(filePath);
                       }}
                     >
                       <FileDiff
