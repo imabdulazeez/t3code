@@ -294,7 +294,7 @@ export default function ProjectScriptsControl({
                     >
                       {scriptScope}
                     </span>
-                    <span className="relative ms-auto flex h-6 min-w-6 items-center justify-end">
+                    <span className="relative ms-auto flex h-6 min-w-14 items-center justify-end">
                       {shortcutLabel && (
                         <MenuShortcut className="ms-0 transition-opacity group-hover:opacity-0 group-focus-visible:opacity-0">
                           {shortcutLabel}
