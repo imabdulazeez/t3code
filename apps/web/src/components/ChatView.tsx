@@ -133,7 +133,6 @@ import ThreadTerminalDrawer, {
 } from "./ThreadTerminalDrawer";
 import { ChevronDownIcon, TriangleAlertIcon, WifiOffIcon } from "lucide-react";
 import { RightPanelTabs } from "./RightPanelTabs";
-import { SessionContextTab } from "./chat/SessionContextTab";
 import { DiffWorkerPoolProvider } from "./DiffWorkerPoolProvider";
 import { cn, randomHex } from "~/lib/utils";
 import { stackedThreadToast, toastManager } from "./ui/toast";
@@ -436,7 +435,6 @@ type ChatViewProps =
       environmentId: EnvironmentId;
       threadId: ThreadId;
       onDiffPanelOpen?: () => void;
-      onOpenContextTab?: () => void;
       reserveTitleBarControlInset?: boolean;
       routeKind: "server";
       draftId?: never;
@@ -445,7 +443,6 @@ type ChatViewProps =
       environmentId: EnvironmentId;
       threadId: ThreadId;
       onDiffPanelOpen?: () => void;
-      onOpenContextTab?: () => void;
       reserveTitleBarControlInset?: boolean;
       routeKind: "draft";
       draftId: DraftId;
@@ -2472,18 +2469,6 @@ function ChatViewContent(props: ChatViewProps) {
     if (!activeThreadRef || !activeProject) return;
     useRightPanelStore.getState().openFile(activeThreadRef, relativePath);
   };
-  const addContextSurface = useCallback(() => {
-    if (!activeThreadRef) return;
-    useRightPanelStore.getState().open(activeThreadRef, "context");
-    if (diffOpen) {
-      void navigate({
-        to: "/$environmentId/$threadId",
-        params: { environmentId, threadId },
-        replace: true,
-        search: (previous) => ({ ...stripDiffSearchParams(previous), diff: undefined }),
-      });
-    }
-  }, [activeThreadRef, diffOpen, environmentId, navigate, threadId]);
   // Right-panel arbitration:
   //   - The diff panel's openness is mirrored by the `?diff=1` URL search
   //     param so it deep-links cleanly. The store still records preview/plan
@@ -5183,12 +5168,6 @@ function ChatViewContent(props: ChatViewProps) {
       <Suspense fallback={null}>
         <DiffPanel mode="embedded" composerDraftTarget={composerDraftTarget} />
       </Suspense>
-    ) : activeRightPanelSurface?.kind === "context" ? (
-      <SessionContextTab
-        environmentId={activeThreadRef.environmentId}
-        threadId={activeThreadRef.threadId}
-        onClose={() => closeRightPanelSurface(activeRightPanelSurface)}
-      />
     ) : activeRightPanelSurface?.kind === "plan" ? (
       <PlanSidebar
         activePlan={activePlan}
@@ -5422,7 +5401,6 @@ function ChatViewContent(props: ChatViewProps) {
                       scheduleComposerFocus={scheduleComposerFocus}
                       setThreadError={setThreadError}
                       onExpandImage={onExpandTimelineImage}
-                      onOpenContextTab={props.onOpenContextTab ?? addContextSurface}
                     />
                   </div>
                 </div>
@@ -5538,7 +5516,6 @@ function ChatViewContent(props: ChatViewProps) {
             onAddTerminal={addTerminalSurface}
             onAddDiff={addDiffSurface}
             onAddFiles={addFilesSurface}
-            onAddContext={addContextSurface}
             browserAvailable={isPreviewSupportedInRuntime()}
             diffAvailable={isServerThread && isGitRepo}
             filesAvailable={Boolean(activeProject)}
@@ -5568,7 +5545,6 @@ function ChatViewContent(props: ChatViewProps) {
               onAddTerminal={addTerminalSurface}
               onAddDiff={addDiffSurface}
               onAddFiles={addFilesSurface}
-              onAddContext={addContextSurface}
               browserAvailable={isPreviewSupportedInRuntime()}
               diffAvailable={isServerThread && isGitRepo}
               filesAvailable={Boolean(activeProject)}

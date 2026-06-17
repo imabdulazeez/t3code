@@ -1,15 +1,10 @@
-import type { ContextMenuItem, PreviewSessionSnapshot, ProjectScriptScope } from "@t3tools/contracts";
+import type {
+  ContextMenuItem,
+  PreviewSessionSnapshot,
+  ProjectScriptScope,
+} from "@t3tools/contracts";
 import { getTerminalLabel } from "@t3tools/shared/terminalLabels";
-import {
-  BarChart3,
-  ClipboardList,
-  FileDiff,
-  Files,
-  Globe2,
-  Plus,
-  TerminalSquare,
-  X,
-} from "lucide-react";
+import { ClipboardList, FileDiff, Files, Globe2, Plus, TerminalSquare, X } from "lucide-react";
 import {
   type MouseEvent as ReactMouseEvent,
   type ReactElement,
@@ -52,7 +47,6 @@ interface RightPanelTabsProps {
   onAddTerminal: (scope: ProjectScriptScope) => void;
   onAddDiff: () => void;
   onAddFiles: () => void;
-  onAddContext: () => void;
   browserAvailable: boolean;
   diffAvailable: boolean;
   filesAvailable: boolean;
@@ -165,7 +159,6 @@ function RightPanelEmptyState(props: {
   onAddTerminal: (scope: ProjectScriptScope) => void;
   onAddDiff: () => void;
   onAddFiles: () => void;
-  onAddContext: () => void;
   browserAvailable: boolean;
   diffAvailable: boolean;
   filesAvailable: boolean;
@@ -195,14 +188,6 @@ function RightPanelEmptyState(props: {
       available: props.diffAvailable,
       disabledReason: SURFACE_DISABLED_REASONS.diff,
       onClick: props.onAddDiff,
-    },
-    {
-      label: "Context",
-      description: "Inspect token usage and message breakdown.",
-      icon: BarChart3,
-      available: true,
-      disabledReason: null,
-      onClick: props.onAddContext,
     },
   ] as const;
 
@@ -277,8 +262,6 @@ function surfaceTitle(
   switch (surface.kind) {
     case "diff":
       return "Diff";
-    case "context":
-      return "Context";
     case "files":
       return "Files";
     case "file":
@@ -336,8 +319,6 @@ function SurfaceIcon({
     }
     case "diff":
       return <FileDiff className="size-3.5 shrink-0" />;
-    case "context":
-      return <BarChart3 className="size-3.5 shrink-0" />;
     case "files":
       return <Files className="size-3.5 shrink-0" />;
     case "file":
@@ -554,10 +535,6 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                     <FileDiff />
                     Diff
                   </SurfaceMenuItem>
-                  <SurfaceMenuItem available onClick={props.onAddContext}>
-                    <BarChart3 />
-                    Context
-                  </SurfaceMenuItem>
                 </MenuPopup>
               </Menu>
             ) : null}
@@ -572,7 +549,6 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
             onAddTerminal={props.onAddTerminal}
             onAddDiff={props.onAddDiff}
             onAddFiles={props.onAddFiles}
-            onAddContext={props.onAddContext}
             browserAvailable={props.browserAvailable}
             diffAvailable={props.diffAvailable}
             filesAvailable={props.filesAvailable}

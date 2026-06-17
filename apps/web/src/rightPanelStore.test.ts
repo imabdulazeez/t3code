@@ -89,17 +89,6 @@ describe("rightPanelStore", () => {
     ).toHaveLength(2);
   });
 
-  it("opens context usage as a singleton surface", () => {
-    useRightPanelStore.getState().open(refA, "context");
-    useRightPanelStore.getState().open(refA, "context");
-
-    expect(selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refA)).toEqual({
-      isOpen: true,
-      activeSurfaceId: "context",
-      surfaces: [{ id: "context", kind: "context" }],
-    });
-  });
-
   it("keeps files as a singleton surface", () => {
     useRightPanelStore.getState().open(refA, "files");
     useRightPanelStore.getState().open(refA, "files");

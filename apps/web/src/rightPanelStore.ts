@@ -18,15 +18,7 @@ import { createJSONStorage, persist } from "zustand/middleware";
 
 import { resolveStorage } from "./lib/storage";
 
-export const RIGHT_PANEL_KINDS = [
-  "plan",
-  "diff",
-  "context",
-  "files",
-  "file",
-  "preview",
-  "terminal",
-] as const;
+export const RIGHT_PANEL_KINDS = ["plan", "diff", "files", "file", "preview", "terminal"] as const;
 export type RightPanelKind = (typeof RIGHT_PANEL_KINDS)[number];
 
 export type RightPanelSurface =
@@ -42,13 +34,12 @@ export type RightPanelSurface =
       splitDirection?: "horizontal" | "vertical";
     }
   | { id: "diff"; kind: "diff" }
-  | { id: "context"; kind: "context" }
   | { id: "files"; kind: "files" }
   | { id: `file:${string}`; kind: "file"; relativePath: string }
   | { id: "plan"; kind: "plan" };
 
 const RIGHT_PANEL_STORAGE_KEY = "t3code:right-panel-state:v2";
-const RIGHT_PANEL_STORAGE_VERSION = 6;
+const RIGHT_PANEL_STORAGE_VERSION = 7;
 
 export interface ThreadRightPanelState {
   isOpen: boolean;
@@ -96,8 +87,6 @@ const singletonSurface = (
   switch (kind) {
     case "diff":
       return { id: "diff", kind };
-    case "context":
-      return { id: "context", kind };
     case "files":
       return { id: "files", kind };
     case "plan":
@@ -170,6 +159,15 @@ export function migratePersistedRightPanelState(persistedState: unknown): {
                 threadState && typeof threadState === "object" ? threadState : null;
               const surfaces = Array.isArray(validThreadState?.surfaces)
                 ? validThreadState.surfaces.flatMap<RightPanelSurface>((surface) => {
+                    if (
+                      !surface ||
+                      typeof surface !== "object" ||
+                      !(RIGHT_PANEL_KINDS as readonly string[]).includes(
+                        (surface as { kind?: unknown }).kind as string,
+                      )
+                    ) {
+                      return [];
+                    }
                     if (surface.kind !== "terminal") return [surface];
                     if (
                       !("resourceId" in surface) ||
