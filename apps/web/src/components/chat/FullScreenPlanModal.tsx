@@ -5,6 +5,18 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
 import ChatMarkdown from "../ChatMarkdown";
+import { PlanImplementActions } from "./PlanImplementActions";
+
+export interface FullScreenPlanImplementActions {
+  isReimplementation: boolean;
+  isBusy: boolean;
+  disabled: boolean;
+  canRevertPlan: boolean;
+  onImplement: () => void;
+  onImplementInNewThread: () => void;
+  onImplementInNewThreadDraft: () => void;
+  onRevertPlan: () => void;
+}
 
 interface FullScreenPlanPayload {
   planMarkdown: string;
@@ -31,9 +43,11 @@ export function useFullScreenPlan(): FullScreenPlanContextValue {
 export function FullScreenPlanProvider({
   children,
   resetKey,
+  implementActions,
 }: {
   children: ReactNode;
   resetKey?: string;
+  implementActions?: FullScreenPlanImplementActions | null;
 }) {
   const [payload, setPayload] = useState<FullScreenPlanPayload | null>(null);
 
@@ -71,7 +85,7 @@ export function FullScreenPlanProvider({
       {children}
       {payload ? (
         <div
-          className="absolute inset-0 z-40 flex items-center justify-center bg-black/40 p-3 backdrop-blur-md sm:p-6"
+          className="absolute inset-0 z-[60] flex items-center justify-center bg-black/40 p-3 backdrop-blur-md sm:p-6"
           onClick={closeFullScreenPlan}
         >
           <div
@@ -103,6 +117,33 @@ export function FullScreenPlanProvider({
                 <ChatMarkdown text={payload.planMarkdown} cwd={payload.cwd} isStreaming={false} />
               </div>
             </ScrollArea>
+            {implementActions ? (
+              <div className="flex shrink-0 items-center justify-end border-t border-border/60 px-3 py-2.5 sm:px-5">
+                <PlanImplementActions
+                  isReimplementation={implementActions.isReimplementation}
+                  isBusy={implementActions.isBusy}
+                  disabled={implementActions.disabled}
+                  canRevertPlan={implementActions.canRevertPlan}
+                  menuPositionerClassName="z-[70]"
+                  onImplement={() => {
+                    implementActions.onImplement();
+                    closeFullScreenPlan();
+                  }}
+                  onImplementInNewThread={() => {
+                    implementActions.onImplementInNewThread();
+                    closeFullScreenPlan();
+                  }}
+                  onImplementInNewThreadDraft={() => {
+                    implementActions.onImplementInNewThreadDraft();
+                    closeFullScreenPlan();
+                  }}
+                  onRevertPlan={() => {
+                    implementActions.onRevertPlan();
+                    closeFullScreenPlan();
+                  }}
+                />
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}

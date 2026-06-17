@@ -23,6 +23,7 @@ function MenuTrigger({ className, children, ...props }: MenuPrimitive.Trigger.Pr
 function MenuPopup({
   children,
   className,
+  positionerClassName,
   sideOffset = 4,
   align = "center",
   alignOffset,
@@ -35,6 +36,7 @@ function MenuPopup({
   alignOffset?: MenuPrimitive.Positioner.Props["alignOffset"];
   side?: MenuPrimitive.Positioner.Props["side"];
   anchor?: MenuPrimitive.Positioner.Props["anchor"];
+  positionerClassName?: string;
 }) {
   return (
     <MenuPrimitive.Portal>
@@ -42,7 +44,7 @@ function MenuPopup({
         align={align}
         alignOffset={alignOffset}
         anchor={anchor}
-        className="z-50"
+        className={cn("z-50", positionerClassName)}
         data-slot="menu-positioner"
         side={side}
         sideOffset={sideOffset}

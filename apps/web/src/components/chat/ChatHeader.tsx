@@ -72,15 +72,15 @@ export const ChatHeader = memo(function ChatHeader({
     primaryEnvironmentId,
   });
   return (
-    <div className="@container/header-actions flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex min-w-0 flex-wrap items-center gap-2 overflow-hidden sm:flex-1 sm:flex-nowrap sm:gap-3">
+    <div className="@container/header-actions flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+      <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden sm:gap-3">
         <SidebarTrigger className="size-7 shrink-0 md:hidden" />
         <Tooltip>
           <TooltipTrigger
             render={
               <h2
                 aria-label={activeThreadTitle}
-                className="min-w-0 flex-1 basis-40 truncate text-sm font-medium text-foreground"
+                className="min-w-0 flex-1 truncate text-sm font-medium text-foreground"
               >
                 {activeThreadTitle}
               </h2>
