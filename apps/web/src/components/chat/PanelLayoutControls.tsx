@@ -1,6 +1,8 @@
 import {
   ChevronDownIcon,
+  FolderIcon,
   Maximize2Icon,
+  MessageCircleIcon,
   Minimize2Icon,
   PanelBottomIcon,
   PanelRightIcon,
@@ -88,6 +90,7 @@ export const PanelLayoutControls = memo(function PanelLayoutControls({
               </MenuTrigger>
               <MenuPopup align="end" side="bottom" className="min-w-40">
                 <MenuItem onClick={() => onSetTerminalScope("chat")}>
+                  <MessageCircleIcon className="size-3.5 shrink-0 text-muted-foreground" />
                   <span className="flex-1">Chat terminal</span>
                   {terminalScope !== "project" ? (
                     <span className="ms-2 text-[10px] uppercase text-muted-foreground">
@@ -96,6 +99,7 @@ export const PanelLayoutControls = memo(function PanelLayoutControls({
                   ) : null}
                 </MenuItem>
                 <MenuItem onClick={() => onSetTerminalScope("project")}>
+                  <FolderIcon className="size-3.5 shrink-0 text-muted-foreground" />
                   <span className="flex-1">Project terminal</span>
                   {terminalScope === "project" ? (
                     <span className="ms-2 text-[10px] uppercase text-muted-foreground">
