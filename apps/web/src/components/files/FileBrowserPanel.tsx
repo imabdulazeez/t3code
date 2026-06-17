@@ -1,7 +1,7 @@
 import type { EnvironmentId, ProjectEntry } from "@t3tools/contracts";
 import { FileTree, useFileTree } from "@pierre/trees/react";
-import { RefreshCw, Search } from "lucide-react";
-import { useEffect, useMemo, useRef } from "react";
+import { ChevronsDownUp, ChevronsUpDown, RefreshCw, Search } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useTheme } from "~/hooks/useTheme";
 import { cn } from "~/lib/utils";
@@ -47,13 +47,18 @@ export default function FileBrowserPanel({
   );
   const entryKindsRef = useRef<ReadonlyMap<string, ProjectEntry["kind"]>>(entryKinds);
   const treePaths = useMemo(() => entries.map(treePath), [entries]);
+  const directoryPaths = useMemo(
+    () => entries.filter((entry) => entry.kind === "directory").map(treePath),
+    [entries],
+  );
   const previousTreePathsRef = useRef<readonly string[]>([]);
+  const [allExpanded, setAllExpanded] = useState(false);
 
   const { model } = useFileTree({
     density: "compact",
     fileTreeSearchMode: "hide-non-matches",
     flattenEmptyDirectories: true,
-    initialExpansion: 1,
+    initialExpansion: "closed",
     icons: T3_PIERRE_ICONS,
     onSelectionChange: (selectedPaths) => {
       const selectedPath = selectedPaths.at(-1)?.replace(/\/$/, "");
@@ -71,7 +76,18 @@ export default function FileBrowserPanel({
     entryKindsRef.current = entryKinds;
     previousTreePathsRef.current = treePaths;
     model.resetPaths(treePaths);
+    setAllExpanded(false);
   }, [entryKinds, model, treePaths]);
+
+  const toggleExpandAll = () => {
+    if (allExpanded) {
+      model.resetPaths(treePaths);
+      setAllExpanded(false);
+    } else {
+      model.resetPaths(treePaths, { initialExpandedPaths: directoryPaths });
+      setAllExpanded(true);
+    }
+  };
 
   const fileCount = useMemo(
     () => entries.reduce((count, entry) => count + (entry.kind === "file" ? 1 : 0), 0),
@@ -100,6 +116,19 @@ export default function FileBrowserPanel({
           onClick={() => model.openSearch()}
         >
           <Search className="size-3.5" />
+        </button>
+        <button
+          type="button"
+          className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+          aria-label={allExpanded ? "Collapse all directories" : "Expand all directories"}
+          disabled={directoryPaths.length === 0}
+          onClick={toggleExpandAll}
+        >
+          {allExpanded ? (
+            <ChevronsDownUp className="size-3.5" />
+          ) : (
+            <ChevronsUpDown className="size-3.5" />
+          )}
         </button>
         <button
           type="button"
