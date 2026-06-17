@@ -413,7 +413,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       <div
         className={cn(
           "workspace-topbar gap-1 pl-2",
-          props.mode === "inline" ? "pr-28" : "pr-3",
+          props.mode === "inline" ? "pr-35" : "pr-3",
           ownsDesktopTitleBar && "wco:pr-[calc(var(--workspace-native-controls-inset)+6rem)]",
         )}
         data-right-panel-tabbar
@@ -447,7 +447,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                       render={
                         <button
                           type="button"
-                          className="flex min-w-0 flex-1 items-center gap-1.5"
+                          className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden"
                           onClick={() => props.onActivate(surface)}
                         >
                           <SurfaceIcon

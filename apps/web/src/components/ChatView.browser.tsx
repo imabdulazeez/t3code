@@ -2308,6 +2308,9 @@ describe("ChatView timeline estimator parity (full app)", () => {
       );
 
       useRightPanelStore.getState().openFile(THREAD_REF, "components.json");
+      useRightPanelStore.getState().openFile(THREAD_REF, "src/index.ts");
+      useRightPanelStore.getState().openFile(THREAD_REF, "README.md");
+      useRightPanelStore.getState().openFile(THREAD_REF, "package.json");
       const fileTabIcon = await waitForElement(
         () =>
           document.querySelector<SVGElement>(
@@ -2316,6 +2319,18 @@ describe("ChatView timeline estimator parity (full app)", () => {
         "Unable to find the Pierre file icon in the file tab.",
       );
       expect(fileTabIcon.closest("button")?.textContent).toContain("components.json");
+      await vi.waitFor(() => {
+        const latestMaximizeRect = maximizeButton.getBoundingClientRect();
+        const closeButtons = Array.from(
+          rightPanelTabbar.querySelectorAll<HTMLButtonElement>('button[aria-label^="Close "]'),
+        );
+        expect(closeButtons.length).toBeGreaterThanOrEqual(4);
+        expect(
+          closeButtons.every(
+            (button) => button.getBoundingClientRect().right <= latestMaximizeRect.left - 4,
+          ),
+        ).toBe(true);
+      });
 
       document.documentElement.classList.add("wco");
       expect(rightPanelTabbar.getBoundingClientRect().height).toBe(
