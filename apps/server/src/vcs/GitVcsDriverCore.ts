@@ -58,6 +58,42 @@ const STATUS_UPSTREAM_REFRESH_ENV = Object.freeze({
 } satisfies NodeJS.ProcessEnv);
 const DEFAULT_BASE_BRANCH_CANDIDATES = ["main", "master"] as const;
 const GIT_LIST_BRANCHES_DEFAULT_LIMIT = 100;
+
+const INDEX_LOCK_CONTENTION_PATTERN = /Unable to create '[^']*\.lock': File exists/i;
+const INDEX_LOCK_PATH_PATTERN = /Unable to create '([^']*\.lock)': File exists/i;
+const INDEX_MUTATING_SUBCOMMANDS = new Set<string>([
+  "add",
+  "am",
+  "apply",
+  "checkout",
+  "cherry-pick",
+  "clean",
+  "commit",
+  "merge",
+  "mv",
+  "pull",
+  "rebase",
+  "reset",
+  "restore",
+  "revert",
+  "rm",
+  "stash",
+  "switch",
+  "update-index",
+]);
+const LOCK_RECOVERY_MAX_ATTEMPTS = 4;
+const LOCK_RETRY_BACKOFF_MS = [100, 250, 500, 1000] as const;
+const LOCK_STALE_THRESHOLD_MS = 10_000;
+
+const isIndexLockContention = (text: string): boolean => INDEX_LOCK_CONTENTION_PATTERN.test(text);
+
+const parseIndexLockPath = (text: string): string | null => {
+  const match = text.match(INDEX_LOCK_PATH_PATTERN);
+  return match?.[1] ?? null;
+};
+
+const commandHoldsIndexLock = (subcommand: string, env: NodeJS.ProcessEnv | undefined): boolean =>
+  env?.GIT_INDEX_FILE === undefined && INDEX_MUTATING_SUBCOMMANDS.has(subcommand);
 const NON_REPOSITORY_STATUS_DETAILS = Object.freeze<GitVcsDriver.GitStatusDetails>({
   isRepo: false,
   hasOriginRemote: false,
@@ -657,6 +693,61 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const commandSpawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+
+  const repoWriteLocks = new Map<string, Semaphore.Semaphore>();
+  const repoWriteLockRegistry = yield* Semaphore.make(1);
+  const getRepoWriteLock = (cwd: string) =>
+    repoWriteLockRegistry.withPermit(
+      Effect.suspend(() => {
+        const key = path.resolve(cwd);
+        const existing = repoWriteLocks.get(key);
+        if (existing) {
+          return Effect.succeed(existing);
+        }
+        return Semaphore.make(1).pipe(
+          Effect.tap((semaphore) => Effect.sync(() => repoWriteLocks.set(key, semaphore))),
+        );
+      }),
+    );
+
+  const inspectIndexLock = Effect.fn("inspectIndexLock")(function* (lockPath: string) {
+    const info = yield* fileSystem.stat(lockPath).pipe(Effect.option);
+    if (Option.isNone(info)) {
+      return "absent" as const;
+    }
+    const mtime = info.value.mtime;
+    if (Option.isNone(mtime)) {
+      return "held" as const;
+    }
+    const nowMs = DateTime.toEpochMillis(yield* DateTime.now);
+    if (nowMs - mtime.value.getTime() < LOCK_STALE_THRESHOLD_MS) {
+      return "held" as const;
+    }
+    yield* fileSystem.remove(lockPath).pipe(Effect.ignore);
+    return "removed" as const;
+  });
+
+  const recoverFromIndexLock = Effect.fn("recoverFromIndexLock")(function* (
+    stderr: string,
+    attempt: number,
+  ) {
+    if (attempt + 1 >= LOCK_RECOVERY_MAX_ATTEMPTS) {
+      return false;
+    }
+    const lockPath = parseIndexLockPath(stderr);
+    const state = lockPath ? yield* inspectIndexLock(lockPath) : "held";
+    if (state === "removed") {
+      yield* Effect.logWarning(`Removed stale git index lock at ${lockPath}; retrying command.`);
+      return true;
+    }
+    if (state === "absent") {
+      return true;
+    }
+    const backoffMs =
+      LOCK_RETRY_BACKOFF_MS[Math.min(attempt, LOCK_RETRY_BACKOFF_MS.length - 1)] ?? 1000;
+    yield* Effect.sleep(Duration.millis(backoffMs));
+    return true;
+  });
   const { worktreesDir } = yield* ServerConfig;
   const crypto = yield* Crypto.Crypto;
 
@@ -740,7 +831,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
         } satisfies GitVcsDriver.ExecuteGitResult;
       });
 
-      return yield* runGitCommand().pipe(
+      const runAttempt = runGitCommand().pipe(
         Effect.scoped,
         Effect.timeoutOption(timeoutMs),
         Effect.flatMap((result) =>
@@ -758,6 +849,38 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
           }),
         ),
       );
+
+      const runWithLockRecovery = (
+        attempt: number,
+      ): Effect.Effect<GitVcsDriver.ExecuteGitResult, GitCommandError> =>
+        runAttempt.pipe(
+          Effect.flatMap((result) =>
+            result.exitCode !== 0 && isIndexLockContention(result.stderr)
+              ? recoverFromIndexLock(result.stderr, attempt).pipe(
+                  Effect.flatMap((retry) =>
+                    retry ? runWithLockRecovery(attempt + 1) : Effect.succeed(result),
+                  ),
+                )
+              : Effect.succeed(result),
+          ),
+          Effect.catchIf(
+            (error): error is GitCommandError =>
+              isGitCommandError(error) && isIndexLockContention(error.detail),
+            (error) =>
+              recoverFromIndexLock(error.detail, attempt).pipe(
+                Effect.flatMap((retry) =>
+                  retry ? runWithLockRecovery(attempt + 1) : Effect.fail(error),
+                ),
+              ),
+          ),
+        );
+
+      const subcommand = commandInput.args[0];
+      if (subcommand !== undefined && commandHoldsIndexLock(subcommand, input.env)) {
+        const writeLock = yield* getRepoWriteLock(commandInput.cwd);
+        return yield* writeLock.withPermit(runWithLockRecovery(0));
+      }
+      return yield* runWithLockRecovery(0);
     },
   );
 
