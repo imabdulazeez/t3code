@@ -1,9 +1,11 @@
 import { Outlet, createFileRoute, redirect } from "@tanstack/react-router";
+import { useAtomValue } from "@effect/atom-react";
 import { useEffect } from "react";
 
-import { useCommandPaletteStore } from "../commandPaletteStore";
+import { isCommandPaletteOpen } from "../commandPaletteContext";
 import { dispatchPreviewAction } from "../components/preview/previewActionBus";
 import { useHandleNewThread } from "../hooks/useHandleNewThread";
+import { useTerminalUiStateReconcile } from "../hooks/useTerminalUiStateReconcile";
 import {
   startNewLocalThreadFromContext,
   startNewThreadFromContext,
@@ -11,22 +13,20 @@ import {
 import { isPreviewFocused } from "../lib/previewFocus";
 import { isTerminalFocused } from "../lib/terminalFocus";
 import { resolveShortcutCommand } from "../keybindings";
-import { threadTerminalOwnerRef } from "@t3tools/client-runtime";
+import { threadTerminalOwnerRef } from "@t3tools/client-runtime/environment";
 import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../terminalUiStateStore";
 import { isPreviewSupportedInRuntime } from "../previewStateStore";
 import { selectActiveRightPanel, useRightPanelStore } from "../rightPanelStore";
 import { useThreadSelectionStore } from "../threadSelectionStore";
-import { resolveSidebarNewThreadEnvMode } from "~/components/Sidebar.logic";
 import { stackedThreadToast, toastManager } from "~/components/ui/toast";
-import { useSettings } from "~/hooks/useSettings";
-import { useServerKeybindings } from "~/rpc/serverState";
+import { primaryServerKeybindingsAtom } from "~/state/server";
 
 function ChatRouteGlobalShortcuts() {
   const clearSelection = useThreadSelectionStore((state) => state.clearSelection);
   const selectedThreadKeysSize = useThreadSelectionStore((state) => state.selectedThreadKeys.size);
   const { activeDraftThread, activeThread, defaultProjectRef, handleNewThread, routeThreadRef } =
     useHandleNewThread();
-  const keybindings = useServerKeybindings();
+  const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const terminalOpen = useTerminalUiStateStore((state) =>
     routeThreadRef
       ? selectThreadTerminalUiState(
@@ -43,8 +43,6 @@ function ChatRouteGlobalShortcuts() {
       ? selectActiveRightPanel(state.byThreadKey, routeThreadRef) === "preview"
       : false,
   );
-  const appSettings = useSettings();
-
   useEffect(() => {
     const onWindowKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented) return;
@@ -57,7 +55,7 @@ function ChatRouteGlobalShortcuts() {
         },
       });
 
-      if (useCommandPaletteStore.getState().open) {
+      if (isCommandPaletteOpen()) {
         return;
       }
 
@@ -72,11 +70,8 @@ function ChatRouteGlobalShortcuts() {
         event.stopPropagation();
         void startNewLocalThreadFromContext({
           activeDraftThread,
-          activeThread,
+          activeThread: activeThread ?? undefined,
           defaultProjectRef,
-          defaultThreadEnvMode: resolveSidebarNewThreadEnvMode({
-            defaultEnvMode: appSettings.defaultThreadEnvMode,
-          }),
           handleNewThread,
         });
         return;
@@ -87,11 +82,8 @@ function ChatRouteGlobalShortcuts() {
         event.stopPropagation();
         void startNewThreadFromContext({
           activeDraftThread,
-          activeThread,
+          activeThread: activeThread ?? undefined,
           defaultProjectRef,
-          defaultThreadEnvMode: resolveSidebarNewThreadEnvMode({
-            defaultEnvMode: appSettings.defaultThreadEnvMode,
-          }),
           handleNewThread,
         });
         return;
@@ -156,9 +148,13 @@ function ChatRouteGlobalShortcuts() {
     routeThreadRef,
     selectedThreadKeysSize,
     terminalOpen,
-    appSettings.defaultThreadEnvMode,
   ]);
 
+  return null;
+}
+
+function ChatRouteTerminalUiStateReconciler() {
+  useTerminalUiStateReconcile();
   return null;
 }
 
@@ -166,6 +162,7 @@ function ChatRouteLayout() {
   return (
     <>
       <ChatRouteGlobalShortcuts />
+      <ChatRouteTerminalUiStateReconciler />
       <Outlet />
     </>
   );

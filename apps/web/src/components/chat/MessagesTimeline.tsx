@@ -5,7 +5,7 @@ import {
   type ServerProviderSkill,
   type TurnId,
 } from "@t3tools/contracts";
-import { parseScopedThreadKey } from "@t3tools/client-runtime";
+import { parseScopedThreadKey } from "@t3tools/client-runtime/environment";
 import {
   createContext,
   Fragment,
@@ -92,7 +92,7 @@ import { cn } from "~/lib/utils";
 import { useUiStateStore } from "~/uiStateStore";
 import { type TimestampFormat } from "@t3tools/contracts/settings";
 import { formatChatTimestampTooltip, formatShortTimestamp } from "../../timestampFormat";
-import { useSettings } from "../../hooks/useSettings";
+import { useClientSettings } from "../../hooks/useSettings";
 
 import {
   buildInlineTerminalContextText,
@@ -608,16 +608,10 @@ function AssistantTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "mess
                 <TooltipTrigger
                   render={<p className="text-muted-foreground text-xs tabular-nums" />}
                 >
-                  {formatShortTimestamp(
-                    row.message.completedAt ?? row.message.createdAt,
-                    ctx.timestampFormat,
-                  )}
+                  {formatShortTimestamp(row.message.updatedAt, ctx.timestampFormat)}
                 </TooltipTrigger>
                 <TooltipPopup>
-                  {formatChatTimestampTooltip(
-                    row.message.completedAt ?? row.message.createdAt,
-                    ctx.timestampFormat,
-                  )}
+                  {formatChatTimestampTooltip(row.message.updatedAt, ctx.timestampFormat)}
                 </TooltipPopup>
               </Tooltip>
             )}
@@ -743,7 +737,7 @@ const WorkGroupSection = memo(function WorkGroupSection({
     ? nonEmptyEntries.length === 1
       ? "1 tool call"
       : `${nonEmptyEntries.length} tool calls`
-    : "work log";
+    : "Work Log";
 
   useLayoutEffect(() => {
     const anchorBottomBeforeToggle = anchorBottomBeforeToggleRef.current;
@@ -879,7 +873,7 @@ function AssistantChangedFilesSectionInner({
   resolvedTheme: "light" | "dark";
   onOpenTurnDiff: (turnId: TurnId, filePath?: string) => void;
 }) {
-  const changedFilesExpandedByDefault = useSettings((s) => s.changedFilesExpandedByDefault);
+  const changedFilesExpandedByDefault = useClientSettings((s) => s.changedFilesExpandedByDefault);
   const allDirectoriesExpanded = useUiStateStore(
     (store) =>
       store.threadChangedFilesExpandedById[routeThreadKey]?.[turnSummary.turnId] ??

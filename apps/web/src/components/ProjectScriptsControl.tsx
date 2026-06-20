@@ -6,6 +6,11 @@ import {
   type ResolvedKeybindingsConfig,
 } from "@t3tools/contracts";
 import {
+  isAtomCommandInterrupted,
+  squashAtomCommandFailure,
+  type AtomCommandResult,
+} from "@t3tools/client-runtime/state/runtime";
+import {
   BugIcon,
   ChevronDownIcon,
   FlaskConicalIcon,
@@ -94,14 +99,19 @@ export interface NewProjectScriptInput {
   autoOpenPreview: boolean;
 }
 
+export type ProjectScriptActionResult = AtomCommandResult<void, unknown>;
+
 interface ProjectScriptsControlProps {
-  scripts: ProjectScript[];
+  scripts: ReadonlyArray<ProjectScript>;
   keybindings: ResolvedKeybindingsConfig;
   preferredScriptId?: string | null;
   onRunScript: (script: ProjectScript, options?: { scope?: ProjectScriptScope }) => void;
-  onAddScript: (input: NewProjectScriptInput) => Promise<void> | void;
-  onUpdateScript: (scriptId: string, input: NewProjectScriptInput) => Promise<void> | void;
-  onDeleteScript: (scriptId: string) => Promise<void> | void;
+  onAddScript: (input: NewProjectScriptInput) => Promise<ProjectScriptActionResult>;
+  onUpdateScript: (
+    scriptId: string,
+    input: NewProjectScriptInput,
+  ) => Promise<ProjectScriptActionResult>;
+  onDeleteScript: (scriptId: string) => Promise<ProjectScriptActionResult>;
 }
 
 function runInScopeLabel(scope: ProjectScriptScope): string {
@@ -171,6 +181,7 @@ export default function ProjectScriptsControl({
     }
 
     setValidationError(null);
+    let payload: NewProjectScriptInput;
     try {
       const scriptIdForValidation =
         editingScriptId ??
@@ -183,7 +194,7 @@ export default function ProjectScriptsControl({
         command: commandForProjectScript(scriptIdForValidation),
       });
       const trimmedPreviewUrl = previewUrl.trim();
-      const payload = {
+      payload = {
         name: trimmedName,
         command: trimmedCommand,
         icon,
@@ -193,16 +204,23 @@ export default function ProjectScriptsControl({
         previewUrl: trimmedPreviewUrl.length > 0 ? trimmedPreviewUrl : null,
         autoOpenPreview: trimmedPreviewUrl.length > 0 ? autoOpenPreview : false,
       } satisfies NewProjectScriptInput;
-      if (editingScriptId) {
-        await onUpdateScript(editingScriptId, payload);
-      } else {
-        await onAddScript(payload);
-      }
-      setDialogOpen(false);
-      setIconPickerOpen(false);
     } catch (error) {
       setValidationError(error instanceof Error ? error.message : "Failed to save action.");
+      return;
     }
+
+    const result = editingScriptId
+      ? await onUpdateScript(editingScriptId, payload)
+      : await onAddScript(payload);
+    if (result._tag === "Failure") {
+      if (!isAtomCommandInterrupted(result)) {
+        const error = squashAtomCommandFailure(result);
+        setValidationError(error instanceof Error ? error.message : "Failed to save action.");
+      }
+      return;
+    }
+    setDialogOpen(false);
+    setIconPickerOpen(false);
   };
 
   const openAddDialog = () => {

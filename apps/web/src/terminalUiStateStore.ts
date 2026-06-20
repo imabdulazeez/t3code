@@ -11,7 +11,7 @@ import {
   terminalOwnerKey,
   type TerminalOwnerRef,
   threadTerminalOwnerRef,
-} from "@t3tools/client-runtime";
+} from "@t3tools/client-runtime/environment";
 import { type ProjectId, type ProjectScriptScope } from "@t3tools/contracts";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";

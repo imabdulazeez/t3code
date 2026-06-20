@@ -7,7 +7,7 @@
  * terminal surfaces point at terminal session ids, file surfaces point at
  * workspace paths, and diff/plan/files remain singleton surfaces.
  */
-import { scopedThreadKey } from "@t3tools/client-runtime";
+import { scopedThreadKey } from "@t3tools/client-runtime/environment";
 import {
   DEFAULT_PROJECT_SCRIPT_SCOPE,
   type ProjectScriptScope,
@@ -361,6 +361,7 @@ export const useRightPanelStore = create<RightPanelStoreState>()(
               const fallback = surfaces[Math.min(index, surfaces.length - 1)] ?? null;
               return {
                 ...current,
+                isOpen: surfaces.length > 0 && current.isOpen,
                 surfaces,
                 activeSurfaceId:
                   current.activeSurfaceId === surfaceId
@@ -399,9 +400,16 @@ export const useRightPanelStore = create<RightPanelStoreState>()(
             const index = current.surfaces.findIndex((surface) => surface.id === surfaceId);
             if (index < 0) return current;
             const surfaces = current.surfaces.filter((surface) => surface.id !== surfaceId);
-            if (current.activeSurfaceId !== surfaceId) return { ...current, surfaces };
+            if (current.activeSurfaceId !== surfaceId) {
+              return { ...current, isOpen: surfaces.length > 0 && current.isOpen, surfaces };
+            }
             const fallback = surfaces[Math.min(index, surfaces.length - 1)] ?? null;
-            return { ...current, surfaces, activeSurfaceId: fallback?.id ?? null };
+            return {
+              ...current,
+              isOpen: surfaces.length > 0 && current.isOpen,
+              surfaces,
+              activeSurfaceId: fallback?.id ?? null,
+            };
           }),
         })),
       closeOtherSurfaces: (ref, surfaceId) =>
@@ -438,7 +446,7 @@ export const useRightPanelStore = create<RightPanelStoreState>()(
           byThreadKey: updateThread(state.byThreadKey, scopedThreadKey(ref), (current) =>
             current.surfaces.length === 0
               ? current
-              : { ...current, isOpen: true, surfaces: [], activeSurfaceId: null },
+              : { ...current, isOpen: false, surfaces: [], activeSurfaceId: null },
           ),
         })),
       reconcileBrowserSurfaces: (ref, tabIds) =>
@@ -570,14 +578,4 @@ export function selectActiveRightPanelSurface(
   const state = selectThreadRightPanelState(byThreadKey, ref);
   if (!state.isOpen) return null;
   return state.surfaces.find((surface) => surface.id === state.activeSurfaceId) ?? null;
-}
-
-export function selectActiveRightPanelKindWithUrl(
-  byThreadKey: Record<string, ThreadRightPanelState>,
-  ref: ScopedThreadRef | null | undefined,
-  diffSearchActive: boolean,
-): RightPanelKind | null {
-  if (!selectThreadRightPanelState(byThreadKey, ref).isOpen) return null;
-  if (diffSearchActive) return "diff";
-  return selectActiveRightPanel(byThreadKey, ref);
 }

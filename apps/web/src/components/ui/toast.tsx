@@ -11,7 +11,13 @@ import {
   type ReactNode,
 } from "react";
 import { useParams } from "@tanstack/react-router";
-import { type EnvironmentId, type ScopedThreadRef, type ThreadId } from "@t3tools/contracts";
+import {
+  type EnvironmentId,
+  type ScopedProjectRef,
+  type ScopedThreadRef,
+  type ThreadId,
+} from "@t3tools/contracts";
+import { scopeProjectRef } from "@t3tools/client-runtime/environment";
 import {
   CheckIcon,
   ChevronDownIcon,
@@ -30,8 +36,7 @@ import { buttonVariants } from "~/components/ui/button";
 import { useComposerDraftStore } from "~/composerDraftStore";
 import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
 import { resolveThreadRouteTarget } from "~/threadRoutes";
-import { useStore } from "~/store";
-import { createProjectSelectorByRef, createThreadSelectorByRef } from "~/storeSelectors";
+import { useProject, useThread } from "~/state/entities";
 import {
   buildVisibleToastLayout,
   shouldHideCollapsedToastContent,
@@ -475,31 +480,25 @@ function useActiveThreadAndProjectRefs(): {
     return null;
   }, [activeDraftSession, routeTarget]);
 
-  const activeThreadSelector = useMemo(
-    () => createThreadSelectorByRef(activeThreadRef),
-    [activeThreadRef],
-  );
-  const activeThread = useStore(activeThreadSelector);
+  const activeThread = useThread(activeThreadRef);
 
-  const projectRef = useMemo(() => {
+  const projectRef = useMemo<ScopedProjectRef | null>(() => {
     if (activeThread) {
-      return { environmentId: activeThread.environmentId, projectId: activeThread.projectId };
+      return scopeProjectRef(activeThread.environmentId, activeThread.projectId);
     }
     if (activeDraftSession) {
-      return {
-        environmentId: activeDraftSession.environmentId,
-        projectId: activeDraftSession.projectId,
-      };
+      return scopeProjectRef(activeDraftSession.environmentId, activeDraftSession.projectId);
     }
     return null;
   }, [activeThread, activeDraftSession]);
 
-  const activeProjectSelector = useMemo(() => createProjectSelectorByRef(projectRef), [projectRef]);
-  const activeProject = useStore(activeProjectSelector);
+  const activeProject = useProject(projectRef);
 
   const activeProjectRef = useMemo(
     () =>
-      activeProject ? { environmentId: activeProject.environmentId, cwd: activeProject.cwd } : null,
+      activeProject
+        ? { environmentId: activeProject.environmentId, cwd: activeProject.workspaceRoot }
+        : null,
     [activeProject],
   );
 

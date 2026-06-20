@@ -8,10 +8,6 @@ import * as Schema from "effect/Schema";
 
 import * as DesktopConfig from "../app/DesktopConfig.ts";
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
-import {
-  DEFAULT_DESKTOP_SETTINGS,
-  type DesktopSettings as DesktopSettingsValue,
-} from "./DesktopAppSettings.ts";
 import * as DesktopAppSettings from "./DesktopAppSettings.ts";
 
 const DesktopSettingsPatch = Schema.Struct({
@@ -80,8 +76,8 @@ describe("DesktopSettings", () => {
     withSettings(
       Effect.gen(function* () {
         const settings = yield* DesktopAppSettings.DesktopAppSettings;
-        assert.deepEqual(yield* settings.load, DEFAULT_DESKTOP_SETTINGS);
-        assert.deepEqual(yield* settings.get, DEFAULT_DESKTOP_SETTINGS);
+        assert.deepEqual(yield* settings.load, DesktopAppSettings.DEFAULT_DESKTOP_SETTINGS);
+        assert.deepEqual(yield* settings.get, DesktopAppSettings.DEFAULT_DESKTOP_SETTINGS);
       }),
     ),
   );
@@ -100,7 +96,7 @@ describe("DesktopSettings", () => {
           serverExposureMode: "network-accessible",
           tailscaleServeEnabled: true,
           tailscaleServePort: 8443,
-        } satisfies DesktopSettingsValue);
+        } satisfies DesktopAppSettings.DesktopSettings);
 
         const exposure = yield* settings.setServerExposureMode("local-only");
         assert.isTrue(exposure.changed);
@@ -112,6 +108,27 @@ describe("DesktopSettings", () => {
         });
         assert.isTrue(tailscale.changed);
         assert.equal(tailscale.settings.tailscaleServePort, 9443);
+      }),
+    ),
+  );
+
+  it.effect("reports the failed desktop settings write operation and path", () =>
+    withSettings(
+      Effect.gen(function* () {
+        const environment = yield* DesktopEnvironment.DesktopEnvironment;
+        const fileSystem = yield* FileSystem.FileSystem;
+        const settings = yield* DesktopAppSettings.DesktopAppSettings;
+        yield* fileSystem.makeDirectory(environment.desktopSettingsPath, { recursive: true });
+
+        const error = yield* settings.setServerExposureMode("network-accessible").pipe(Effect.flip);
+        assert.instanceOf(error, DesktopAppSettings.DesktopSettingsWriteError);
+        assert.equal(error.operation, "replace-settings-file");
+        assert.equal(error.path, environment.desktopSettingsPath);
+        assert.exists(error.cause);
+        assert.equal(
+          error.message,
+          `Desktop settings write failed during replace-settings-file at ${environment.desktopSettingsPath}.`,
+        );
       }),
     ),
   );
@@ -142,7 +159,7 @@ describe("DesktopSettings", () => {
         yield* fileSystem.makeDirectory(environment.stateDir, { recursive: true });
         yield* fileSystem.writeFileString(environment.desktopSettingsPath, "{not-json");
 
-        assert.deepEqual(yield* settings.load, DEFAULT_DESKTOP_SETTINGS);
+        assert.deepEqual(yield* settings.load, DesktopAppSettings.DEFAULT_DESKTOP_SETTINGS);
       }),
     ),
   );
@@ -168,7 +185,7 @@ describe("DesktopSettings", () => {
           serverExposureMode: "network-accessible",
           tailscaleServeEnabled: true,
           tailscaleServePort: 8443,
-        } satisfies DesktopSettingsValue);
+        } satisfies DesktopAppSettings.DesktopSettings);
       }),
     ),
   );
@@ -205,7 +222,7 @@ describe("DesktopSettings", () => {
           serverExposureMode: "local-only",
           tailscaleServeEnabled: true,
           tailscaleServePort: 443,
-        } satisfies DesktopSettingsValue);
+        } satisfies DesktopAppSettings.DesktopSettings);
       }),
     ),
   );

@@ -1,13 +1,13 @@
 // @effect-diagnostics nodeBuiltinImport:off
-import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import * as NodeChildProcess from "node:child_process";
+import * as NodeFS from "node:fs";
+import * as NodeOS from "node:os";
+import * as NodePath from "node:path";
+import * as NodeURL from "node:url";
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const repoRoot = NodePath.resolve(NodePath.dirname(NodeURL.fileURLToPath(import.meta.url)), "..");
 
 const workspaceFiles = [
   "package.json",
@@ -36,15 +36,15 @@ const workspaceFiles = [
 
 function copyWorkspaceManifestFixture(targetRoot: string): void {
   for (const relativePath of workspaceFiles) {
-    const sourcePath = resolve(repoRoot, relativePath);
-    const destinationPath = resolve(targetRoot, relativePath);
-    mkdirSync(dirname(destinationPath), { recursive: true });
-    cpSync(sourcePath, destinationPath);
+    const sourcePath = NodePath.resolve(repoRoot, relativePath);
+    const destinationPath = NodePath.resolve(targetRoot, relativePath);
+    NodeFS.mkdirSync(NodePath.dirname(destinationPath), { recursive: true });
+    NodeFS.cpSync(sourcePath, destinationPath);
   }
 
-  const patchesDirectory = resolve(repoRoot, "patches");
-  if (existsSync(patchesDirectory)) {
-    cpSync(patchesDirectory, resolve(targetRoot, "patches"), { recursive: true });
+  const patchesDirectory = NodePath.resolve(repoRoot, "patches");
+  if (NodeFS.existsSync(patchesDirectory)) {
+    NodeFS.cpSync(patchesDirectory, NodePath.resolve(targetRoot, "patches"), { recursive: true });
   }
 }
 
@@ -55,7 +55,7 @@ function assertContains(haystack: string, needle: string, message: string): void
 }
 
 function assertPackageVersion(path: string, version: string): void {
-  const packageJson = JSON.parse(readFileSync(path, "utf8")) as {
+  const packageJson = JSON.parse(NodeFS.readFileSync(path, "utf8")) as {
     readonly version?: unknown;
   };
 
@@ -64,15 +64,15 @@ function assertPackageVersion(path: string, version: string): void {
   }
 }
 
-const tempRoot = mkdtempSync(join(tmpdir(), "t3-release-smoke-"));
+const tempRoot = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-release-smoke-"));
 
 try {
   copyWorkspaceManifestFixture(tempRoot);
 
-  execFileSync(
+  NodeChildProcess.execFileSync(
     process.execPath,
     [
-      resolve(repoRoot, "scripts/update-release-package-versions.ts"),
+      NodePath.resolve(repoRoot, "scripts/update-release-package-versions.ts"),
       "9.9.9-smoke.0",
       "--root",
       tempRoot,
@@ -83,14 +83,14 @@ try {
     },
   );
 
-  rmSync(resolve(tempRoot, "pnpm-lock.yaml"), { force: true });
+  NodeFS.rmSync(NodePath.resolve(tempRoot, "pnpm-lock.yaml"), { force: true });
 
-  execFileSync("vp", ["install", "--lockfile-only", "--ignore-scripts"], {
+  NodeChildProcess.execFileSync("vp", ["install", "--lockfile-only", "--ignore-scripts"], {
     cwd: tempRoot,
     stdio: "inherit",
   });
 
-  const lockfile = readFileSync(resolve(tempRoot, "pnpm-lock.yaml"), "utf8");
+  const lockfile = NodeFS.readFileSync(NodePath.resolve(tempRoot, "pnpm-lock.yaml"), "utf8");
   assertContains(lockfile, "lockfileVersion:", "Expected pnpm-lock.yaml to be regenerated.");
 
   for (const relativePath of [
@@ -99,13 +99,13 @@ try {
     "apps/web/package.json",
     "packages/contracts/package.json",
   ]) {
-    assertPackageVersion(resolve(tempRoot, relativePath), "9.9.9-smoke.0");
+    assertPackageVersion(NodePath.resolve(tempRoot, relativePath), "9.9.9-smoke.0");
   }
 
-  const nightlyReleaseMetadata = execFileSync(
+  const nightlyReleaseMetadata = NodeChildProcess.execFileSync(
     process.execPath,
     [
-      resolve(repoRoot, "scripts/resolve-nightly-release.ts"),
+      NodePath.resolve(repoRoot, "scripts/resolve-nightly-release.ts"),
       "--date",
       "20260413",
       "--run-number",
@@ -138,5 +138,5 @@ try {
 
   Effect.runSync(Console.log("Release smoke checks passed."));
 } finally {
-  rmSync(tempRoot, { recursive: true, force: true });
+  NodeFS.rmSync(tempRoot, { recursive: true, force: true });
 }

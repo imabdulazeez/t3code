@@ -1,4 +1,4 @@
-import * as Crypto from "node:crypto";
+import * as NodeCrypto from "node:crypto";
 
 import type { DesktopSshEnvironmentTarget } from "@t3tools/contracts";
 import { HostProcessPlatform } from "@t3tools/shared/hostProcess";
@@ -75,7 +75,10 @@ export function targetConnectionKey(target: DesktopSshEnvironmentTarget): string
 }
 
 export function remoteStateKey(target: DesktopSshEnvironmentTarget): string {
-  return Crypto.createHash("sha256").update(targetConnectionKey(target)).digest("hex").slice(0, 16);
+  return NodeCrypto.createHash("sha256")
+    .update(targetConnectionKey(target))
+    .digest("hex")
+    .slice(0, 16);
 }
 
 export function buildSshHostSpec(target: DesktopSshEnvironmentTarget): string {

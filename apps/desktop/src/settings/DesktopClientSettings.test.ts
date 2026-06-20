@@ -25,7 +25,6 @@ const clientSettings: ClientSettings = {
   diffIgnoreWhitespace: true,
   diffWordWrap: true,
   dismissedProviderUpdateNotificationKeys: [],
-  hideUnavailableProviders: false,
   favorites: [],
   providerModelPreferences: {},
   sidebarProjectGroupingMode: "repository_path",
@@ -43,7 +42,6 @@ const decodeClientSettingsJson = Schema.decodeEffect(Schema.fromJsonString(Clien
 const decodeRecordJson = Schema.decodeEffect(
   Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown)),
 );
-
 function makeLayer(baseDir: string) {
   const environmentLayer = DesktopEnvironment.layer({
     dirname: "/repo/apps/desktop/src",
@@ -111,6 +109,27 @@ describe("DesktopClientSettings", () => {
             ),
             "settings",
           ),
+        );
+      }),
+    ),
+  );
+
+  it.effect("reports the failed client settings write operation and path", () =>
+    withClientSettings(
+      Effect.gen(function* () {
+        const environment = yield* DesktopEnvironment.DesktopEnvironment;
+        const fileSystem = yield* FileSystem.FileSystem;
+        const settings = yield* DesktopClientSettings.DesktopClientSettings;
+        yield* fileSystem.makeDirectory(environment.clientSettingsPath, { recursive: true });
+
+        const error = yield* settings.set(clientSettings).pipe(Effect.flip);
+        assert.instanceOf(error, DesktopClientSettings.DesktopClientSettingsWriteError);
+        assert.equal(error.operation, "replace-settings-file");
+        assert.equal(error.path, environment.clientSettingsPath);
+        assert.exists(error.cause);
+        assert.equal(
+          error.message,
+          `Desktop client settings write failed during replace-settings-file at ${environment.clientSettingsPath}.`,
         );
       }),
     ),

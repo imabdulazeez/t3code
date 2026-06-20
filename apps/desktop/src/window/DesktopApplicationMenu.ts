@@ -5,24 +5,22 @@ import * as Layer from "effect/Layer";
 
 import type * as Electron from "electron";
 
-import * as DesktopObservability from "../app/DesktopObservability.ts";
+import { makeComponentLogger } from "../app/DesktopObservability.ts";
 import * as ElectronApp from "../electron/ElectronApp.ts";
 import * as ElectronMenu from "../electron/ElectronMenu.ts";
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
 import * as DesktopWindow from "./DesktopWindow.ts";
 
-export interface DesktopApplicationMenuShape {
-  readonly configure: Effect.Effect<void>;
-}
-
 export class DesktopApplicationMenu extends Context.Service<
   DesktopApplicationMenu,
-  DesktopApplicationMenuShape
+  {
+    readonly configure: Effect.Effect<void>;
+  }
 >()("@t3tools/desktop/window/DesktopApplicationMenu") {}
 
 type DesktopApplicationMenuRuntimeServices = DesktopWindow.DesktopWindow;
 
-const { logError: logMenuError } = DesktopObservability.makeComponentLogger("desktop-menu");
+const { logError: logMenuError } = makeComponentLogger("desktop-menu");
 
 const dispatchMenuAction = Effect.fn("desktop.menu.dispatchMenuAction")(function* (
   action: string,
@@ -31,7 +29,7 @@ const dispatchMenuAction = Effect.fn("desktop.menu.dispatchMenuAction")(function
   yield* desktopWindow.dispatchMenuAction(action);
 });
 
-const make = Effect.gen(function* () {
+export const make = Effect.gen(function* () {
   const electronApp = yield* ElectronApp.ElectronApp;
   const electronMenu = yield* ElectronMenu.ElectronMenu;
   const environment = yield* DesktopEnvironment.DesktopEnvironment;

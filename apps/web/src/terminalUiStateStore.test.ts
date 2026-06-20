@@ -3,7 +3,7 @@ import {
   scopeThreadRef,
   terminalOwnerKey,
   threadTerminalOwnerRef,
-} from "@t3tools/client-runtime";
+} from "@t3tools/client-runtime/environment";
 import { ThreadId } from "@t3tools/contracts";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 
