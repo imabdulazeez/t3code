@@ -185,6 +185,9 @@ export function useSettingsRestore(onRestored?: () => void) {
       ...(settings.sidebarThreadPreviewCount !== DEFAULT_UNIFIED_SETTINGS.sidebarThreadPreviewCount
         ? ["Visible threads"]
         : []),
+      ...(settings.chatCodeBlockWordWrap !== DEFAULT_UNIFIED_SETTINGS.chatCodeBlockWordWrap
+        ? ["Wrap code blocks"]
+        : []),
       ...(settings.diffWordWrap !== DEFAULT_UNIFIED_SETTINGS.diffWordWrap
         ? ["Diff line wrapping"]
         : []),
@@ -250,6 +253,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       settings.prContentPromptInstructions,
       settings.autoOpenPlanSidebar,
       settings.changedFilesExpandedByDefault,
+      settings.chatCodeBlockWordWrap,
       settings.confirmThreadArchive,
       settings.confirmThreadDelete,
       settings.deleteRemoteBranchOnDelete,
@@ -281,6 +285,7 @@ export function useSettingsRestore(onRestored?: () => void) {
     setTheme("system");
     updateSettings({
       timestampFormat: DEFAULT_UNIFIED_SETTINGS.timestampFormat,
+      chatCodeBlockWordWrap: DEFAULT_UNIFIED_SETTINGS.chatCodeBlockWordWrap,
       diffWordWrap: DEFAULT_UNIFIED_SETTINGS.diffWordWrap,
       diffIgnoreWhitespace: DEFAULT_UNIFIED_SETTINGS.diffIgnoreWhitespace,
       sidebarThreadPreviewCount: DEFAULT_UNIFIED_SETTINGS.sidebarThreadPreviewCount,
@@ -546,6 +551,32 @@ export function GeneralSettingsPanel() {
               value={settings.terminalFontFamily}
               onValueChange={(next) => updateSettings({ terminalFontFamily: next })}
               className="w-full sm:w-64"
+            />
+          }
+        />
+
+        <SettingsRow
+          title="Wrap code blocks"
+          description="Wrap long lines in chat message code blocks by default."
+          resetAction={
+            settings.chatCodeBlockWordWrap !== DEFAULT_UNIFIED_SETTINGS.chatCodeBlockWordWrap ? (
+              <SettingResetButton
+                label="code block wrapping"
+                onClick={() =>
+                  updateSettings({
+                    chatCodeBlockWordWrap: DEFAULT_UNIFIED_SETTINGS.chatCodeBlockWordWrap,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <Switch
+              checked={settings.chatCodeBlockWordWrap}
+              onCheckedChange={(checked) =>
+                updateSettings({ chatCodeBlockWordWrap: Boolean(checked) })
+              }
+              aria-label="Wrap code blocks by default"
             />
           }
         />
