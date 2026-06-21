@@ -145,7 +145,7 @@ function handleClearAllToastsClick(
 }
 
 function CopyErrorButton({ text }: { text: string }) {
-  const { copyToClipboard, isCopied } = useCopyToClipboard();
+  const { copyToClipboard, isCopied } = useCopyToClipboard({ target: "error-message" });
   const label = isCopied ? "Copied error" : "Copy error";
 
   return (

@@ -55,6 +55,7 @@ export const ProposedPlanCard = memo(function ProposedPlanCard({
     reportFailure: false,
   });
   const { copyToClipboard, isCopied } = useCopyToClipboard({
+    target: "plan",
     onError: (error) => {
       toastManager.add(
         stackedThreadToast({

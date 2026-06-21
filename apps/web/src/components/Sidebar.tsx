@@ -56,6 +56,7 @@ import {
   scopeThreadRef,
   threadTerminalOwnerRef,
 } from "@t3tools/client-runtime/environment";
+import { safeErrorLogAttributes } from "@t3tools/client-runtime/errors";
 import {
   isAtomCommandInterrupted,
   settlePromise,
@@ -1539,7 +1540,7 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
                   console.error("Failed to remove project", {
                     projectId: member.id,
                     environmentId: member.environmentId,
-                    error,
+                    ...safeErrorLogAttributes(error),
                   });
                   toastManager.add(
                     stackedThreadToast({
@@ -1574,7 +1575,7 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
         console.error("Failed to remove project", {
           projectId: member.id,
           environmentId: member.environmentId,
-          error,
+          ...safeErrorLogAttributes(error),
         });
         toastManager.add(
           stackedThreadToast({
