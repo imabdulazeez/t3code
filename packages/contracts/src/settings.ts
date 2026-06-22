@@ -66,7 +66,7 @@ export const ClientSettingsSchema = Schema.Struct({
   changedFilesExpandedByDefault: Schema.Boolean.pipe(
     Schema.withDecodingDefault(Effect.succeed(false)),
   ),
-  chatCodeBlockWordWrap: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
+  chatWordWrap: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
   confirmThreadArchive: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   confirmThreadDelete: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
   deleteRemoteBranchOnDelete: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
@@ -605,7 +605,7 @@ export const ClientSettingsPatch = Schema.Struct({
   branchListSortDirection: Schema.optionalKey(BranchListSortDirection),
   branchRemoteSyncMode: Schema.optionalKey(BranchRemoteSyncMode),
   changedFilesExpandedByDefault: Schema.optionalKey(Schema.Boolean),
-  chatCodeBlockWordWrap: Schema.optionalKey(Schema.Boolean),
+  chatWordWrap: Schema.optionalKey(Schema.Boolean),
   confirmThreadArchive: Schema.optionalKey(Schema.Boolean),
   confirmThreadDelete: Schema.optionalKey(Schema.Boolean),
   deleteRemoteBranchOnDelete: Schema.optionalKey(Schema.Boolean),

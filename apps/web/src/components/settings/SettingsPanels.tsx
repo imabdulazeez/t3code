@@ -185,8 +185,8 @@ export function useSettingsRestore(onRestored?: () => void) {
       ...(settings.sidebarThreadPreviewCount !== DEFAULT_UNIFIED_SETTINGS.sidebarThreadPreviewCount
         ? ["Visible threads"]
         : []),
-      ...(settings.chatCodeBlockWordWrap !== DEFAULT_UNIFIED_SETTINGS.chatCodeBlockWordWrap
-        ? ["Wrap code blocks"]
+      ...(settings.chatWordWrap !== DEFAULT_UNIFIED_SETTINGS.chatWordWrap
+        ? ["Wrap code blocks and tables"]
         : []),
       ...(settings.diffWordWrap !== DEFAULT_UNIFIED_SETTINGS.diffWordWrap
         ? ["Diff line wrapping"]
@@ -253,7 +253,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       settings.prContentPromptInstructions,
       settings.autoOpenPlanSidebar,
       settings.changedFilesExpandedByDefault,
-      settings.chatCodeBlockWordWrap,
+      settings.chatWordWrap,
       settings.confirmThreadArchive,
       settings.confirmThreadDelete,
       settings.deleteRemoteBranchOnDelete,
@@ -285,7 +285,7 @@ export function useSettingsRestore(onRestored?: () => void) {
     setTheme("system");
     updateSettings({
       timestampFormat: DEFAULT_UNIFIED_SETTINGS.timestampFormat,
-      chatCodeBlockWordWrap: DEFAULT_UNIFIED_SETTINGS.chatCodeBlockWordWrap,
+      chatWordWrap: DEFAULT_UNIFIED_SETTINGS.chatWordWrap,
       diffWordWrap: DEFAULT_UNIFIED_SETTINGS.diffWordWrap,
       diffIgnoreWhitespace: DEFAULT_UNIFIED_SETTINGS.diffIgnoreWhitespace,
       sidebarThreadPreviewCount: DEFAULT_UNIFIED_SETTINGS.sidebarThreadPreviewCount,
@@ -556,15 +556,15 @@ export function GeneralSettingsPanel() {
         />
 
         <SettingsRow
-          title="Wrap code blocks"
-          description="Wrap long lines in chat message code blocks by default."
+          title="Wrap code blocks and tables"
+          description="Wrap long lines in chat code blocks and table cells by default."
           resetAction={
-            settings.chatCodeBlockWordWrap !== DEFAULT_UNIFIED_SETTINGS.chatCodeBlockWordWrap ? (
+            settings.chatWordWrap !== DEFAULT_UNIFIED_SETTINGS.chatWordWrap ? (
               <SettingResetButton
-                label="code block wrapping"
+                label="code block and table wrapping"
                 onClick={() =>
                   updateSettings({
-                    chatCodeBlockWordWrap: DEFAULT_UNIFIED_SETTINGS.chatCodeBlockWordWrap,
+                    chatWordWrap: DEFAULT_UNIFIED_SETTINGS.chatWordWrap,
                   })
                 }
               />
@@ -572,11 +572,9 @@ export function GeneralSettingsPanel() {
           }
           control={
             <Switch
-              checked={settings.chatCodeBlockWordWrap}
-              onCheckedChange={(checked) =>
-                updateSettings({ chatCodeBlockWordWrap: Boolean(checked) })
-              }
-              aria-label="Wrap code blocks by default"
+              checked={settings.chatWordWrap}
+              onCheckedChange={(checked) => updateSettings({ chatWordWrap: Boolean(checked) })}
+              aria-label="Wrap code blocks and tables by default"
             />
           }
         />

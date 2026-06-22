@@ -19,7 +19,7 @@ const clientSettings: ClientSettings = {
   branchListSortDirection: "desc",
   branchRemoteSyncMode: "fetch",
   changedFilesExpandedByDefault: false,
-  chatCodeBlockWordWrap: true,
+  chatWordWrap: true,
   confirmThreadArchive: true,
   confirmThreadDelete: false,
   diffFontFamily: "",
