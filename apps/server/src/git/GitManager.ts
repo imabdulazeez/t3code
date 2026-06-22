@@ -1131,7 +1131,13 @@ export const make = Effect.gen(function* () {
       .resolveBaseBranchForNoUpstream(cwd, branch)
       .pipe(Effect.orElseSucceed(() => null));
     if (localFallback) {
-      return localFallback;
+      const primaryRemoteName = yield* gitCore
+        .resolvePrimaryRemoteName(cwd)
+        .pipe(Effect.orElseSucceed(() => null));
+      return extractBranchNameFromRemoteRef(
+        localFallback,
+        primaryRemoteName ? { remoteName: primaryRemoteName } : {},
+      );
     }
 
     return "main";

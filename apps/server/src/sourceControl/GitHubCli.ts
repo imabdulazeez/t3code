@@ -446,11 +446,11 @@ export const make = Effect.gen(function* () {
         args: [
           "repo",
           "view",
+          ...(input.repository ? [input.repository] : []),
           "--json",
           "defaultBranchRef",
           "--jq",
           ".defaultBranchRef.name",
-          ...(input.repository ? ["--repo", input.repository] : []),
         ],
       }).pipe(
         Effect.map((value) => {
