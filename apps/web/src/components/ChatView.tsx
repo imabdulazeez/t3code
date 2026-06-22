@@ -1370,6 +1370,14 @@ function ChatViewContent(props: ChatViewProps) {
     [activeThreadRef],
   );
   const activeThreadKey = activeThreadRef ? scopedThreadKey(activeThreadRef) : null;
+  const activeProjectTerminalOpen = useTerminalUiStateStore((state) =>
+    activeThread
+      ? selectThreadTerminalUiState(
+          state.terminalUiStateByOwnerKey,
+          projectTerminalOwnerRef(activeThread.environmentId, activeThread.projectId),
+        ).terminalOpen
+      : false,
+  );
   const activeRightPanelKind = useRightPanelStore((state) =>
     selectActiveRightPanel(state.byThreadKey, activeThreadRef),
   );
@@ -1442,7 +1450,9 @@ function ChatViewContent(props: ChatViewProps) {
         currentThreadIds,
         openThreadIds: existingOpenTerminalThreadKeys,
         activeThreadId: activeThreadKey,
-        activeThreadTerminalOpen: Boolean(activeThreadKey && terminalUiState.terminalOpen),
+        activeThreadTerminalOpen: Boolean(
+          activeThreadKey && (terminalUiState.terminalOpen || activeProjectTerminalOpen),
+        ),
         maxHiddenThreadCount: MAX_HIDDEN_MOUNTED_TERMINAL_THREADS,
       });
       return currentThreadIds.length === nextThreadIds.length &&
@@ -1450,7 +1460,12 @@ function ChatViewContent(props: ChatViewProps) {
         ? currentThreadIds
         : nextThreadIds;
     });
-  }, [activeThreadKey, existingOpenTerminalThreadKeys, terminalUiState.terminalOpen]);
+  }, [
+    activeThreadKey,
+    activeProjectTerminalOpen,
+    existingOpenTerminalThreadKeys,
+    terminalUiState.terminalOpen,
+  ]);
   const latestTurnSettled = isLatestTurnSettled(activeLatestTurn, activeThread?.session ?? null);
   const activeProjectRef = activeThread
     ? scopeProjectRef(activeThread.environmentId, activeThread.projectId)
