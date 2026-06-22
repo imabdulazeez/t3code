@@ -19,11 +19,10 @@ const clientSettings: ClientSettings = {
   branchListSortDirection: "desc",
   branchRemoteSyncMode: "fetch",
   changedFilesExpandedByDefault: false,
-  wordWrap: true,
   confirmThreadArchive: true,
   confirmThreadDelete: false,
-  diffFontFamily: "",
   deleteRemoteBranchOnDelete: true,
+  diffFontFamily: "",
   diffIgnoreWhitespace: true,
   dismissedProviderUpdateNotificationKeys: [],
   favorites: [],
@@ -37,6 +36,7 @@ const clientSettings: ClientSettings = {
   sidebarThreadPreviewCount: 6,
   terminalFontFamily: "",
   timestampFormat: "24-hour",
+  wordWrap: true,
 };
 
 const decodeClientSettingsJson = Schema.decodeEffect(Schema.fromJsonString(ClientSettingsSchema));
