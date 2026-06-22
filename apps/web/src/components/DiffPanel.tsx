@@ -207,7 +207,7 @@ export default function DiffPanel({ mode = "inline", composerDraftTarget }: Diff
     ? ({ "--diff-font-family": diffFontFamilyValue } as CSSProperties)
     : undefined;
   const [diffRenderMode, setDiffRenderMode] = useState<DiffRenderMode>("stacked");
-  const [diffWordWrap, setDiffWordWrap] = useState(settings.diffWordWrap);
+  const [wordWrap, setWordWrap] = useState(settings.wordWrap);
   const [diffIgnoreWhitespace, setDiffIgnoreWhitespace] = useState(settings.diffIgnoreWhitespace);
   const [baseRefQuery, setBaseRefQuery] = useState("");
   const [fileSearchQuery, setFileSearchQuery] = useState("");
@@ -798,14 +798,12 @@ export default function DiffPanel({ mode = "inline", composerDraftTarget }: Diff
           <TooltipTrigger
             render={
               <Toggle
-                aria-label={
-                  diffWordWrap ? "Disable diff line wrapping" : "Enable diff line wrapping"
-                }
+                aria-label={wordWrap ? "Disable diff line wrapping" : "Enable diff line wrapping"}
                 variant="outline"
                 size="xs"
-                pressed={diffWordWrap}
+                pressed={wordWrap}
                 onPressedChange={(pressed) => {
-                  setDiffWordWrap(Boolean(pressed));
+                  setWordWrap(Boolean(pressed));
                 }}
               />
             }
@@ -813,7 +811,7 @@ export default function DiffPanel({ mode = "inline", composerDraftTarget }: Diff
             <TextWrapIcon className="size-3" />
           </TooltipTrigger>
           <TooltipPopup side="top">
-            {diffWordWrap ? "Disable line wrapping" : "Enable line wrapping"}
+            {wordWrap ? "Disable line wrapping" : "Enable line wrapping"}
           </TooltipPopup>
         </Tooltip>
         <Tooltip>
@@ -948,7 +946,7 @@ export default function DiffPanel({ mode = "inline", composerDraftTarget }: Diff
                   options={{
                     diffStyle: diffRenderMode === "split" ? "split" : "unified",
                     lineDiffType: "none",
-                    overflow: diffWordWrap ? "wrap" : "scroll",
+                    overflow: wordWrap ? "wrap" : "scroll",
                     theme: resolveDiffThemeName(resolvedTheme),
                     themeType: resolvedTheme as DiffThemeType,
                     unsafeCSS: diffPanelUnsafeCss,
@@ -964,7 +962,7 @@ export default function DiffPanel({ mode = "inline", composerDraftTarget }: Diff
                   <pre
                     className={cn(
                       "max-h-[72vh] rounded-md border border-border/70 bg-background/70 p-3 font-mono text-[11px] leading-relaxed text-muted-foreground/90",
-                      diffWordWrap
+                      wordWrap
                         ? "overflow-auto whitespace-pre-wrap wrap-break-word"
                         : "overflow-auto",
                     )}

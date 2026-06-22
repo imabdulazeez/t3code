@@ -185,12 +185,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       ...(settings.sidebarThreadPreviewCount !== DEFAULT_UNIFIED_SETTINGS.sidebarThreadPreviewCount
         ? ["Visible threads"]
         : []),
-      ...(settings.chatWordWrap !== DEFAULT_UNIFIED_SETTINGS.chatWordWrap
-        ? ["Wrap code blocks and tables"]
-        : []),
-      ...(settings.diffWordWrap !== DEFAULT_UNIFIED_SETTINGS.diffWordWrap
-        ? ["Diff line wrapping"]
-        : []),
+      ...(settings.wordWrap !== DEFAULT_UNIFIED_SETTINGS.wordWrap ? ["Word wrap"] : []),
       ...(settings.diffIgnoreWhitespace !== DEFAULT_UNIFIED_SETTINGS.diffIgnoreWhitespace
         ? ["Diff whitespace changes"]
         : []),
@@ -253,7 +248,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       settings.prContentPromptInstructions,
       settings.autoOpenPlanSidebar,
       settings.changedFilesExpandedByDefault,
-      settings.chatWordWrap,
+      settings.wordWrap,
       settings.confirmThreadArchive,
       settings.confirmThreadDelete,
       settings.deleteRemoteBranchOnDelete,
@@ -263,7 +258,6 @@ export function useSettingsRestore(onRestored?: () => void) {
       settings.diffFontFamily,
       settings.terminalFontFamily,
       settings.diffIgnoreWhitespace,
-      settings.diffWordWrap,
       settings.automaticGitFetchInterval,
       settings.enableAssistantStreaming,
       settings.sidebarThreadPreviewCount,
@@ -285,8 +279,7 @@ export function useSettingsRestore(onRestored?: () => void) {
     setTheme("system");
     updateSettings({
       timestampFormat: DEFAULT_UNIFIED_SETTINGS.timestampFormat,
-      chatWordWrap: DEFAULT_UNIFIED_SETTINGS.chatWordWrap,
-      diffWordWrap: DEFAULT_UNIFIED_SETTINGS.diffWordWrap,
+      wordWrap: DEFAULT_UNIFIED_SETTINGS.wordWrap,
       diffIgnoreWhitespace: DEFAULT_UNIFIED_SETTINGS.diffIgnoreWhitespace,
       sidebarThreadPreviewCount: DEFAULT_UNIFIED_SETTINGS.sidebarThreadPreviewCount,
       autoOpenPlanSidebar: DEFAULT_UNIFIED_SETTINGS.autoOpenPlanSidebar,
@@ -556,15 +549,15 @@ export function GeneralSettingsPanel() {
         />
 
         <SettingsRow
-          title="Wrap code blocks and tables"
-          description="Wrap long lines in chat code blocks and table cells by default."
+          title="Word wrap"
+          description="Wrap long lines in code blocks, tables, diffs, and file previews by default."
           resetAction={
-            settings.chatWordWrap !== DEFAULT_UNIFIED_SETTINGS.chatWordWrap ? (
+            settings.wordWrap !== DEFAULT_UNIFIED_SETTINGS.wordWrap ? (
               <SettingResetButton
-                label="code block and table wrapping"
+                label="word wrapping"
                 onClick={() =>
                   updateSettings({
-                    chatWordWrap: DEFAULT_UNIFIED_SETTINGS.chatWordWrap,
+                    wordWrap: DEFAULT_UNIFIED_SETTINGS.wordWrap,
                   })
                 }
               />
@@ -572,33 +565,9 @@ export function GeneralSettingsPanel() {
           }
           control={
             <Switch
-              checked={settings.chatWordWrap}
-              onCheckedChange={(checked) => updateSettings({ chatWordWrap: Boolean(checked) })}
-              aria-label="Wrap code blocks and tables by default"
-            />
-          }
-        />
-
-        <SettingsRow
-          title="Diff line wrapping"
-          description="Set the default wrap state when the diff panel opens."
-          resetAction={
-            settings.diffWordWrap !== DEFAULT_UNIFIED_SETTINGS.diffWordWrap ? (
-              <SettingResetButton
-                label="diff line wrapping"
-                onClick={() =>
-                  updateSettings({
-                    diffWordWrap: DEFAULT_UNIFIED_SETTINGS.diffWordWrap,
-                  })
-                }
-              />
-            ) : null
-          }
-          control={
-            <Switch
-              checked={settings.diffWordWrap}
-              onCheckedChange={(checked) => updateSettings({ diffWordWrap: Boolean(checked) })}
-              aria-label="Wrap diff lines by default"
+              checked={settings.wordWrap}
+              onCheckedChange={(checked) => updateSettings({ wordWrap: Boolean(checked) })}
+              aria-label="Wrap code, tables, diffs, and file previews by default"
             />
           }
         />
