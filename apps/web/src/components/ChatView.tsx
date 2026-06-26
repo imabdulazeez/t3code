@@ -234,6 +234,7 @@ import {
   MAX_HIDDEN_MOUNTED_TERMINAL_THREADS,
   buildExpiredTerminalContextToastCopy,
   buildLocalDraftThread,
+  buildThreadTurnInterruptInput,
   collectUserMessageBlobPreviewUrls,
   createLocalDispatchSnapshot,
   deriveComposerSendState,
@@ -4214,9 +4215,7 @@ function ChatViewContent(props: ChatViewProps) {
     if (!activeThread) return;
     const result = await interruptThreadTurn({
       environmentId,
-      input: {
-        threadId: activeThread.id,
-      },
+      input: buildThreadTurnInterruptInput(activeThread),
     });
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
       const error = squashAtomCommandFailure(result);
@@ -5257,6 +5256,11 @@ function ChatViewContent(props: ChatViewProps) {
                   listRef={legendListRef}
                   timelineEntries={timelineEntries}
                   latestTurn={activeLatestTurn}
+                  runningTurnId={
+                    activeThread.session?.status === "running"
+                      ? activeThread.session.activeTurnId
+                      : null
+                  }
                   turnDiffSummaryByAssistantMessageId={turnDiffSummaryByAssistantMessageId}
                   activeThreadEnvironmentId={activeThread.environmentId}
                   routeThreadKey={routeThreadKey}
