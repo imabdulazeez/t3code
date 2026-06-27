@@ -1189,17 +1189,18 @@ export const make = Effect.gen(function* () {
         };
       }
 
-      const { commitMessagePromptInstructions } = yield* serverSettingsService.getSettings.pipe(
-        Effect.mapError(
-          (cause) =>
-            new GitManagerError({
-              operation: "resolveCommitAndBranchSuggestion",
-              cwd: input.cwd,
-              detail: "Failed to get server settings.",
-              cause,
-            }),
-        ),
-      );
+      const { commitMessagePromptInstructions, branchNamePromptInstructions } =
+        yield* serverSettingsService.getSettings.pipe(
+          Effect.mapError(
+            (cause) =>
+              new GitManagerError({
+                operation: "resolveCommitAndBranchSuggestion",
+                cwd: input.cwd,
+                detail: "Failed to get server settings.",
+                cause,
+              }),
+          ),
+        );
 
       const generated = yield* textGeneration
         .generateCommitMessage({
@@ -1211,6 +1212,9 @@ export const make = Effect.gen(function* () {
           modelSelection: input.modelSelection,
           ...(commitMessagePromptInstructions.length > 0
             ? { instructionsOverride: commitMessagePromptInstructions }
+            : {}),
+          ...(input.includeBranch && branchNamePromptInstructions.length > 0
+            ? { branchInstructionsOverride: branchNamePromptInstructions }
             : {}),
         })
         .pipe(Effect.map((result) => sanitizeCommitMessage(result)));

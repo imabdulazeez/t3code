@@ -20,6 +20,8 @@ export interface CommitMessageGenerationInput {
   modelSelection: ModelSelection;
   /** Custom prompt instructions to replace the built-in ones. */
   instructionsOverride?: string | undefined;
+  /** Custom branch-name instructions, applied only when `includeBranch` is set. */
+  branchInstructionsOverride?: string | undefined;
 }
 
 export interface CommitMessageGenerationResult {

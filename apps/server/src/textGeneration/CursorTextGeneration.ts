@@ -172,6 +172,9 @@ export const makeCursorTextGeneration = Effect.fn("makeCursorTextGeneration")(fu
         stagedPatch: input.stagedPatch,
         includeBranch: input.includeBranch === true,
         ...(input.instructionsOverride ? { instructionsOverride: input.instructionsOverride } : {}),
+        ...(input.branchInstructionsOverride
+          ? { branchInstructionsOverride: input.branchInstructionsOverride }
+          : {}),
       });
 
       const generated = yield* runCursorJson({

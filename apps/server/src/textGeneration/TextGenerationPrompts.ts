@@ -45,10 +45,12 @@ export interface CommitMessagePromptInput {
   includeBranch: boolean;
   policy?: TextGenerationPolicy | undefined;
   instructionsOverride?: string | undefined;
+  branchInstructionsOverride?: string | undefined;
 }
 
 export function buildCommitMessagePrompt(input: CommitMessagePromptInput) {
   const wantsBranch = input.includeBranch;
+  const branchOverride = wantsBranch ? input.branchInstructionsOverride?.trim() : undefined;
 
   const instructions = [
     "You write concise git commit messages.",
@@ -59,9 +61,16 @@ export function buildCommitMessagePrompt(input: CommitMessagePromptInput) {
   ];
 
   const requiredInstructions = wantsBranch
-    ? [
-        "- branch must be a short semantic git branch fragment for this change; never reuse the current branch name or a remote ref like origin/<branch>",
-      ]
+    ? branchOverride
+      ? [
+          "",
+          "Branch name instructions:",
+          limitSection(branchOverride, 4_000),
+          "- the branch must never reuse the current branch name or a remote ref like origin/<branch>",
+        ]
+      : [
+          "- branch must be a short semantic git branch fragment for this change; never reuse the current branch name or a remote ref like origin/<branch>",
+        ]
     : [];
 
   const contractLine = wantsBranch
