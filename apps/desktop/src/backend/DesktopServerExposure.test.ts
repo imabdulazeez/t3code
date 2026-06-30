@@ -253,6 +253,11 @@ describe("DesktopServerExposure", () => {
       load: Effect.succeed(DesktopAppSettings.DEFAULT_DESKTOP_SETTINGS),
       setServerExposureMode: () => Effect.fail(settingsFailure),
       setTailscaleServe: () => Effect.fail(settingsFailure),
+      setWslBackendEnabled: () => Effect.die("unexpected WSL backend toggle"),
+      setWslDistro: () => Effect.die("unexpected WSL distro change"),
+      setWslOnly: () => Effect.die("unexpected WSL-only toggle"),
+      applyWslWindowsFallback: Effect.die("unexpected WSL Windows fallback"),
+      applyWslWindowsFallbackInMemory: Effect.die("unexpected WSL Windows fallback"),
     } satisfies DesktopAppSettings.DesktopAppSettings["Service"]);
 
     return withHarness(
