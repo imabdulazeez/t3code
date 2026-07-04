@@ -79,7 +79,7 @@ import { isElectron } from "../env";
 import { APP_STAGE_LABEL } from "../branding";
 import { useOpenPrLink } from "../lib/openPullRequestLink";
 import { isTerminalFocused } from "../lib/terminalFocus";
-import { isMacPlatform } from "../lib/utils";
+import { fileManagerLabel, isMacPlatform } from "../lib/utils";
 import {
   readThreadShell,
   useProject,
@@ -200,7 +200,12 @@ import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
 import { useIsMobile } from "~/hooks/useMediaQuery";
 import { CommandDialogTrigger } from "./ui/command";
 import { useClientSettings, useUpdateClientSettings } from "~/hooks/useSettings";
-import { primaryServerConfigAtom, primaryServerKeybindingsAtom } from "../state/server";
+import {
+  primaryServerAvailableEditorsAtom,
+  primaryServerConfigAtom,
+  primaryServerKeybindingsAtom,
+} from "../state/server";
+import { shellEnvironment } from "../state/shell";
 import {
   derivePhysicalProjectKey,
   deriveProjectGroupingOverrideKey,
@@ -1137,6 +1142,9 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
   const updateThreadMetadata = useAtomCommand(threadEnvironment.updateMetadata, {
     reportFailure: false,
   });
+  const primaryEnvironmentId = usePrimaryEnvironmentId();
+  const availableEditors = useAtomValue(primaryServerAvailableEditorsAtom);
+  const openInEditor = useAtomCommand(shellEnvironment.openInEditor, "show in file manager");
   const updateSettings = useUpdateClientSettings();
   const sidebarThreadPreviewCount = useClientSettings<SidebarThreadPreviewCount>(
     (settings) => settings.sidebarThreadPreviewCount,
@@ -1614,7 +1622,7 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
 
         const actionHandlers = new Map<string, () => Promise<void> | void>();
         const makeLeaf = (
-          action: "rename" | "grouping" | "copy-path" | "delete",
+          action: "rename" | "grouping" | "copy-path" | "show-in-file-manager" | "delete",
           member: SidebarProjectGroupMember,
           options?: {
             destructive?: boolean;
@@ -1633,6 +1641,12 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
               case "copy-path":
                 copyPathToClipboard(member.workspaceRoot, { path: member.workspaceRoot });
                 return;
+              case "show-in-file-manager":
+                void openInEditor({
+                  environmentId: member.environmentId,
+                  input: { cwd: member.workspaceRoot, editor: "file-manager" },
+                });
+                return;
               case "delete":
                 return handleRemoveProject(member);
             }
@@ -1647,7 +1661,7 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
         };
 
         const buildTargetedItem = (
-          action: "rename" | "grouping" | "copy-path" | "delete",
+          action: "rename" | "grouping" | "copy-path" | "show-in-file-manager" | "delete",
           label: string,
           options?: {
             destructive?: boolean;
@@ -1684,6 +1698,19 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
             buildTargetedItem("rename", "Rename"),
             buildTargetedItem("grouping", "Group into..."),
             buildTargetedItem("copy-path", "Copy Path"),
+            ...(availableEditors.includes("file-manager")
+              ? [
+                  buildTargetedItem(
+                    "show-in-file-manager",
+                    `Show in ${fileManagerLabel(navigator.platform)}`,
+                    {
+                      isDisabled: (member) =>
+                        primaryEnvironmentId === null ||
+                        member.environmentId !== primaryEnvironmentId,
+                    },
+                  ),
+                ]
+              : []),
             buildTargetedItem("delete", "Remove", {
               destructive: true,
             }),
@@ -1702,10 +1729,13 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
       })();
     },
     [
+      availableEditors,
       copyPathToClipboard,
       handleRemoveProject,
+      openInEditor,
       openProjectGroupingDialog,
       openProjectRenameDialog,
+      primaryEnvironmentId,
       project.groupedProjectCount,
       project.memberProjects,
       suppressProjectClickForContextMenuRef,
