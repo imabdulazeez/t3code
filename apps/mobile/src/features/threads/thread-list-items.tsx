@@ -6,8 +6,9 @@ import type {
 import type { MenuAction } from "@react-native-menu/menu";
 import { SymbolView } from "expo-symbols";
 import { memo, useCallback, useMemo, type ComponentProps } from "react";
-import { Pressable, useWindowDimensions, View } from "react-native";
+import { Pressable, useColorScheme, useWindowDimensions, View } from "react-native";
 import type { SwipeableMethods } from "react-native-gesture-handler/ReanimatedSwipeable";
+import Svg, { Circle, Path } from "react-native-svg";
 
 import { AppText as Text } from "../../components/AppText";
 import { ControlPillMenu } from "../../components/ControlPill";
@@ -16,7 +17,7 @@ import { cn } from "../../lib/cn";
 import { relativeTime } from "../../lib/time";
 import { useThemeColor } from "../../lib/useThemeColor";
 import type { PendingNewTask } from "../../state/use-pending-new-tasks";
-import { useThreadPr } from "../../state/use-thread-pr";
+import { useThreadPr, type ThreadPr } from "../../state/use-thread-pr";
 import type { HomeGroupDisplayAction } from "../home/homeListItems";
 import { ThreadSwipeable } from "../home/thread-swipe-actions";
 import { resolveThreadStatus } from "./threadPresentation";
@@ -32,6 +33,41 @@ export type ThreadListVariant = "compact" | "sidebar";
 /** Left inset that aligns compact secondary rows with the title column. */
 export const THREAD_LIST_COMPACT_INSET = 20;
 const SIDEBAR_ROW_RADIUS = 12;
+
+function pullRequestTintColor(
+  state: ThreadPr["state"],
+  colorScheme: ReturnType<typeof useColorScheme>,
+) {
+  const dark = colorScheme === "dark";
+  switch (state) {
+    case "open":
+      return dark ? "#34d399" : "#059669";
+    case "merged":
+      return dark ? "#a78bfa" : "#7c3aed";
+    case "closed":
+      return dark ? "#a1a1aa" : "#71717a";
+  }
+}
+
+function PullRequestIcon(props: { readonly size: number; readonly color: string }) {
+  return (
+    <Svg
+      width={props.size}
+      height={props.size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={props.color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <Circle cx={18} cy={18} r={3} />
+      <Circle cx={6} cy={6} r={3} />
+      <Path d="M13 6h3a2 2 0 0 1 2 2v7" />
+      <Path d="M6 9v12" />
+    </Svg>
+  );
+}
 
 /* ─── Project group header ───────────────────────────────────────────── */
 
@@ -394,6 +430,7 @@ export const ThreadListRow = memo(function ThreadListRow(props: {
   >["simultaneousWithExternalGesture"];
 }) {
   const { width: windowWidth } = useWindowDimensions();
+  const colorScheme = useColorScheme();
   const compact = props.variant === "compact";
   const selected = props.selected === true;
   // Recycling-safe: resets when the list container is reused for another
@@ -404,10 +441,8 @@ export const ThreadListRow = memo(function ThreadListRow(props: {
   const iconSubtleColor = useThemeColor("--color-icon-subtle");
   const screenColor = useThemeColor("--color-screen");
   const drawerColor = useThemeColor("--color-drawer");
-  const mutedColor = useThemeColor("--color-foreground-muted");
   const pressedBackgroundColor = useThemeColor("--color-subtle");
   const selectedBackgroundColor = useThemeColor("--color-user-bubble");
-  const selectedMutedColor = useThemeColor("--color-user-bubble-foreground-muted");
 
   const { thread, onSelectThread, onArchiveThread, onDeleteThread } = props;
   const status = resolveThreadStatus(thread);
@@ -415,12 +450,12 @@ export const ThreadListRow = memo(function ThreadListRow(props: {
   const timestamp = relativeTime(
     thread.latestUserMessageAt ?? thread.updatedAt ?? thread.createdAt,
   );
+  const threadAccessibilityLabel = pr ? `${thread.title}, ${pr.accessibilityLabel}` : thread.title;
   const subtitleParts = [props.environmentLabel, thread.branch].filter((part): part is string =>
     Boolean(part),
   );
 
   const backgroundColor = compact ? screenColor : drawerColor;
-  const effectiveMuted = selected ? selectedMutedColor : mutedColor;
   const effectivePressedBackground = selected ? "rgba(255,255,255,0.16)" : pressedBackgroundColor;
   const effectiveStatus =
     selected && status
@@ -459,12 +494,6 @@ export const ThreadListRow = memo(function ThreadListRow(props: {
       <View className="mt-px flex-row items-center gap-1.5">
         {subtitleParts.length > 0 ? (
           <>
-            <SymbolView
-              name="arrow.triangle.branch"
-              size={10}
-              tintColor={compact ? iconSubtleColor : effectiveMuted}
-              type="monochrome"
-            />
             <Text
               className={cn(
                 "shrink",
@@ -479,13 +508,19 @@ export const ThreadListRow = memo(function ThreadListRow(props: {
           </>
         ) : null}
         {pr !== null ? (
-          <Text
-            className={`${compact ? "text-sm" : "text-xs"} font-t3-medium ${
-              selected ? "text-white" : pr.textClassName
-            }`}
-          >
-            {pr.label}
-          </Text>
+          <View className="flex-row items-center gap-0.5">
+            <PullRequestIcon
+              size={compact ? 13 : 11}
+              color={selected ? "#ffffff" : pullRequestTintColor(pr.state, colorScheme)}
+            />
+            <Text
+              className={`${compact ? "text-sm" : "text-xs"} font-t3-medium ${
+                selected ? "text-white" : pr.textClassName
+              }`}
+            >
+              {pr.label}
+            </Text>
+          </View>
         ) : null}
       </View>
     ) : null;
@@ -494,7 +529,7 @@ export const ThreadListRow = memo(function ThreadListRow(props: {
     compact ? (
       <Pressable
         accessibilityHint="Swipe left for archive and delete actions"
-        accessibilityLabel={thread.title}
+        accessibilityLabel={threadAccessibilityLabel}
         accessibilityRole="button"
         className="bg-screen"
         onPress={() => {
@@ -540,7 +575,7 @@ export const ThreadListRow = memo(function ThreadListRow(props: {
     ) : (
       <Pressable
         accessibilityHint="Opens the thread"
-        accessibilityLabel={thread.title}
+        accessibilityLabel={threadAccessibilityLabel}
         accessibilityRole="button"
         accessibilityState={{ selected }}
         onHoverIn={() => setHovered(true)}
