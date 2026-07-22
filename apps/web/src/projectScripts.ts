@@ -1,4 +1,5 @@
 import {
+  DEFAULT_PROJECT_SCRIPT_SCOPE,
   MAX_SCRIPT_ID_LENGTH,
   SCRIPT_RUN_COMMAND_PATTERN,
   type KeybindingCommand,
@@ -6,6 +7,32 @@ import {
 } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
 const isScriptRunCommand = Schema.is(SCRIPT_RUN_COMMAND_PATTERN);
+
+export interface ProjectScriptInput {
+  readonly name: ProjectScript["name"];
+  readonly command: ProjectScript["command"];
+  readonly icon: ProjectScript["icon"];
+  readonly runOnWorktreeCreate: ProjectScript["runOnWorktreeCreate"];
+  readonly previewUrl: Exclude<ProjectScript["previewUrl"], undefined> | null;
+  readonly autoOpenPreview: boolean;
+}
+
+export function buildProjectScript(id: string, input: ProjectScriptInput): ProjectScript {
+  return {
+    id,
+    name: input.name,
+    command: input.command,
+    icon: input.icon,
+    runOnWorktreeCreate: input.runOnWorktreeCreate,
+    defaultScope: DEFAULT_PROJECT_SCRIPT_SCOPE,
+    ...(input.previewUrl === null
+      ? {}
+      : {
+          previewUrl: input.previewUrl,
+          autoOpenPreview: input.autoOpenPreview,
+        }),
+  };
+}
 
 function normalizeScriptId(value: string): string {
   const cleaned = value

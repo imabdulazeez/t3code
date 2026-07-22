@@ -251,6 +251,7 @@ describe("DesktopServerExposure", () => {
     const settingsLayer = Layer.succeed(DesktopAppSettings.DesktopAppSettings, {
       get: Effect.succeed(DesktopAppSettings.DEFAULT_DESKTOP_SETTINGS),
       load: Effect.succeed(DesktopAppSettings.DEFAULT_DESKTOP_SETTINGS),
+      setMainWindowBounds: () => Effect.die("unexpected main window bounds update"),
       setServerExposureMode: () => Effect.fail(settingsFailure),
       setTailscaleServe: () => Effect.fail(settingsFailure),
       setWslBackendEnabled: () => Effect.die("unexpected WSL backend toggle"),

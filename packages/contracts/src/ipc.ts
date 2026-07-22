@@ -924,6 +924,8 @@ export interface DesktopBridge {
   ) => Promise<T | null>;
   openExternal: (url: string) => Promise<boolean>;
   onMenuAction: (listener: (action: string) => void) => () => void;
+  getWindowFullscreenState: () => boolean;
+  onWindowFullscreenStateChange: (listener: (fullscreen: boolean) => void) => () => void;
   /**
    * Desktop-only preview surface. Present iff the renderer is hosted by the
    * Electron desktop build; web builds have `preview === undefined`.
