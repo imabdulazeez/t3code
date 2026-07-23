@@ -1,6 +1,7 @@
 import { ArchiveIcon, ArchiveX, LoaderIcon, PlusIcon, RefreshCwIcon } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import type React from "react";
+import type { CSSProperties } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAtomValue } from "@effect/atom-react";
 import {
@@ -23,6 +24,8 @@ import {
   DEFAULT_COMMIT_MESSAGE_PROMPT_INSTRUCTIONS,
   DEFAULT_PR_CONTENT_PROMPT_INSTRUCTIONS,
   DEFAULT_UNIFIED_SETTINGS,
+  MAX_GLASS_OPACITY,
+  MIN_GLASS_OPACITY,
 } from "@t3tools/contracts/settings";
 import { createModelSelection } from "@t3tools/shared/model";
 import * as Arr from "effect/Array";
@@ -183,6 +186,7 @@ export function useSettingsRestore(onRestored?: () => void) {
   const changedSettingLabels = useMemo(
     () => [
       ...(theme !== "system" ? ["Theme"] : []),
+      ...(settings.glassOpacity !== DEFAULT_UNIFIED_SETTINGS.glassOpacity ? ["Glass opacity"] : []),
       ...(settings.timestampFormat !== DEFAULT_UNIFIED_SETTINGS.timestampFormat
         ? ["Time format"]
         : []),
@@ -266,6 +270,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       settings.diffFontFamily,
       settings.terminalFontFamily,
       settings.diffIgnoreWhitespace,
+      settings.glassOpacity,
       settings.automaticGitFetchInterval,
       settings.enableAssistantStreaming,
       settings.enableProviderUpdateChecks,
@@ -290,6 +295,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       timestampFormat: DEFAULT_UNIFIED_SETTINGS.timestampFormat,
       wordWrap: DEFAULT_UNIFIED_SETTINGS.wordWrap,
       diffIgnoreWhitespace: DEFAULT_UNIFIED_SETTINGS.diffIgnoreWhitespace,
+      glassOpacity: DEFAULT_UNIFIED_SETTINGS.glassOpacity,
       sidebarThreadPreviewCount: DEFAULT_UNIFIED_SETTINGS.sidebarThreadPreviewCount,
       autoOpenPlanSidebar: DEFAULT_UNIFIED_SETTINGS.autoOpenPlanSidebar,
       changedFilesExpandedByDefault: DEFAULT_UNIFIED_SETTINGS.changedFilesExpandedByDefault,
@@ -403,6 +409,12 @@ export function GeneralSettingsPanel() {
   const updateSettings = useUpdatePrimarySettings();
   const observability = useAtomValue(primaryServerObservabilityAtom);
   const serverProviders = useAtomValue(primaryServerProvidersAtom);
+  const glassOpacityRatio =
+    (settings.glassOpacity - MIN_GLASS_OPACITY) / (MAX_GLASS_OPACITY - MIN_GLASS_OPACITY);
+  const glassOpacitySliderStyle = {
+    "--glass-slider-progress": `${glassOpacityRatio * 100}%`,
+    "--glass-slider-fill-offset": `${0.5 - glassOpacityRatio}rem`,
+  } as CSSProperties;
   const diagnosticsDescription = formatDiagnosticsDescription({
     localTracingEnabled: observability?.localTracingEnabled ?? false,
     otlpTracesEnabled: observability?.otlpTracesEnabled ?? false,
@@ -467,6 +479,52 @@ export function GeneralSettingsPanel() {
                 ))}
               </SelectPopup>
             </Select>
+          }
+        />
+
+        <SettingsRow
+          title="Glass opacity"
+          description="Control how transparent glass surfaces are. Higher values make menus, dialogs, and the composer more solid."
+          resetAction={
+            settings.glassOpacity !== DEFAULT_UNIFIED_SETTINGS.glassOpacity ? (
+              <SettingResetButton
+                label="glass opacity"
+                onClick={() =>
+                  updateSettings({ glassOpacity: DEFAULT_UNIFIED_SETTINGS.glassOpacity })
+                }
+              />
+            ) : null
+          }
+          control={
+            <div className="flex w-full items-center gap-3 sm:w-52">
+              <output
+                className="min-w-12 rounded-md bg-muted px-2 py-1 text-center font-mono text-xs font-medium tabular-nums text-foreground"
+                htmlFor="glass-opacity"
+              >
+                {settings.glassOpacity}%
+              </output>
+              <input
+                aria-label="Glass opacity"
+                className="glass-opacity-slider min-w-0 flex-1"
+                id="glass-opacity"
+                max={MAX_GLASS_OPACITY}
+                min={MIN_GLASS_OPACITY}
+                onChange={(event) => {
+                  const glassOpacity = Number(event.currentTarget.value);
+                  if (
+                    Number.isInteger(glassOpacity) &&
+                    glassOpacity >= MIN_GLASS_OPACITY &&
+                    glassOpacity <= MAX_GLASS_OPACITY
+                  ) {
+                    updateSettings({ glassOpacity });
+                  }
+                }}
+                step={5}
+                style={glassOpacitySliderStyle}
+                type="range"
+                value={settings.glassOpacity}
+              />
+            </div>
           }
         />
 
