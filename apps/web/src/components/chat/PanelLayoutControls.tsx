@@ -56,7 +56,7 @@ export const PanelLayoutControls = memo(function PanelLayoutControls({
                 pressed={terminalOpen}
                 onPressedChange={onToggleTerminal}
                 aria-label="Toggle terminal drawer"
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 disabled={!terminalAvailable}
               >
@@ -80,7 +80,7 @@ export const PanelLayoutControls = memo(function PanelLayoutControls({
                 render={
                   <Button
                     size="icon-sm"
-                    variant="outline"
+                    variant="ghost"
                     aria-label="Choose default terminal scope"
                     className="shrink-0 [-webkit-app-region:no-drag]"
                   />
