@@ -2747,7 +2747,6 @@ engineLayer("OrchestrationProjectionPipeline via engine dispatch", (it) => {
             command: "bun run build",
             icon: "build",
             runOnWorktreeCreate: false,
-            defaultScope: "chat",
           },
         ],
         defaultModelSelection: {
@@ -2769,7 +2768,7 @@ engineLayer("OrchestrationProjectionPipeline via engine dispatch", (it) => {
       assert.deepEqual(projectRows, [
         {
           scriptsJson:
-            '[{"id":"script-1","name":"Build","command":"bun run build","icon":"build","runOnWorktreeCreate":false,"defaultScope":"chat"}]',
+            '[{"id":"script-1","name":"Build","command":"bun run build","icon":"build","runOnWorktreeCreate":false}]',
           defaultModelSelection: '{"instanceId":"codex","model":"gpt-5"}',
         },
       ]);

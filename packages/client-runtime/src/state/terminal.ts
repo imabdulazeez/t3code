@@ -1,8 +1,7 @@
-import { type TerminalOwner, type TerminalSummary, WS_METHODS } from "@t3tools/contracts";
+import { type TerminalSummary, WS_METHODS } from "@t3tools/contracts";
 import * as Stream from "effect/Stream";
 import { Atom } from "effect/unstable/reactivity";
 
-import { terminalOwnerLocalKey } from "../environment/scoped.ts";
 import {
   createAtomCommandScheduler,
   createEnvironmentRpcCommand,
@@ -22,22 +21,21 @@ export function createTerminalEnvironmentAtoms<R, E>(
 ) {
   const lifecycleScheduler = createAtomCommandScheduler();
   const resizeScheduler = createAtomCommandScheduler();
-  const terminalOwnerKey = ({
+  const terminalThreadKey = ({
     environmentId,
     input,
   }: {
     readonly environmentId: string;
-    readonly input: { readonly owner: TerminalOwner; readonly terminalId?: string | undefined };
-  }) => JSON.stringify([environmentId, terminalOwnerLocalKey(input.owner)]);
+    readonly input: { readonly threadId: string; readonly terminalId?: string | undefined };
+  }) => JSON.stringify([environmentId, input.threadId]);
   const terminalSessionKey = ({
     environmentId,
     input,
   }: {
     readonly environmentId: string;
-    readonly input: { readonly owner: TerminalOwner; readonly terminalId?: string | undefined };
-  }) =>
-    JSON.stringify([environmentId, terminalOwnerLocalKey(input.owner), input.terminalId ?? null]);
-  const lifecycleConcurrency = { mode: "serial" as const, key: terminalOwnerKey };
+    readonly input: { readonly threadId: string; readonly terminalId?: string | undefined };
+  }) => JSON.stringify([environmentId, input.threadId, input.terminalId ?? null]);
+  const lifecycleConcurrency = { mode: "serial" as const, key: terminalThreadKey };
   return {
     attach: createEnvironmentSubscriptionAtomFamily(runtime, {
       label: "environment-data:terminal:attach",

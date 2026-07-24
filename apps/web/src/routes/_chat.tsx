@@ -11,12 +11,10 @@ import { selectProjectGroupingSettings } from "../logicalProject";
 import { buildSidebarProjectSnapshots } from "../sidebarProjectGrouping";
 import { dispatchPreviewAction } from "../components/preview/previewActionBus";
 import { useHandleNewThread } from "../hooks/useHandleNewThread";
-import { useTerminalUiStateReconcile } from "../hooks/useTerminalUiStateReconcile";
 import { startNewThreadFromContext } from "../lib/chatThreadActions";
 import { isPreviewFocused } from "../lib/previewFocus";
 import { isTerminalFocused } from "../lib/terminalFocus";
 import { resolveShortcutCommand } from "../keybindings";
-import { threadTerminalOwnerRef } from "@t3tools/client-runtime/environment";
 import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../terminalUiStateStore";
 import { isPreviewSupportedInRuntime } from "../previewStateStore";
 import { selectActiveRightPanel, useRightPanelStore } from "../rightPanelStore";
@@ -46,10 +44,7 @@ function ChatRouteGlobalShortcuts() {
   );
   const terminalOpen = useTerminalUiStateStore((state) =>
     routeThreadRef
-      ? selectThreadTerminalUiState(
-          state.terminalUiStateByOwnerKey,
-          threadTerminalOwnerRef(routeThreadRef.environmentId, routeThreadRef.threadId),
-        ).terminalOpen
+      ? selectThreadTerminalUiState(state.terminalUiStateByThreadKey, routeThreadRef).terminalOpen
       : false,
   );
   // The `previewOpen` shortcut-context flag here uses the store-only value;
@@ -179,16 +174,10 @@ function ChatRouteGlobalShortcuts() {
   return null;
 }
 
-function ChatRouteTerminalUiStateReconciler() {
-  useTerminalUiStateReconcile();
-  return null;
-}
-
 function ChatRouteLayout() {
   return (
     <>
       <ChatRouteGlobalShortcuts />
-      <ChatRouteTerminalUiStateReconciler />
       <Outlet />
     </>
   );

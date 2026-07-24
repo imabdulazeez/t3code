@@ -6,7 +6,6 @@ import {
   scopeProjectRef,
   scopeThreadRef,
   scopedThreadKey,
-  threadTerminalOwnerRef,
 } from "@t3tools/client-runtime/environment";
 import type { ScopedThreadRef, SidebarProjectGroupingMode } from "@t3tools/contracts";
 import {
@@ -1691,10 +1690,7 @@ export default function SidebarV2() {
   // v1 — the keybinding layer is shared, only the ordered list differs.
   const routeTerminalOpen = useTerminalUiStateStore((state) =>
     routeThreadRef
-      ? selectThreadTerminalUiState(
-          state.terminalUiStateByOwnerKey,
-          threadTerminalOwnerRef(routeThreadRef.environmentId, routeThreadRef.threadId),
-        ).terminalOpen
+      ? selectThreadTerminalUiState(state.terminalUiStateByThreadKey, routeThreadRef).terminalOpen
       : false,
   );
   useEffect(() => {

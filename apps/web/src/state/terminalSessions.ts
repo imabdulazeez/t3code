@@ -1,4 +1,3 @@
-import { terminalOwnerLocalKey } from "@t3tools/client-runtime/environment";
 import {
   combineTerminalSessionState,
   EMPTY_TERMINAL_BUFFER_STATE,
@@ -7,13 +6,7 @@ import {
   type KnownTerminalSession,
   type TerminalSessionState,
 } from "@t3tools/client-runtime/state/terminal";
-import type {
-  EnvironmentId,
-  ProjectId,
-  TerminalAttachInput,
-  TerminalOwner,
-  ThreadId,
-} from "@t3tools/contracts";
+import { ThreadId, type EnvironmentId, type TerminalAttachInput } from "@t3tools/contracts";
 import { useMemo } from "react";
 
 import { useEnvironmentQuery } from "./query";
@@ -44,11 +37,10 @@ export function useAttachedTerminalSession(input: {
     if (input.environmentId === null || input.terminal === null) {
       return EMPTY_TERMINAL_SESSION_STATE;
     }
-    const ownerKey = terminalOwnerLocalKey(input.terminal.owner);
     const summary =
       metadata.data?.find(
         (terminal) =>
-          terminalOwnerLocalKey(terminal.owner) === ownerKey &&
+          terminal.threadId === input.terminal?.threadId &&
           terminal.terminalId === input.terminal?.terminalId,
       ) ?? null;
     const state = combineTerminalSessionState(summary, attach.data ?? EMPTY_TERMINAL_BUFFER_STATE);
@@ -56,9 +48,9 @@ export function useAttachedTerminalSession(input: {
   }, [attach.data, attach.error, input.environmentId, input.terminal, metadata.data]);
 }
 
-function useOwnerKnownTerminalSessions(input: {
+export function useKnownTerminalSessions(input: {
   readonly environmentId: EnvironmentId | null;
-  readonly owner: TerminalOwner | null;
+  readonly threadId: ThreadId | null;
 }): ReadonlyArray<KnownTerminalSession> {
   const metadata = useEnvironmentQuery(
     input.environmentId === null
@@ -68,17 +60,16 @@ function useOwnerKnownTerminalSessions(input: {
           input: null,
         }),
   );
-  const ownerKey = input.owner === null ? null : terminalOwnerLocalKey(input.owner);
   return useMemo(() => {
     if (input.environmentId === null) {
       return [];
     }
     return (metadata.data ?? [])
-      .filter((summary) => ownerKey === null || terminalOwnerLocalKey(summary.owner) === ownerKey)
+      .filter((summary) => input.threadId === null || summary.threadId === input.threadId)
       .map((summary) => ({
         target: {
           environmentId: input.environmentId!,
-          owner: summary.owner,
+          threadId: ThreadId.make(summary.threadId),
           terminalId: summary.terminalId,
         },
         state: combineTerminalSessionState(summary, EMPTY_TERMINAL_BUFFER_STATE),
@@ -88,27 +79,7 @@ function useOwnerKnownTerminalSessions(input: {
           numeric: true,
         }),
       );
-  }, [input.environmentId, metadata.data, ownerKey]);
-}
-
-export function useKnownTerminalSessions(input: {
-  readonly environmentId: EnvironmentId | null;
-  readonly threadId: ThreadId | null;
-}): ReadonlyArray<KnownTerminalSession> {
-  return useOwnerKnownTerminalSessions({
-    environmentId: input.environmentId,
-    owner: input.threadId === null ? null : { type: "thread", threadId: input.threadId },
-  });
-}
-
-export function useProjectKnownTerminalSessions(input: {
-  readonly environmentId: EnvironmentId | null;
-  readonly projectId: ProjectId | null;
-}): ReadonlyArray<KnownTerminalSession> {
-  return useOwnerKnownTerminalSessions({
-    environmentId: input.environmentId,
-    owner: input.projectId === null ? null : { type: "project", projectId: input.projectId },
-  });
+  }, [input.environmentId, input.threadId, metadata.data]);
 }
 
 export function useThreadRunningTerminalIds(input: {
@@ -116,11 +87,4 @@ export function useThreadRunningTerminalIds(input: {
   readonly threadId: ThreadId | null;
 }): ReadonlyArray<string> {
   return selectRunningSubprocessTerminalIds(useKnownTerminalSessions(input));
-}
-
-export function useProjectRunningTerminalIds(input: {
-  readonly environmentId: EnvironmentId | null;
-  readonly projectId: ProjectId | null;
-}): ReadonlyArray<string> {
-  return selectRunningSubprocessTerminalIds(useProjectKnownTerminalSessions(input));
 }

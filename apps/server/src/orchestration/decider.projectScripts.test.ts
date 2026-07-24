@@ -75,7 +75,6 @@ it.layer(NodeServices.layer)("decider project scripts", (it) => {
           command: "bun run lint",
           icon: "lint",
           runOnWorktreeCreate: false,
-          defaultScope: "chat",
         },
       ] as const;
 

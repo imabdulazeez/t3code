@@ -24,28 +24,14 @@ const TerminalEnvSchema = Schema.Record(TerminalEnvKeySchema, TerminalEnvValueSc
   Schema.isMaxProperties(128),
 );
 
-export const TerminalThreadOwner = Schema.Struct({
-  type: Schema.Literal("thread"),
+export const TerminalThreadInput = Schema.Struct({
   threadId: TrimmedNonEmptyStringSchema,
 });
-export type TerminalThreadOwner = typeof TerminalThreadOwner.Type;
-
-export const TerminalProjectOwner = Schema.Struct({
-  type: Schema.Literal("project"),
-  projectId: TrimmedNonEmptyStringSchema,
-});
-export type TerminalProjectOwner = typeof TerminalProjectOwner.Type;
-
-export const TerminalOwner = Schema.Union([TerminalThreadOwner, TerminalProjectOwner]);
-export type TerminalOwner = typeof TerminalOwner.Type;
-
-export function terminalOwnerLabel(owner: TerminalOwner): string {
-  return owner.type === "thread" ? `thread: ${owner.threadId}` : `project: ${owner.projectId}`;
-}
+export type TerminalThreadInput = typeof TerminalThreadInput.Type;
 
 /** Terminal ids are ALWAYS chosen by the client and sent explicitly — no server-side allocation. */
 const TerminalSessionInput = Schema.Struct({
-  owner: TerminalOwner,
+  ...TerminalThreadInput.fields,
   terminalId: TerminalIdSchema,
 });
 export type TerminalSessionInput = Schema.Codec.Encoded<typeof TerminalSessionInput>;
@@ -98,7 +84,7 @@ export const TerminalRestartInput = Schema.Struct({
 export type TerminalRestartInput = Schema.Codec.Encoded<typeof TerminalRestartInput>;
 
 export const TerminalCloseInput = Schema.Struct({
-  owner: TerminalOwner,
+  ...TerminalThreadInput.fields,
   terminalId: Schema.optional(TerminalIdSchema),
   deleteHistory: Schema.optional(Schema.Boolean),
 });
@@ -108,7 +94,7 @@ export const TerminalSessionStatus = Schema.Literals(["starting", "running", "ex
 export type TerminalSessionStatus = typeof TerminalSessionStatus.Type;
 
 export const TerminalSessionSnapshot = Schema.Struct({
-  owner: TerminalOwner,
+  threadId: Schema.String.check(Schema.isNonEmpty()),
   terminalId: Schema.String.check(Schema.isNonEmpty()),
   cwd: Schema.String.check(Schema.isNonEmpty()),
   worktreePath: Schema.NullOr(TrimmedNonEmptyStringSchema),
@@ -125,7 +111,7 @@ export const TerminalSessionSnapshot = Schema.Struct({
 export type TerminalSessionSnapshot = typeof TerminalSessionSnapshot.Type;
 
 export const TerminalSummary = Schema.Struct({
-  owner: TerminalOwner,
+  threadId: Schema.String.check(Schema.isNonEmpty()),
   terminalId: Schema.String.check(Schema.isNonEmpty()),
   cwd: Schema.String.check(Schema.isNonEmpty()),
   worktreePath: Schema.NullOr(TrimmedNonEmptyStringSchema),
@@ -152,7 +138,7 @@ const TerminalMetadataUpsertEvent = Schema.Struct({
 
 const TerminalMetadataRemoveEvent = Schema.Struct({
   type: Schema.Literal("remove"),
-  owner: TerminalOwner,
+  threadId: Schema.String.check(Schema.isNonEmpty()),
   terminalId: Schema.String.check(Schema.isNonEmpty()),
 });
 
@@ -164,7 +150,7 @@ export const TerminalMetadataStreamEvent = Schema.Union([
 export type TerminalMetadataStreamEvent = typeof TerminalMetadataStreamEvent.Type;
 
 const TerminalEventBaseSchema = Schema.Struct({
-  owner: TerminalOwner,
+  threadId: Schema.String.check(Schema.isNonEmpty()),
   terminalId: Schema.String.check(Schema.isNonEmpty()),
   sequence: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
 });
@@ -291,37 +277,37 @@ export class TerminalHistoryError extends Schema.TaggedErrorClass<TerminalHistor
   "TerminalHistoryError",
   {
     operation: Schema.Literals(["read", "truncate", "migrate"]),
-    owner: TerminalOwner,
+    threadId: Schema.String,
     terminalId: Schema.String,
     cause: Schema.optional(Schema.Defect()),
   },
 ) {
   override get message() {
-    return `Failed to ${this.operation} terminal history for ${terminalOwnerLabel(this.owner)}, terminal: ${this.terminalId}`;
+    return `Failed to ${this.operation} terminal history for thread: ${this.threadId}, terminal: ${this.terminalId}`;
   }
 }
 
 export class TerminalSessionLookupError extends Schema.TaggedErrorClass<TerminalSessionLookupError>()(
   "TerminalSessionLookupError",
   {
-    owner: TerminalOwner,
+    threadId: Schema.String,
     terminalId: Schema.String,
   },
 ) {
   override get message() {
-    return `Unknown terminal ${terminalOwnerLabel(this.owner)}, terminal: ${this.terminalId}`;
+    return `Unknown terminal thread: ${this.threadId}, terminal: ${this.terminalId}`;
   }
 }
 
 export class TerminalNotRunningError extends Schema.TaggedErrorClass<TerminalNotRunningError>()(
   "TerminalNotRunningError",
   {
-    owner: TerminalOwner,
+    threadId: Schema.String,
     terminalId: Schema.String,
   },
 ) {
   override get message() {
-    return `Terminal is not running for ${terminalOwnerLabel(this.owner)}, terminal: ${this.terminalId}`;
+    return `Terminal is not running for thread: ${this.threadId}, terminal: ${this.terminalId}`;
   }
 }
 

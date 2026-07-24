@@ -8,11 +8,7 @@
  * workspace paths, and diff/plan/files remain singleton surfaces.
  */
 import { scopedThreadKey } from "@t3tools/client-runtime/environment";
-import {
-  DEFAULT_PROJECT_SCRIPT_SCOPE,
-  type ProjectScriptScope,
-  type ScopedThreadRef,
-} from "@t3tools/contracts";
+import type { ScopedThreadRef } from "@t3tools/contracts";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
@@ -27,7 +23,6 @@ export type RightPanelSurface =
   | {
       id: `terminal:${string}`;
       kind: "terminal";
-      scope: ProjectScriptScope;
       resourceId: string;
       terminalIds: string[];
       activeTerminalId: string;
@@ -58,7 +53,7 @@ interface RightPanelStoreState {
   open: (ref: ScopedThreadRef, kind: Exclude<RightPanelKind, "file" | "terminal">) => void;
   openBrowser: (ref: ScopedThreadRef, tabId: string | null) => void;
   openFile: (ref: ScopedThreadRef, relativePath: string, line?: number) => void;
-  openTerminal: (ref: ScopedThreadRef, terminalId: string, scope: ProjectScriptScope) => void;
+  openTerminal: (ref: ScopedThreadRef, terminalId: string) => void;
   splitTerminal: (
     ref: ScopedThreadRef,
     surfaceId: string,
@@ -117,10 +112,9 @@ const fileSurface = (
   revealRequestId,
 });
 
-const terminalSurface = (terminalId: string, scope: ProjectScriptScope): RightPanelSurface => ({
+const terminalSurface = (terminalId: string): RightPanelSurface => ({
   id: `terminal:${terminalId}`,
   kind: "terminal",
-  scope,
   resourceId: terminalId,
   terminalIds: [terminalId],
   activeTerminalId: terminalId,
@@ -176,15 +170,6 @@ export function migratePersistedRightPanelState(persistedState: unknown): {
                 threadState && typeof threadState === "object" ? threadState : null;
               const surfaces = Array.isArray(validThreadState?.surfaces)
                 ? validThreadState.surfaces.flatMap<RightPanelSurface>((surface) => {
-                    if (
-                      !surface ||
-                      typeof surface !== "object" ||
-                      !(RIGHT_PANEL_KINDS as readonly string[]).includes(
-                        (surface as { kind?: unknown }).kind as string,
-                      )
-                    ) {
-                      return [];
-                    }
                     if (surface.kind === "file") {
                       const revealLine =
                         typeof surface.revealLine === "number" &&
@@ -224,15 +209,9 @@ export function migratePersistedRightPanelState(persistedState: unknown): {
                       terminalIds.includes(surface.activeTerminalId)
                         ? surface.activeTerminalId
                         : (terminalIds[0] ?? surface.resourceId);
-                    const scope: ProjectScriptScope =
-                      "scope" in surface &&
-                      (surface.scope === "chat" || surface.scope === "project")
-                        ? surface.scope
-                        : DEFAULT_PROJECT_SCRIPT_SCOPE;
                     return [
                       {
                         ...surface,
-                        scope,
                         terminalIds: terminalIds.length > 0 ? terminalIds : [surface.resourceId],
                         activeTerminalId,
                       },
@@ -307,10 +286,10 @@ export const useRightPanelStore = create<RightPanelStoreState>()(
             };
           }),
         })),
-      openTerminal: (ref, terminalId, scope) =>
+      openTerminal: (ref, terminalId) =>
         set((state) => ({
           byThreadKey: updateThread(state.byThreadKey, scopedThreadKey(ref), (current) =>
-            upsertSurface(current, terminalSurface(terminalId, scope)),
+            upsertSurface(current, terminalSurface(terminalId)),
           ),
         })),
       splitTerminal: (ref, surfaceId, terminalId, direction = "horizontal") =>

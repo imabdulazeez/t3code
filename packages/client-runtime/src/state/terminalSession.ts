@@ -2,12 +2,10 @@ import type {
   EnvironmentId,
   TerminalAttachStreamEvent,
   TerminalMetadataStreamEvent,
-  TerminalOwner,
   TerminalSessionSnapshot,
   TerminalSummary,
+  ThreadId,
 } from "@t3tools/contracts";
-
-import { terminalOwnerLocalKey } from "../environment/scoped.ts";
 
 export interface TerminalSessionState {
   readonly summary: TerminalSummary | null;
@@ -29,7 +27,7 @@ export interface TerminalBufferState {
 
 export interface KnownTerminalSessionTarget {
   readonly environmentId: EnvironmentId;
-  readonly owner: TerminalOwner;
+  readonly threadId: ThreadId;
   readonly terminalId: string;
 }
 
@@ -182,17 +180,14 @@ export function applyTerminalMetadataStreamEvent(
     return event.terminals;
   }
   if (event.type === "remove") {
-    const removedOwnerKey = terminalOwnerLocalKey(event.owner);
     return current.filter(
       (terminal) =>
-        terminalOwnerLocalKey(terminal.owner) !== removedOwnerKey ||
-        terminal.terminalId !== event.terminalId,
+        terminal.threadId !== event.threadId || terminal.terminalId !== event.terminalId,
     );
   }
-  const upsertedOwnerKey = terminalOwnerLocalKey(event.terminal.owner);
   const next = current.filter(
     (terminal) =>
-      terminalOwnerLocalKey(terminal.owner) !== upsertedOwnerKey ||
+      terminal.threadId !== event.terminal.threadId ||
       terminal.terminalId !== event.terminal.terminalId,
   );
   return [...next, event.terminal];

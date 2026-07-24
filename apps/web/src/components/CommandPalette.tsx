@@ -1,10 +1,6 @@
 "use client";
 
-import {
-  scopeProjectRef,
-  scopeThreadRef,
-  threadTerminalOwnerRef,
-} from "@t3tools/client-runtime/environment";
+import { scopeProjectRef, scopeThreadRef } from "@t3tools/client-runtime/environment";
 import {
   isAtomCommandInterrupted,
   settlePromise,
@@ -399,10 +395,7 @@ export function CommandPalette({ children }: { children: ReactNode }) {
   const routeThreadRef = routeTarget?.kind === "server" ? routeTarget.threadRef : null;
   const terminalOpen = useTerminalUiStateStore((state) =>
     routeThreadRef
-      ? selectThreadTerminalUiState(
-          state.terminalUiStateByOwnerKey,
-          threadTerminalOwnerRef(routeThreadRef.environmentId, routeThreadRef.threadId),
-        ).terminalOpen
+      ? selectThreadTerminalUiState(state.terminalUiStateByThreadKey, routeThreadRef).terminalOpen
       : false,
   );
 

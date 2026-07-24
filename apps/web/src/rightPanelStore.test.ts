@@ -62,7 +62,6 @@ describe("rightPanelStore", () => {
             {
               id: "terminal:term-1",
               kind: "terminal",
-              scope: "chat",
               resourceId: "term-1",
               terminalIds: ["term-1"],
               activeTerminalId: "term-1",
@@ -294,15 +293,14 @@ describe("rightPanelStore", () => {
   });
 
   it("tracks one surface per terminal session", () => {
-    useRightPanelStore.getState().openTerminal(refA, "term-1", "chat");
-    useRightPanelStore.getState().openTerminal(refA, "term-2", "chat");
+    useRightPanelStore.getState().openTerminal(refA, "term-1");
+    useRightPanelStore.getState().openTerminal(refA, "term-2");
 
     const state = selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refA);
     expect(state.surfaces).toEqual([
       {
         id: "terminal:term-1",
         kind: "terminal",
-        scope: "chat",
         resourceId: "term-1",
         terminalIds: ["term-1"],
         activeTerminalId: "term-1",
@@ -310,7 +308,6 @@ describe("rightPanelStore", () => {
       {
         id: "terminal:term-2",
         kind: "terminal",
-        scope: "chat",
         resourceId: "term-2",
         terminalIds: ["term-2"],
         activeTerminalId: "term-2",
@@ -320,13 +317,12 @@ describe("rightPanelStore", () => {
   });
 
   it("tracks split panes and the active pane within a terminal surface", () => {
-    useRightPanelStore.getState().openTerminal(refA, "term-1", "chat");
+    useRightPanelStore.getState().openTerminal(refA, "term-1");
     useRightPanelStore.getState().splitTerminal(refA, "terminal:term-1", "term-2");
 
     expect(selectActiveRightPanelSurface(useRightPanelStore.getState().byThreadKey, refA)).toEqual({
       id: "terminal:term-1",
       kind: "terminal",
-      scope: "chat",
       resourceId: "term-1",
       terminalIds: ["term-1", "term-2"],
       activeTerminalId: "term-2",
@@ -337,7 +333,6 @@ describe("rightPanelStore", () => {
     expect(selectActiveRightPanelSurface(useRightPanelStore.getState().byThreadKey, refA)).toEqual({
       id: "terminal:term-1",
       kind: "terminal",
-      scope: "chat",
       resourceId: "term-1",
       terminalIds: ["term-2"],
       activeTerminalId: "term-2",
@@ -345,13 +340,12 @@ describe("rightPanelStore", () => {
   });
 
   it("tracks vertical layout for a terminal surface", () => {
-    useRightPanelStore.getState().openTerminal(refA, "term-1", "chat");
+    useRightPanelStore.getState().openTerminal(refA, "term-1");
     useRightPanelStore.getState().splitTerminal(refA, "terminal:term-1", "term-2", "vertical");
 
     expect(selectActiveRightPanelSurface(useRightPanelStore.getState().byThreadKey, refA)).toEqual({
       id: "terminal:term-1",
       kind: "terminal",
-      scope: "chat",
       resourceId: "term-1",
       terminalIds: ["term-1", "term-2"],
       activeTerminalId: "term-2",
@@ -360,7 +354,7 @@ describe("rightPanelStore", () => {
   });
 
   it("closing the final terminal pane removes its surface and closes the panel", () => {
-    useRightPanelStore.getState().openTerminal(refA, "term-1", "chat");
+    useRightPanelStore.getState().openTerminal(refA, "term-1");
     useRightPanelStore.getState().closeTerminal(refA, "terminal:term-1", "term-1");
 
     expect(selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refA)).toEqual({
@@ -372,7 +366,7 @@ describe("rightPanelStore", () => {
 
   it("closing the active surface activates a neighboring surface", () => {
     useRightPanelStore.getState().openBrowser(refA, "tab-a");
-    useRightPanelStore.getState().openTerminal(refA, "term-1", "chat");
+    useRightPanelStore.getState().openTerminal(refA, "term-1");
     useRightPanelStore.getState().closeSurface(refA, "terminal:term-1");
 
     expect(selectActiveRightPanelSurface(useRightPanelStore.getState().byThreadKey, refA)?.id).toBe(
@@ -381,7 +375,7 @@ describe("rightPanelStore", () => {
   });
 
   it("closing the final surface closes the panel", () => {
-    useRightPanelStore.getState().openTerminal(refA, "term-1", "chat");
+    useRightPanelStore.getState().openTerminal(refA, "term-1");
     useRightPanelStore.getState().closeSurface(refA, "terminal:term-1");
 
     expect(selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refA)).toEqual({
@@ -394,7 +388,7 @@ describe("rightPanelStore", () => {
   it("closing other surfaces keeps the selected surface active", () => {
     useRightPanelStore.getState().openBrowser(refA, "tab-a");
     useRightPanelStore.getState().openFile(refA, "src/index.ts");
-    useRightPanelStore.getState().openTerminal(refA, "term-1", "chat");
+    useRightPanelStore.getState().openTerminal(refA, "term-1");
 
     useRightPanelStore.getState().closeOtherSurfaces(refA, "file:src/index.ts");
 
@@ -416,7 +410,7 @@ describe("rightPanelStore", () => {
   it("closing surfaces to the right activates the selected surface when active was removed", () => {
     useRightPanelStore.getState().openBrowser(refA, "tab-a");
     useRightPanelStore.getState().openFile(refA, "src/index.ts");
-    useRightPanelStore.getState().openTerminal(refA, "term-1", "chat");
+    useRightPanelStore.getState().openTerminal(refA, "term-1");
 
     useRightPanelStore.getState().closeSurfacesToRight(refA, "browser:tab-a");
 
@@ -441,7 +435,7 @@ describe("rightPanelStore", () => {
   });
 
   it("reconciles browser surfaces without deleting other surface kinds", () => {
-    useRightPanelStore.getState().openTerminal(refA, "term-1", "chat");
+    useRightPanelStore.getState().openTerminal(refA, "term-1");
     useRightPanelStore.getState().openBrowser(refA, "tab-a");
     useRightPanelStore.getState().openBrowser(refA, "tab-b");
     useRightPanelStore.getState().reconcileBrowserSurfaces(refA, ["tab-b", "tab-c"]);

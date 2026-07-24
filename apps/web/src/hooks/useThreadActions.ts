@@ -2,7 +2,6 @@ import {
   parseScopedThreadKey,
   scopeProjectRef,
   scopeThreadRef,
-  threadTerminalOwnerRef,
 } from "@t3tools/client-runtime/environment";
 import { settlePromise, squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import { canSettle } from "@t3tools/client-runtime/state/thread-settled";
@@ -256,7 +255,7 @@ export function useThreadActions() {
 
       await closeTerminal({
         environmentId: threadRef.environmentId,
-        input: { owner: { type: "thread", threadId: threadRef.threadId }, deleteHistory: true },
+        input: { threadId: threadRef.threadId, deleteHistory: true },
       });
 
       const deletedThreadIds = deletedIds ?? new Set<ThreadId>();
@@ -283,7 +282,7 @@ export function useThreadActions() {
         scopeProjectRef(threadRef.environmentId, thread.projectId),
         threadRef,
       );
-      clearTerminalUiState(threadTerminalOwnerRef(threadRef.environmentId, threadRef.threadId));
+      clearTerminalUiState(threadRef);
 
       if (shouldNavigateToFallback) {
         if (fallbackThreadId) {

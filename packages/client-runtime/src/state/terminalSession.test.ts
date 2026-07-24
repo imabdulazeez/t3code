@@ -1,12 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import {
-  EnvironmentId,
-  ProjectId,
-  type TerminalOwner,
-  TerminalSessionSnapshot,
-  ThreadId,
-} from "@t3tools/contracts";
+import { EnvironmentId, TerminalSessionSnapshot, ThreadId } from "@t3tools/contracts";
 
 import {
   applyTerminalAttachStreamEvent,
@@ -16,17 +10,14 @@ import {
   selectRunningSubprocessTerminalIds,
 } from "./terminalSession.ts";
 
-const OWNER: TerminalOwner = { type: "thread", threadId: ThreadId.make("thread-1") };
-const PROJECT_OWNER: TerminalOwner = { type: "project", projectId: ProjectId.make("project-1") };
-
 const TARGET = {
   environmentId: EnvironmentId.make("env-local"),
-  owner: OWNER,
+  threadId: ThreadId.make("thread-1"),
   terminalId: "term-1",
 } as const;
 
 const BASE_SNAPSHOT: TerminalSessionSnapshot = {
-  owner: OWNER,
+  threadId: TARGET.threadId,
   terminalId: TARGET.terminalId,
   cwd: "/repo",
   worktreePath: null,
@@ -45,7 +36,7 @@ describe("terminal session reducers", () => {
       type: "snapshot",
       terminals: [
         {
-          owner: BASE_SNAPSHOT.owner,
+          threadId: BASE_SNAPSHOT.threadId,
           terminalId: BASE_SNAPSHOT.terminalId,
           cwd: BASE_SNAPSHOT.cwd,
           worktreePath: BASE_SNAPSHOT.worktreePath,
@@ -61,7 +52,7 @@ describe("terminal session reducers", () => {
     })[0]!;
     const attached = applyTerminalAttachStreamEvent(EMPTY_TERMINAL_BUFFER_STATE, {
       type: "error",
-      owner: TARGET.owner,
+      threadId: TARGET.threadId,
       terminalId: TARGET.terminalId,
       message: "Terminal disconnected.",
     });
@@ -78,7 +69,7 @@ describe("terminal session reducers", () => {
       type: "snapshot",
       terminals: [
         {
-          owner: BASE_SNAPSHOT.owner,
+          threadId: BASE_SNAPSHOT.threadId,
           terminalId: BASE_SNAPSHOT.terminalId,
           cwd: BASE_SNAPSHOT.cwd,
           worktreePath: BASE_SNAPSHOT.worktreePath,
@@ -127,7 +118,7 @@ describe("terminal session reducers", () => {
       snapshot,
       {
         type: "output",
-        owner: TARGET.owner,
+        threadId: TARGET.threadId,
         terminalId: TARGET.terminalId,
         data: " world",
       },
@@ -147,7 +138,7 @@ describe("terminal session reducers", () => {
       type: "snapshot",
       terminals: [
         {
-          owner: BASE_SNAPSHOT.owner,
+          threadId: BASE_SNAPSHOT.threadId,
           terminalId: BASE_SNAPSHOT.terminalId,
           cwd: BASE_SNAPSHOT.cwd,
           worktreePath: BASE_SNAPSHOT.worktreePath,
@@ -170,7 +161,7 @@ describe("terminal session reducers", () => {
     });
     const removed = applyTerminalMetadataStreamEvent(updated, {
       type: "remove",
-      owner: TARGET.owner,
+      threadId: TARGET.threadId,
       terminalId: TARGET.terminalId,
     });
 
@@ -179,56 +170,12 @@ describe("terminal session reducers", () => {
     expect(removed).toEqual([]);
   });
 
-  it("keys metadata by owner so project and thread terminals do not collide", () => {
-    const withThread = applyTerminalMetadataStreamEvent([], {
-      type: "upsert",
-      terminal: {
-        owner: OWNER,
-        terminalId: TARGET.terminalId,
-        cwd: BASE_SNAPSHOT.cwd,
-        worktreePath: BASE_SNAPSHOT.worktreePath,
-        status: BASE_SNAPSHOT.status,
-        pid: BASE_SNAPSHOT.pid,
-        exitCode: BASE_SNAPSHOT.exitCode,
-        exitSignal: BASE_SNAPSHOT.exitSignal,
-        updatedAt: BASE_SNAPSHOT.updatedAt,
-        hasRunningSubprocess: false,
-        label: BASE_SNAPSHOT.label,
-      },
-    });
-    const withBoth = applyTerminalMetadataStreamEvent(withThread, {
-      type: "upsert",
-      terminal: {
-        owner: PROJECT_OWNER,
-        terminalId: TARGET.terminalId,
-        cwd: BASE_SNAPSHOT.cwd,
-        worktreePath: BASE_SNAPSHOT.worktreePath,
-        status: BASE_SNAPSHOT.status,
-        pid: BASE_SNAPSHOT.pid,
-        exitCode: BASE_SNAPSHOT.exitCode,
-        exitSignal: BASE_SNAPSHOT.exitSignal,
-        updatedAt: BASE_SNAPSHOT.updatedAt,
-        hasRunningSubprocess: false,
-        label: BASE_SNAPSHOT.label,
-      },
-    });
-    const afterRemoveProject = applyTerminalMetadataStreamEvent(withBoth, {
-      type: "remove",
-      owner: PROJECT_OWNER,
-      terminalId: TARGET.terminalId,
-    });
-
-    expect(withBoth).toHaveLength(2);
-    expect(afterRemoveProject).toHaveLength(1);
-    expect(afterRemoveProject[0]?.owner).toEqual(OWNER);
-  });
-
   it("caps retained output by UTF-8 byte length", () => {
     const state = applyTerminalAttachStreamEvent(
       EMPTY_TERMINAL_BUFFER_STATE,
       {
         type: "output",
-        owner: TARGET.owner,
+        threadId: TARGET.threadId,
         terminalId: TARGET.terminalId,
         data: "🙂🙂",
       },

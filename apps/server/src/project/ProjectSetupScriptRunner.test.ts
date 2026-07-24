@@ -94,7 +94,7 @@ describe("ProjectSetupScriptRunner", () => {
     () => {
       const open = vi.fn(() =>
         Effect.succeed({
-          owner: { type: "thread" as const, threadId: "thread-1" },
+          threadId: "thread-1",
           terminalId: "setup-setup",
           cwd: "/repo/worktrees/a",
           worktreePath: "/repo/worktrees/a",
@@ -115,7 +115,6 @@ describe("ProjectSetupScriptRunner", () => {
           command: "bun install",
           icon: "configure",
           runOnWorktreeCreate: true,
-          defaultScope: "chat",
         },
       ]);
 
@@ -135,7 +134,7 @@ describe("ProjectSetupScriptRunner", () => {
           cwd: "/repo/worktrees/a",
         });
         expect(open).toHaveBeenCalledWith({
-          owner: { type: "thread", threadId: "thread-1" },
+          threadId: "thread-1",
           terminalId: "setup-setup",
           cwd: "/repo/worktrees/a",
           worktreePath: "/repo/worktrees/a",
@@ -145,7 +144,7 @@ describe("ProjectSetupScriptRunner", () => {
           },
         });
         expect(write).toHaveBeenCalledWith({
-          owner: { type: "thread", threadId: "thread-1" },
+          threadId: "thread-1",
           terminalId: "setup-setup",
           data: "bun install\r",
         });
@@ -166,7 +165,6 @@ describe("ProjectSetupScriptRunner", () => {
         command: "bun install",
         icon: "configure",
         runOnWorktreeCreate: true,
-        defaultScope: "chat",
       },
     ]);
 

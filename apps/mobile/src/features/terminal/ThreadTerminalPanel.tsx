@@ -93,7 +93,7 @@ export const ThreadTerminalPanel = memo(function ThreadTerminalPanel(
     void openTerminal({
       environmentId: props.environmentId,
       input: {
-        owner: { type: "thread", threadId: props.threadId },
+        threadId: props.threadId,
         terminalId,
         cwd: props.cwd,
         worktreePath: props.worktreePath,
@@ -146,7 +146,7 @@ export const ThreadTerminalPanel = memo(function ThreadTerminalPanel(
     void closeTerminal({
       environmentId: props.environmentId,
       input: {
-        owner: { type: "thread", threadId: props.threadId },
+        threadId: props.threadId,
         terminalId,
       },
     });
@@ -158,7 +158,7 @@ export const ThreadTerminalPanel = memo(function ThreadTerminalPanel(
       void resizeTerminal({
         environmentId: props.environmentId,
         input: {
-          owner: { type: "thread", threadId: props.threadId },
+          threadId: props.threadId,
           terminalId,
           cols: size.cols,
           rows: size.rows,
@@ -183,7 +183,7 @@ export const ThreadTerminalPanel = memo(function ThreadTerminalPanel(
       void writeTerminal({
         environmentId: props.environmentId,
         input: {
-          owner: { type: "thread", threadId: props.threadId },
+          threadId: props.threadId,
           terminalId,
           data,
         },

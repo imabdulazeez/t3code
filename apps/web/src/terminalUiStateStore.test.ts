@@ -1,9 +1,4 @@
-import {
-  scopedThreadKey,
-  scopeThreadRef,
-  terminalOwnerKey,
-  threadTerminalOwnerRef,
-} from "@t3tools/client-runtime/environment";
+import { scopeThreadRef, scopedThreadKey } from "@t3tools/client-runtime/environment";
 import { ThreadId } from "@t3tools/contracts";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 
@@ -16,22 +11,21 @@ import { DEFAULT_THREAD_TERMINAL_ID } from "./types";
 
 const THREAD_ID = ThreadId.make("thread-1");
 const THREAD_REF = scopeThreadRef("environment-a" as never, THREAD_ID);
-const OWNER_REF = threadTerminalOwnerRef("environment-a" as never, THREAD_ID);
-const OTHER_OWNER_REF = threadTerminalOwnerRef("environment-b" as never, THREAD_ID);
+const OTHER_THREAD_REF = scopeThreadRef("environment-b" as never, THREAD_ID);
 
 describe("terminalUiStateStore actions", () => {
   beforeEach(() => {
     useTerminalUiStateStore.persist.clearStorage();
     useTerminalUiStateStore.setState({
-      terminalUiStateByOwnerKey: {},
-      customTerminalNamesByOwnerKey: {},
+      terminalUiStateByThreadKey: {},
+      suppressedTerminalIdsByThreadKey: {},
     });
   });
 
   it("returns an empty default terminal UI state for unknown threads", () => {
     const terminalUiState = selectThreadTerminalUiState(
-      useTerminalUiStateStore.getState().terminalUiStateByOwnerKey,
-      OWNER_REF,
+      useTerminalUiStateStore.getState().terminalUiStateByThreadKey,
+      THREAD_REF,
     );
     expect(terminalUiState).toEqual({
       terminalOpen: false,
@@ -45,12 +39,12 @@ describe("terminalUiStateStore actions", () => {
 
   it("opens and splits terminals into the active group", () => {
     const store = useTerminalUiStateStore.getState();
-    store.setTerminalOpen(OWNER_REF, true);
-    store.splitTerminal(OWNER_REF, "terminal-2");
+    store.setTerminalOpen(THREAD_REF, true);
+    store.splitTerminal(THREAD_REF, "terminal-2");
 
     const terminalUiState = selectThreadTerminalUiState(
-      useTerminalUiStateStore.getState().terminalUiStateByOwnerKey,
-      OWNER_REF,
+      useTerminalUiStateStore.getState().terminalUiStateByThreadKey,
+      THREAD_REF,
     );
     expect(terminalUiState.terminalOpen).toBe(true);
     expect(terminalUiState.terminalIds).toEqual([DEFAULT_THREAD_TERMINAL_ID, "terminal-2"]);
@@ -65,12 +59,12 @@ describe("terminalUiStateStore actions", () => {
 
   it("stacks vertically split terminals in the active group", () => {
     const store = useTerminalUiStateStore.getState();
-    store.setTerminalOpen(OWNER_REF, true);
-    store.splitTerminalVertical(OWNER_REF, "terminal-2");
+    store.setTerminalOpen(THREAD_REF, true);
+    store.splitTerminalVertical(THREAD_REF, "terminal-2");
 
     const terminalUiState = selectThreadTerminalUiState(
-      useTerminalUiStateStore.getState().terminalUiStateByOwnerKey,
-      OWNER_REF,
+      useTerminalUiStateStore.getState().terminalUiStateByThreadKey,
+      THREAD_REF,
     );
     expect(terminalUiState.terminalGroups).toEqual([
       {
@@ -82,11 +76,11 @@ describe("terminalUiStateStore actions", () => {
   });
 
   it("materializes the default terminal when opening an empty drawer", () => {
-    useTerminalUiStateStore.getState().setTerminalOpen(OWNER_REF, true);
+    useTerminalUiStateStore.getState().setTerminalOpen(THREAD_REF, true);
 
     const terminalUiState = selectThreadTerminalUiState(
-      useTerminalUiStateStore.getState().terminalUiStateByOwnerKey,
-      OWNER_REF,
+      useTerminalUiStateStore.getState().terminalUiStateByThreadKey,
+      THREAD_REF,
     );
     expect(terminalUiState).toEqual({
       terminalOpen: true,
@@ -105,15 +99,15 @@ describe("terminalUiStateStore actions", () => {
 
   it("caps splits at four terminals per group", () => {
     const store = useTerminalUiStateStore.getState();
-    store.splitTerminal(OWNER_REF, "terminal-2");
-    store.splitTerminal(OWNER_REF, "terminal-3");
-    store.splitTerminal(OWNER_REF, "terminal-4");
-    store.splitTerminal(OWNER_REF, "terminal-5");
-    store.splitTerminal(OWNER_REF, "terminal-6");
+    store.splitTerminal(THREAD_REF, "terminal-2");
+    store.splitTerminal(THREAD_REF, "terminal-3");
+    store.splitTerminal(THREAD_REF, "terminal-4");
+    store.splitTerminal(THREAD_REF, "terminal-5");
+    store.splitTerminal(THREAD_REF, "terminal-6");
 
     const terminalUiState = selectThreadTerminalUiState(
-      useTerminalUiStateStore.getState().terminalUiStateByOwnerKey,
-      OWNER_REF,
+      useTerminalUiStateStore.getState().terminalUiStateByThreadKey,
+      THREAD_REF,
     );
     expect(terminalUiState.terminalIds).toEqual([
       "terminal-2",
@@ -130,11 +124,11 @@ describe("terminalUiStateStore actions", () => {
   });
 
   it("creates new terminals in a separate group", () => {
-    useTerminalUiStateStore.getState().newTerminal(OWNER_REF, "terminal-2");
+    useTerminalUiStateStore.getState().newTerminal(THREAD_REF, "terminal-2");
 
     const terminalUiState = selectThreadTerminalUiState(
-      useTerminalUiStateStore.getState().terminalUiStateByOwnerKey,
-      OWNER_REF,
+      useTerminalUiStateStore.getState().terminalUiStateByThreadKey,
+      THREAD_REF,
     );
     expect(terminalUiState.terminalIds).toEqual(["terminal-2"]);
     expect(terminalUiState.activeTerminalId).toBe("terminal-2");
@@ -144,37 +138,13 @@ describe("terminalUiStateStore actions", () => {
     ]);
   });
 
-  it("stores custom terminal names and clears them when the terminal closes", () => {
-    const store = useTerminalUiStateStore.getState();
-    store.newTerminal(OWNER_REF, "term-1");
-    store.newTerminal(OWNER_REF, "term-2");
-    store.renameTerminal(OWNER_REF, "term-2", "Lint");
-
-    expect(
-      useTerminalUiStateStore.getState().customTerminalNamesByOwnerKey[
-        terminalOwnerKey(OWNER_REF)
-      ]?.["term-2"],
-    ).toBe("Lint");
-
-    store.closeTerminal(OWNER_REF, "term-2");
-
-    expect(
-      useTerminalUiStateStore.getState().customTerminalNamesByOwnerKey[
-        terminalOwnerKey(OWNER_REF)
-      ]?.["term-2"],
-    ).toBeUndefined();
-  });
-
   it("ensures unknown server terminals are registered, opened, and activated", () => {
     const store = useTerminalUiStateStore.getState();
-    store.ensureTerminal(OWNER_REF, "setup-setup", {
-      open: true,
-      active: true,
-    });
+    store.ensureTerminal(THREAD_REF, "setup-setup", { open: true, active: true });
 
     const terminalUiState = selectThreadTerminalUiState(
-      useTerminalUiStateStore.getState().terminalUiStateByOwnerKey,
-      OWNER_REF,
+      useTerminalUiStateStore.getState().terminalUiStateByThreadKey,
+      THREAD_REF,
     );
     expect(terminalUiState.terminalOpen).toBe(true);
     expect(terminalUiState.terminalIds).toEqual(["setup-setup"]);
@@ -186,24 +156,24 @@ describe("terminalUiStateStore actions", () => {
 
   it("keeps state isolated per environment when raw thread ids collide", () => {
     const store = useTerminalUiStateStore.getState();
-    store.setTerminalOpen(OWNER_REF, true);
-    store.newTerminal(OTHER_OWNER_REF, "env-b-terminal");
+    store.setTerminalOpen(THREAD_REF, true);
+    store.newTerminal(OTHER_THREAD_REF, "env-b-terminal");
 
     expect(
       selectThreadTerminalUiState(
-        useTerminalUiStateStore.getState().terminalUiStateByOwnerKey,
-        OWNER_REF,
+        useTerminalUiStateStore.getState().terminalUiStateByThreadKey,
+        THREAD_REF,
       ).terminalOpen,
     ).toBe(true);
     expect(
       selectThreadTerminalUiState(
-        useTerminalUiStateStore.getState().terminalUiStateByOwnerKey,
-        OTHER_OWNER_REF,
+        useTerminalUiStateStore.getState().terminalUiStateByThreadKey,
+        OTHER_THREAD_REF,
       ).terminalIds,
     ).toEqual(["env-b-terminal"]);
   });
 
-  it("migrates legacy scoped thread keys to owner keys and drops invalid keys", () => {
+  it("drops persisted entries whose thread keys are not valid scoped keys", () => {
     const migrated = migratePersistedTerminalUiStateStoreState(
       {
         terminalStateByThreadKey: {
@@ -229,8 +199,8 @@ describe("terminalUiStateStore actions", () => {
     );
 
     expect(migrated).toEqual({
-      terminalUiStateByOwnerKey: {
-        [terminalOwnerKey(OWNER_REF)]: {
+      terminalUiStateByThreadKey: {
+        [scopedThreadKey(THREAD_REF)]: {
           terminalOpen: true,
           terminalHeight: 320,
           terminalIds: ["term-1"],
@@ -239,60 +209,34 @@ describe("terminalUiStateStore actions", () => {
           activeTerminalGroupId: "group-term-1",
         },
       },
-      defaultTerminalScopeByProjectId: {},
-      customTerminalNamesByOwnerKey: {},
     });
   });
 
   it("resets to default and clears persisted entry when closing the last terminal", () => {
     const store = useTerminalUiStateStore.getState();
-    store.newTerminal(OWNER_REF, "terminal-only");
-    store.closeTerminal(OWNER_REF, "terminal-only");
+    store.newTerminal(THREAD_REF, "terminal-only");
+    store.closeTerminal(THREAD_REF, "terminal-only");
 
     expect(
-      useTerminalUiStateStore.getState().terminalUiStateByOwnerKey[terminalOwnerKey(OWNER_REF)],
+      useTerminalUiStateStore.getState().terminalUiStateByThreadKey[scopedThreadKey(THREAD_REF)],
     ).toBeUndefined();
     expect(
       selectThreadTerminalUiState(
-        useTerminalUiStateStore.getState().terminalUiStateByOwnerKey,
-        OWNER_REF,
+        useTerminalUiStateStore.getState().terminalUiStateByThreadKey,
+        THREAD_REF,
       ).terminalIds,
     ).toEqual([]);
-  });
-
-  it("does not resurrect a locally closed terminal from stale server reconciliation", () => {
-    const store = useTerminalUiStateStore.getState();
-    store.newTerminal(OWNER_REF, "terminal-only");
-    store.closeTerminal(OWNER_REF, "terminal-only");
-    store.reconcileTerminalIds(OWNER_REF, ["terminal-only"]);
-
-    expect(
-      selectThreadTerminalUiState(
-        useTerminalUiStateStore.getState().terminalUiStateByOwnerKey,
-        OWNER_REF,
-      ).terminalIds,
-    ).toEqual([]);
-
-    store.reconcileTerminalIds(OWNER_REF, []);
-    store.reconcileTerminalIds(OWNER_REF, ["terminal-only"]);
-
-    expect(
-      selectThreadTerminalUiState(
-        useTerminalUiStateStore.getState().terminalUiStateByOwnerKey,
-        OWNER_REF,
-      ).terminalIds,
-    ).toEqual(["terminal-only"]);
   });
 
   it("keeps a valid active terminal after closing an active split terminal", () => {
     const store = useTerminalUiStateStore.getState();
-    store.splitTerminal(OWNER_REF, "terminal-2");
-    store.splitTerminal(OWNER_REF, "terminal-3");
-    store.closeTerminal(OWNER_REF, "terminal-3");
+    store.splitTerminal(THREAD_REF, "terminal-2");
+    store.splitTerminal(THREAD_REF, "terminal-3");
+    store.closeTerminal(THREAD_REF, "terminal-3");
 
     const terminalUiState = selectThreadTerminalUiState(
-      useTerminalUiStateStore.getState().terminalUiStateByOwnerKey,
-      OWNER_REF,
+      useTerminalUiStateStore.getState().terminalUiStateByThreadKey,
+      THREAD_REF,
     );
     expect(terminalUiState.activeTerminalId).toBe("terminal-2");
     expect(terminalUiState.terminalIds).toEqual(["terminal-2"]);
@@ -303,12 +247,12 @@ describe("terminalUiStateStore actions", () => {
 
   it("reconciles terminal ids from an external ordered list", () => {
     const store = useTerminalUiStateStore.getState();
-    store.setTerminalOpen(OWNER_REF, true);
-    store.reconcileTerminalIds(OWNER_REF, ["term-a", "term-b"]);
+    store.setTerminalOpen(THREAD_REF, true);
+    store.reconcileTerminalIds(THREAD_REF, ["term-a", "term-b"]);
 
     const terminalUiState = selectThreadTerminalUiState(
-      useTerminalUiStateStore.getState().terminalUiStateByOwnerKey,
-      OWNER_REF,
+      useTerminalUiStateStore.getState().terminalUiStateByThreadKey,
+      THREAD_REF,
     );
     expect(terminalUiState.terminalIds).toEqual(["term-a", "term-b"]);
     expect(terminalUiState.activeTerminalId).toBe("term-a");
@@ -318,11 +262,34 @@ describe("terminalUiStateStore actions", () => {
     ]);
   });
 
+  it("does not import a closed panel terminal from stale metadata", () => {
+    const store = useTerminalUiStateStore.getState();
+    store.newTerminal(THREAD_REF, "term-2");
+    store.closeTerminal(THREAD_REF, "term-1");
+
+    store.reconcileTerminalIds(THREAD_REF, ["term-1", "term-2"]);
+
+    expect(
+      selectThreadTerminalUiState(
+        useTerminalUiStateStore.getState().terminalUiStateByThreadKey,
+        THREAD_REF,
+      ).terminalIds,
+    ).toEqual(["term-2"]);
+
+    store.newTerminal(THREAD_REF, "term-1");
+    expect(
+      selectThreadTerminalUiState(
+        useTerminalUiStateStore.getState().terminalUiStateByThreadKey,
+        THREAD_REF,
+      ).terminalIds,
+    ).toEqual(["term-2", "term-1"]);
+  });
+
   it("is a no-op when clearing terminal UI state for a thread with no state", () => {
     const store = useTerminalUiStateStore.getState();
     const before = useTerminalUiStateStore.getState();
 
-    store.clearTerminalUiState(OWNER_REF);
+    store.clearTerminalUiState(THREAD_REF);
 
     expect(useTerminalUiStateStore.getState()).toBe(before);
   });

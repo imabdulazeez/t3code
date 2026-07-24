@@ -43,7 +43,6 @@ import { restrictToFirstScrollableAncestor, restrictToVerticalAxis } from "@dnd-
 import { CSS } from "@dnd-kit/utilities";
 import {
   type ContextMenuItem,
-  type EnvironmentId,
   ProjectId,
   type ScopedThreadRef,
   type ResolvedKeybindingsConfig,
@@ -56,7 +55,6 @@ import {
   scopedThreadKey,
   scopeProjectRef,
   scopeThreadRef,
-  threadTerminalOwnerRef,
 } from "@t3tools/client-runtime/environment";
 import { safeErrorLogAttributes } from "@t3tools/client-runtime/errors";
 import {
@@ -86,10 +84,7 @@ import {
   useThreadShellsForProjectRefs,
 } from "../state/entities";
 import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../terminalUiStateStore";
-import {
-  useProjectRunningTerminalIds,
-  useThreadRunningTerminalIds,
-} from "../state/terminalSessions";
+import { useThreadRunningTerminalIds } from "../state/terminalSessions";
 import { useThreadDiscoveredPorts } from "../portDiscoveryState";
 import { openDiscoveredPort } from "./preview/openDiscoveredPort";
 import { useAtomCommand } from "../state/use-atom-command";
@@ -1067,30 +1062,6 @@ interface SidebarProjectItemProps {
   isManualProjectSorting: boolean;
   dragHandleProps: SortableProjectHandleProps | null;
 }
-
-const ProjectTerminalRunningIndicator = memo(function ProjectTerminalRunningIndicator(props: {
-  environmentId: EnvironmentId;
-  projectId: ProjectId;
-}) {
-  const runningTerminalIds = useProjectRunningTerminalIds({
-    environmentId: props.environmentId,
-    projectId: props.projectId,
-  });
-  const terminalStatus = terminalStatusFromRunningIds(runningTerminalIds);
-  if (!terminalStatus) {
-    return null;
-  }
-  return (
-    <span
-      role="img"
-      aria-label="Project terminal process running"
-      title="Project terminal process running"
-      className={`inline-flex shrink-0 items-center justify-center ${terminalStatus.colorClass}`}
-    >
-      <TerminalIcon className={`size-3 ${terminalStatus.pulse ? "animate-status-pulse" : ""}`} />
-    </span>
-  );
-});
 
 const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjectItemProps) {
   const {
@@ -2313,10 +2284,6 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
                 {project.groupedProjectCount} projects
               </span>
             ) : null}
-            <ProjectTerminalRunningIndicator
-              environmentId={project.environmentId}
-              projectId={project.id}
-            />
           </span>
         </SidebarMenuButton>
         {/* Environment badge – visible by default, crossfades with the
@@ -3032,10 +2999,7 @@ export default function Sidebar() {
   const routeThreadKey = routeThreadRef ? scopedThreadKey(routeThreadRef) : null;
   const routeTerminalOpen = useTerminalUiStateStore((state) =>
     routeThreadRef
-      ? selectThreadTerminalUiState(
-          state.terminalUiStateByOwnerKey,
-          threadTerminalOwnerRef(routeThreadRef.environmentId, routeThreadRef.threadId),
-        ).terminalOpen
+      ? selectThreadTerminalUiState(state.terminalUiStateByThreadKey, routeThreadRef).terminalOpen
       : false,
   );
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);

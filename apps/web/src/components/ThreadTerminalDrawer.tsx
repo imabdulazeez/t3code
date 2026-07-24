@@ -4,19 +4,25 @@ import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
-import { Plus, SquareSplitHorizontal, TerminalSquare, Trash2, XIcon } from "lucide-react";
 import {
-  type ProjectScriptScope,
+  Plus,
+  SquareSplitHorizontal,
+  SquareSplitVertical,
+  TerminalSquare,
+  Trash2,
+  XIcon,
+} from "lucide-react";
+import {
   type ResolvedKeybindingsConfig,
   type ScopedThreadRef,
-  ThreadId,
+  type ThreadId,
 } from "@t3tools/contracts";
-import { terminalOwnerKey, type TerminalOwnerRef } from "@t3tools/client-runtime/environment";
-import { resolveTerminalSessionLabel } from "@t3tools/shared/terminalLabels";
+import { getTerminalLabel } from "@t3tools/shared/terminalLabels";
 import { Terminal, type ITheme } from "@xterm/xterm";
 import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
+  type SetStateAction,
   useCallback,
   useEffect,
   useEffectEvent,
@@ -25,7 +31,6 @@ import {
   useState,
 } from "react";
 import { Popover, PopoverPopup, PopoverTrigger } from "~/components/ui/popover";
-import { Menu, MenuItem, MenuPopup, MenuTrigger } from "~/components/ui/menu";
 import { writeTextToClipboard } from "~/hooks/useCopyToClipboard";
 import { cn } from "~/lib/utils";
 import { type TerminalContextSelection } from "~/lib/terminalContext";
@@ -44,13 +49,13 @@ import {
   isTerminalCloseShortcut,
   isTerminalNewShortcut,
   isTerminalSplitShortcut,
+  isTerminalSplitVerticalShortcut,
   isTerminalToggleShortcut,
   terminalDeleteShortcutData,
   terminalNavigationShortcutData,
 } from "../keybindings";
 import {
   DEFAULT_THREAD_TERMINAL_HEIGHT,
-  DEFAULT_THREAD_TERMINAL_ID,
   MAX_TERMINALS_PER_GROUP,
   type ThreadTerminalGroup,
 } from "../types";
@@ -265,7 +270,8 @@ export function shouldHandleTerminalSelectionMouseUp(
 }
 
 interface TerminalViewportProps {
-  ownerRef: TerminalOwnerRef;
+  threadRef: ScopedThreadRef;
+  threadId: ThreadId;
   terminalId: string;
   terminalLabel: string;
   cwd: string;
@@ -280,8 +286,15 @@ interface TerminalViewportProps {
   keybindings: ResolvedKeybindingsConfig;
 }
 
+interface TerminalLaunchLocation {
+  readonly cwd: string;
+  readonly worktreePath?: string | null;
+  readonly runtimeEnv?: Record<string, string>;
+}
+
 export function TerminalViewport({
-  ownerRef,
+  threadRef,
+  threadId,
   terminalId,
   terminalLabel,
   cwd,
@@ -298,11 +311,7 @@ export function TerminalViewport({
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
-  const environmentId = ownerRef.environmentId;
-  const owner = ownerRef.owner;
-  const ownerDepKey = owner.type === "thread" ? `t:${owner.threadId}` : `p:${owner.projectId}`;
-  const threadRef: ScopedThreadRef | null =
-    owner.type === "thread" ? { environmentId, threadId: ThreadId.make(owner.threadId) } : null;
+  const environmentId = threadRef.environmentId;
   const serverConfig = useAtomValue(serverEnvironment.configValueAtom(environmentId));
   const openInPreferredEditor = useOpenInPreferredEditor(
     environmentId,
@@ -336,7 +345,7 @@ export function TerminalViewport({
   const terminalSession = useAttachedTerminalSession({
     environmentId,
     terminal: {
-      owner,
+      threadId,
       terminalId,
       cwd,
       ...(worktreePath !== undefined ? { worktreePath } : {}),
@@ -346,13 +355,13 @@ export function TerminalViewport({
   const writeTerminal = useEffectEvent((data: string) =>
     runTerminalWrite({
       environmentId,
-      input: { owner, terminalId, data },
+      input: { threadId, terminalId, data },
     }),
   );
   const resizeTerminal = useEffectEvent((cols: number, rows: number) =>
     runTerminalResize({
       environmentId,
-      input: { owner, terminalId, cols, rows },
+      input: { threadId, terminalId, cols, rows },
     }),
   );
   const terminalBuffer = terminalSession.buffer;
@@ -522,6 +531,7 @@ export function TerminalViewport({
       if (
         isTerminalToggleShortcut(event, currentKeybindings, options) ||
         isTerminalSplitShortcut(event, currentKeybindings, options) ||
+        isTerminalSplitVerticalShortcut(event, currentKeybindings, options) ||
         isTerminalNewShortcut(event, currentKeybindings, options) ||
         isTerminalCloseShortcut(event, currentKeybindings, options) ||
         isDiffToggleShortcut(event, currentKeybindings, options)
@@ -607,10 +617,6 @@ export function TerminalViewport({
                     );
                   });
                 };
-                if (threadRef === null) {
-                  fallbackToBrowser();
-                  return;
-                }
                 void openTerminalLinkInPreview({
                   url: match.text,
                   position: { x: event.clientX, y: event.clientY },
@@ -728,7 +734,7 @@ export function TerminalViewport({
     // autoFocus is intentionally omitted;
     // it is only read at mount time and must not trigger terminal teardown/recreation.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cwd, environmentId, runtimeEnvKey, terminalId, ownerDepKey, worktreePath]);
+  }, [cwd, environmentId, runtimeEnvKey, terminalId, threadId, worktreePath]);
 
   useEffect(() => {
     const terminal = terminalRef.current;
@@ -816,7 +822,7 @@ export function TerminalViewport({
     return () => {
       window.cancelAnimationFrame(frame);
     };
-  }, [drawerHeight, environmentId, resizeEpoch, terminalId, ownerDepKey]);
+  }, [drawerHeight, environmentId, resizeEpoch, terminalId, threadId]);
   return (
     <div
       ref={containerRef}
@@ -825,192 +831,36 @@ export function TerminalViewport({
   );
 }
 
-export interface TerminalDrawerSection {
-  id: ProjectScriptScope;
-  label: string;
-  ownerRef: TerminalOwnerRef;
+interface ThreadTerminalDrawerProps {
+  mode?: "drawer" | "panel";
+  threadRef: ScopedThreadRef;
+  threadId: ThreadId;
   cwd: string;
   worktreePath?: string | null;
   runtimeEnv?: Record<string, string>;
+  visible?: boolean;
+  height: number;
   terminalIds: string[];
   activeTerminalId: string;
   terminalGroups: ThreadTerminalGroup[];
   activeTerminalGroupId: string;
-  serverLabelById: Map<string, string>;
-  customNameById: Map<string, string>;
-  allowGrouping: boolean;
   focusRequestId: number;
-  onNewTerminal: () => void;
   onSplitTerminal: () => void;
-  onActiveTerminalChange: (terminalId: string) => void;
-  onCloseTerminal: (terminalId: string) => void;
-  onRenameTerminal: (terminalId: string, name: string) => void;
-  onAddTerminalContext: (selection: TerminalContextSelection) => void;
-}
-
-export interface TerminalDrawerCreateOption {
-  id: ProjectScriptScope;
-  label: string;
-  onCreate: () => void;
-}
-
-const EMPTY_CREATE_OPTIONS: TerminalDrawerCreateOption[] = [];
-
-interface ThreadTerminalDrawerProps {
-  mode?: "drawer" | "panel";
-  sections: TerminalDrawerSection[];
-  createOptions?: TerminalDrawerCreateOption[] | undefined;
-  activeSectionId: ProjectScriptScope;
-  onActiveSectionChange: (id: ProjectScriptScope) => void;
-  onCloseDrawer: () => void;
-  visible?: boolean;
-  height: number;
-  onHeightChange: (height: number) => void;
-  keybindings: ResolvedKeybindingsConfig;
+  onSplitTerminalVertical: () => void;
+  onNewTerminal: () => void;
   splitShortcutLabel?: string | undefined;
   splitVerticalShortcutLabel?: string | undefined;
   newShortcutLabel?: string | undefined;
   closeShortcutLabel?: string | undefined;
-}
-
-interface SectionView {
-  section: TerminalDrawerSection;
-  normalizedTerminalIds: string[];
-  resolvedActiveTerminalId: string;
-  resolvedTerminalGroups: ThreadTerminalGroup[];
-  resolvedActiveGroupIndex: number;
-  visibleTerminalIds: string[];
-  isSplitView: boolean;
-  showGroupHeaders: boolean;
-  hasReachedSplitLimit: boolean;
-  hasRealTerminals: boolean;
-  terminalLabelById: Map<string, string>;
-}
-
-function deriveSectionView(section: TerminalDrawerSection): SectionView {
-  const rawVisibleTerminalIds = [
-    ...new Set(section.terminalIds.map((id) => id.trim()).filter((id) => id.length > 0)),
-  ];
-  const normalizedTerminalIds =
-    rawVisibleTerminalIds.length > 0 ? rawVisibleTerminalIds : [DEFAULT_THREAD_TERMINAL_ID];
-
-  const resolvedActiveTerminalId = normalizedTerminalIds.includes(section.activeTerminalId)
-    ? section.activeTerminalId
-    : (normalizedTerminalIds[0] ?? DEFAULT_THREAD_TERMINAL_ID);
-
-  const validTerminalIdSet = new Set(normalizedTerminalIds);
-  const assignedTerminalIds = new Set<string>();
-  const usedGroupIds = new Set<string>();
-  const nextGroups: ThreadTerminalGroup[] = [];
-
-  const assignUniqueGroupId = (groupId: string): string => {
-    if (!usedGroupIds.has(groupId)) {
-      usedGroupIds.add(groupId);
-      return groupId;
-    }
-    let suffix = 2;
-    while (usedGroupIds.has(`${groupId}-${suffix}`)) {
-      suffix += 1;
-    }
-    const uniqueGroupId = `${groupId}-${suffix}`;
-    usedGroupIds.add(uniqueGroupId);
-    return uniqueGroupId;
-  };
-
-  for (const terminalGroup of section.terminalGroups) {
-    const nextTerminalIds = [
-      ...new Set(terminalGroup.terminalIds.map((id) => id.trim()).filter((id) => id.length > 0)),
-    ].filter((terminalId) => {
-      if (!validTerminalIdSet.has(terminalId)) return false;
-      if (assignedTerminalIds.has(terminalId)) return false;
-      return true;
-    });
-    if (nextTerminalIds.length === 0) continue;
-
-    for (const terminalId of nextTerminalIds) {
-      assignedTerminalIds.add(terminalId);
-    }
-
-    const baseGroupId =
-      terminalGroup.id.trim().length > 0
-        ? terminalGroup.id.trim()
-        : `group-${nextTerminalIds[0] ?? DEFAULT_THREAD_TERMINAL_ID}`;
-    nextGroups.push({
-      id: assignUniqueGroupId(baseGroupId),
-      terminalIds: nextTerminalIds,
-    });
-  }
-
-  for (const terminalId of normalizedTerminalIds) {
-    if (assignedTerminalIds.has(terminalId)) continue;
-    nextGroups.push({
-      id: assignUniqueGroupId(`group-${terminalId}`),
-      terminalIds: [terminalId],
-    });
-  }
-
-  const groupedTerminalGroups =
-    nextGroups.length > 0
-      ? nextGroups
-      : [
-          {
-            id: `group-${resolvedActiveTerminalId}`,
-            terminalIds: [resolvedActiveTerminalId],
-          },
-        ];
-
-  const resolvedTerminalGroups = section.allowGrouping
-    ? groupedTerminalGroups
-    : normalizedTerminalIds.map((terminalId) => ({
-        id: `group-${terminalId}`,
-        terminalIds: [terminalId],
-      }));
-
-  const indexById = resolvedTerminalGroups.findIndex(
-    (terminalGroup) => terminalGroup.id === section.activeTerminalGroupId,
-  );
-  const resolvedActiveGroupIndex =
-    indexById >= 0
-      ? indexById
-      : Math.max(
-          0,
-          resolvedTerminalGroups.findIndex((terminalGroup) =>
-            terminalGroup.terminalIds.includes(resolvedActiveTerminalId),
-          ),
-        );
-
-  const visibleTerminalIds = section.allowGrouping
-    ? (resolvedTerminalGroups[resolvedActiveGroupIndex]?.terminalIds ?? [resolvedActiveTerminalId])
-    : [resolvedActiveTerminalId];
-  const showGroupHeaders =
-    section.allowGrouping &&
-    (resolvedTerminalGroups.length > 1 ||
-      resolvedTerminalGroups.some((terminalGroup) => terminalGroup.terminalIds.length > 1));
-  const terminalLabelById = new Map(
-    normalizedTerminalIds.map((terminalId) => {
-      const customName = section.customNameById.get(terminalId)?.trim();
-      const serverLabel = section.serverLabelById.get(terminalId);
-      const label =
-        customName && customName.length > 0
-          ? customName
-          : resolveTerminalSessionLabel(terminalId, serverLabel ? { label: serverLabel } : null);
-      return [terminalId, label] as const;
-    }),
-  );
-
-  return {
-    section,
-    normalizedTerminalIds,
-    resolvedActiveTerminalId,
-    resolvedTerminalGroups,
-    resolvedActiveGroupIndex,
-    visibleTerminalIds,
-    isSplitView: visibleTerminalIds.length > 1,
-    showGroupHeaders,
-    hasReachedSplitLimit: visibleTerminalIds.length >= MAX_TERMINALS_PER_GROUP,
-    hasRealTerminals: rawVisibleTerminalIds.length > 0,
-    terminalLabelById,
-  };
+  onActiveTerminalChange: (terminalId: string) => void;
+  onCloseTerminal: (terminalId: string) => void;
+  onHeightChange: (height: number) => void;
+  onAddTerminalContext: (selection: TerminalContextSelection) => void;
+  keybindings: ResolvedKeybindingsConfig;
+  /** Prefer server-provided tab titles when present (e.g. active subprocess name). */
+  terminalLabelsById?: ReadonlyMap<string, string>;
+  /** Prefer per-session launch locations when the server already knows a terminal. */
+  terminalLaunchLocationsById?: ReadonlyMap<string, TerminalLaunchLocation>;
 }
 
 interface TerminalActionButtonProps {
@@ -1042,79 +892,62 @@ function TerminalActionButton({ label, className, onClick, children }: TerminalA
   );
 }
 
-interface TerminalCreateMenuButtonProps {
-  label: string;
-  className: string;
-  options: TerminalDrawerCreateOption[];
-  onFallbackCreate: () => void;
-  children: ReactNode;
-}
-
-function TerminalCreateMenuButton({
-  label,
-  className,
-  options,
-  onFallbackCreate,
-  children,
-}: TerminalCreateMenuButtonProps) {
-  if (options.length <= 1) {
-    return (
-      <TerminalActionButton
-        className={className}
-        onClick={options[0]?.onCreate ?? onFallbackCreate}
-        label={label}
-      >
-        {children}
-      </TerminalActionButton>
-    );
-  }
-
-  return (
-    <Menu highlightItemOnHover={false}>
-      <MenuTrigger render={<button type="button" className={className} aria-label={label} />}>
-        {children}
-      </MenuTrigger>
-      <MenuPopup align="end" side="bottom" className="min-w-36">
-        {options.map((option) => (
-          <MenuItem key={option.id} onClick={option.onCreate}>
-            {option.label}
-          </MenuItem>
-        ))}
-      </MenuPopup>
-    </Menu>
-  );
-}
-
 export default function ThreadTerminalDrawer({
   mode = "drawer",
-  sections,
-  createOptions = EMPTY_CREATE_OPTIONS,
-  activeSectionId,
-  onActiveSectionChange,
-  onCloseDrawer,
+  threadRef,
+  threadId,
+  cwd,
+  worktreePath,
+  runtimeEnv,
   visible = true,
   height,
-  onHeightChange,
-  keybindings,
+  terminalIds,
+  activeTerminalId,
+  terminalGroups,
+  activeTerminalGroupId,
+  focusRequestId,
+  onSplitTerminal,
+  onSplitTerminalVertical,
+  onNewTerminal,
   splitShortcutLabel,
+  splitVerticalShortcutLabel,
   newShortcutLabel,
   closeShortcutLabel,
+  onActiveTerminalChange,
+  onCloseTerminal,
+  onHeightChange,
+  onAddTerminalContext,
+  keybindings,
+  terminalLabelsById,
+  terminalLaunchLocationsById,
 }: ThreadTerminalDrawerProps) {
-  const sectionViews = useMemo(() => sections.map(deriveSectionView), [sections]);
-  const activeSectionIndex = Math.max(
-    0,
-    sections.findIndex((section) => section.id === activeSectionId),
+  const isPanel = mode === "panel";
+  const controlledDrawerHeight = clampDrawerHeight(height);
+  const [drawerHeightState, setDrawerHeightState] = useState(() => ({
+    threadId,
+    height: controlledDrawerHeight,
+  }));
+  const drawerHeight =
+    drawerHeightState.threadId === threadId ? drawerHeightState.height : controlledDrawerHeight;
+  const setDrawerHeight = useCallback(
+    (update: SetStateAction<number>) => {
+      setDrawerHeightState((current) => {
+        const currentHeight =
+          current.threadId === threadId ? current.height : controlledDrawerHeight;
+        const nextHeight = typeof update === "function" ? update(currentHeight) : update;
+        return nextHeight === currentHeight && current.threadId === threadId
+          ? current
+          : { threadId, height: nextHeight };
+      });
+    },
+    [controlledDrawerHeight, threadId],
   );
-  const activeSection = sections[activeSectionIndex];
-  const activeView = sectionViews[activeSectionIndex];
-  const ownerKey = activeSection ? terminalOwnerKey(activeSection.ownerRef) : "";
-  const [drawerHeight, setDrawerHeight] = useState(() => clampDrawerHeight(height));
+  const setDrawerHeightFromWindowResize = useEffectEvent((nextHeight: number) => {
+    setDrawerHeight(nextHeight);
+  });
   const [resizeEpoch, setResizeEpoch] = useState(0);
-  const [editingTerminalKey, setEditingTerminalKey] = useState<string | null>(null);
-  const [editingTerminalDraft, setEditingTerminalDraft] = useState("");
-  const skipRenameBlurCommitRef = useRef(false);
   const drawerHeightRef = useRef(drawerHeight);
-  const lastSyncedHeightRef = useRef(clampDrawerHeight(height));
+  const lastSyncedHeightRef = useRef(controlledDrawerHeight);
   const onHeightChangeRef = useRef(onHeightChange);
   const resizeStateRef = useRef<{
     pointerId: number;
@@ -1122,6 +955,168 @@ export default function ThreadTerminalDrawer({
     startHeight: number;
   } | null>(null);
   const didResizeDuringDragRef = useRef(false);
+
+  const normalizedTerminalIds = useMemo(() => {
+    const normalizedIds: string[] = [];
+    const seen = new Set<string>();
+    for (const id of terminalIds) {
+      const trimmedId = id.trim();
+      if (trimmedId.length === 0 || seen.has(trimmedId)) continue;
+      seen.add(trimmedId);
+      normalizedIds.push(trimmedId);
+    }
+    return normalizedIds;
+  }, [terminalIds]);
+
+  const resolvedActiveTerminalId =
+    normalizedTerminalIds.length === 0
+      ? ""
+      : normalizedTerminalIds.includes(activeTerminalId)
+        ? activeTerminalId
+        : (normalizedTerminalIds[0] ?? "");
+
+  const resolvedTerminalGroups = useMemo(() => {
+    if (normalizedTerminalIds.length === 0) {
+      return [];
+    }
+    const validTerminalIdSet = new Set(normalizedTerminalIds);
+    const assignedTerminalIds = new Set<string>();
+    const usedGroupIds = new Set<string>();
+    const nextGroups: ThreadTerminalGroup[] = [];
+
+    const assignUniqueGroupId = (groupId: string): string => {
+      if (!usedGroupIds.has(groupId)) {
+        usedGroupIds.add(groupId);
+        return groupId;
+      }
+      let suffix = 2;
+      while (usedGroupIds.has(`${groupId}-${suffix}`)) {
+        suffix += 1;
+      }
+      const uniqueGroupId = `${groupId}-${suffix}`;
+      usedGroupIds.add(uniqueGroupId);
+      return uniqueGroupId;
+    };
+
+    for (const terminalGroup of terminalGroups) {
+      const nextTerminalIds: string[] = [];
+      const seenGroupTerminalIds = new Set<string>();
+      for (const id of terminalGroup.terminalIds) {
+        const terminalId = id.trim();
+        if (terminalId.length === 0) continue;
+        if (seenGroupTerminalIds.has(terminalId)) continue;
+        seenGroupTerminalIds.add(terminalId);
+        if (!validTerminalIdSet.has(terminalId)) continue;
+        if (assignedTerminalIds.has(terminalId)) continue;
+        nextTerminalIds.push(terminalId);
+      }
+      if (nextTerminalIds.length === 0) continue;
+
+      for (const terminalId of nextTerminalIds) {
+        assignedTerminalIds.add(terminalId);
+      }
+
+      const baseGroupId =
+        terminalGroup.id.trim().length > 0
+          ? terminalGroup.id.trim()
+          : `group-${nextTerminalIds[0] ?? normalizedTerminalIds[0] ?? ""}`;
+      nextGroups.push({
+        id: assignUniqueGroupId(baseGroupId),
+        terminalIds: nextTerminalIds,
+        ...(terminalGroup.splitDirection === "vertical"
+          ? { splitDirection: "vertical" as const }
+          : {}),
+      });
+    }
+
+    for (const terminalId of normalizedTerminalIds) {
+      if (assignedTerminalIds.has(terminalId)) continue;
+      nextGroups.push({
+        id: assignUniqueGroupId(`group-${terminalId}`),
+        terminalIds: [terminalId],
+      });
+    }
+
+    const terminalOrderIndex = new Map(
+      normalizedTerminalIds.map((id, index) => [id, index] as const),
+    );
+    nextGroups.sort((left, right) => {
+      const rank = (ids: readonly string[]) =>
+        Math.min(...ids.map((id) => terminalOrderIndex.get(id) ?? Number.POSITIVE_INFINITY));
+      return rank(left.terminalIds) - rank(right.terminalIds);
+    });
+
+    return nextGroups;
+  }, [normalizedTerminalIds, terminalGroups]);
+
+  const resolvedActiveGroupIndex = useMemo(() => {
+    const indexById = resolvedTerminalGroups.findIndex(
+      (terminalGroup) => terminalGroup.id === activeTerminalGroupId,
+    );
+    if (indexById >= 0) return indexById;
+    const indexByTerminal = resolvedTerminalGroups.findIndex((terminalGroup) =>
+      terminalGroup.terminalIds.includes(resolvedActiveTerminalId),
+    );
+    return indexByTerminal >= 0 ? indexByTerminal : 0;
+  }, [activeTerminalGroupId, resolvedActiveTerminalId, resolvedTerminalGroups]);
+
+  const visibleTerminalIds =
+    resolvedTerminalGroups[resolvedActiveGroupIndex]?.terminalIds ??
+    (normalizedTerminalIds.length > 0 ? [resolvedActiveTerminalId] : []);
+  const splitDirection =
+    resolvedTerminalGroups[resolvedActiveGroupIndex]?.splitDirection ?? "horizontal";
+  const hasTerminalSidebar = normalizedTerminalIds.length > 1;
+  const isSplitView = visibleTerminalIds.length > 1;
+  const showGroupHeaders =
+    resolvedTerminalGroups.length > 1 ||
+    resolvedTerminalGroups.some((terminalGroup) => terminalGroup.terminalIds.length > 1);
+  const hasReachedSplitLimit = visibleTerminalIds.length >= MAX_TERMINALS_PER_GROUP;
+  const terminalLabelById = useMemo(() => {
+    const next = new Map<string, string>();
+    for (const terminalId of normalizedTerminalIds) {
+      next.set(terminalId, terminalLabelsById?.get(terminalId) ?? getTerminalLabel(terminalId));
+    }
+    return next;
+  }, [normalizedTerminalIds, terminalLabelsById]);
+  const resolveTerminalLaunchLocation = useCallback(
+    (terminalId: string): TerminalLaunchLocation => {
+      return (
+        terminalLaunchLocationsById?.get(terminalId) ?? {
+          cwd,
+          ...(worktreePath !== undefined ? { worktreePath } : {}),
+          ...(runtimeEnv ? { runtimeEnv } : {}),
+        }
+      );
+    },
+    [cwd, runtimeEnv, terminalLaunchLocationsById, worktreePath],
+  );
+  const splitTerminalActionLabel = hasReachedSplitLimit
+    ? `Split Terminal Horizontally (max ${MAX_TERMINALS_PER_GROUP} per group)`
+    : splitShortcutLabel
+      ? `Split Terminal Horizontally (${splitShortcutLabel})`
+      : "Split Terminal Horizontally";
+  const splitTerminalVerticalActionLabel = hasReachedSplitLimit
+    ? `Split Terminal Vertically (max ${MAX_TERMINALS_PER_GROUP} per group)`
+    : splitVerticalShortcutLabel
+      ? `Split Terminal Vertically (${splitVerticalShortcutLabel})`
+      : "Split Terminal Vertically";
+  const newTerminalActionLabel = newShortcutLabel
+    ? `New Terminal (${newShortcutLabel})`
+    : "New Terminal";
+  const closeTerminalActionLabel = closeShortcutLabel
+    ? `Close Terminal (${closeShortcutLabel})`
+    : "Close Terminal";
+  const onSplitTerminalAction = useCallback(() => {
+    if (hasReachedSplitLimit) return;
+    onSplitTerminal();
+  }, [hasReachedSplitLimit, onSplitTerminal]);
+  const onSplitTerminalVerticalAction = useCallback(() => {
+    if (hasReachedSplitLimit) return;
+    onSplitTerminalVertical();
+  }, [hasReachedSplitLimit, onSplitTerminalVertical]);
+  const onNewTerminalAction = useCallback(() => {
+    onNewTerminal();
+  }, [onNewTerminal]);
 
   useEffect(() => {
     onHeightChangeRef.current = onHeightChange;
@@ -1139,11 +1134,8 @@ export default function ThreadTerminalDrawer({
   }, []);
 
   useEffect(() => {
-    const clampedHeight = clampDrawerHeight(height);
-    setDrawerHeight(clampedHeight);
-    drawerHeightRef.current = clampedHeight;
-    lastSyncedHeightRef.current = clampedHeight;
-  }, [height, ownerKey]);
+    lastSyncedHeightRef.current = controlledDrawerHeight;
+  }, [controlledDrawerHeight, threadId]);
 
   const handleResizePointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
@@ -1157,20 +1149,23 @@ export default function ThreadTerminalDrawer({
     };
   }, []);
 
-  const handleResizePointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    const resizeState = resizeStateRef.current;
-    if (!resizeState || resizeState.pointerId !== event.pointerId) return;
-    event.preventDefault();
-    const clampedHeight = clampDrawerHeight(
-      resizeState.startHeight + (resizeState.startY - event.clientY),
-    );
-    if (clampedHeight === drawerHeightRef.current) {
-      return;
-    }
-    didResizeDuringDragRef.current = true;
-    drawerHeightRef.current = clampedHeight;
-    setDrawerHeight(clampedHeight);
-  }, []);
+  const handleResizePointerMove = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const resizeState = resizeStateRef.current;
+      if (!resizeState || resizeState.pointerId !== event.pointerId) return;
+      event.preventDefault();
+      const clampedHeight = clampDrawerHeight(
+        resizeState.startHeight + (resizeState.startY - event.clientY),
+      );
+      if (clampedHeight === drawerHeightRef.current) {
+        return;
+      }
+      didResizeDuringDragRef.current = true;
+      drawerHeightRef.current = clampedHeight;
+      setDrawerHeight(clampedHeight);
+    },
+    [setDrawerHeight],
+  );
 
   const handleResizePointerEnd = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -1198,7 +1193,7 @@ export default function ThreadTerminalDrawer({
       const clampedHeight = clampDrawerHeight(drawerHeightRef.current);
       const changed = clampedHeight !== drawerHeightRef.current;
       if (changed) {
-        setDrawerHeight(clampedHeight);
+        setDrawerHeightFromWindowResize(clampedHeight);
         drawerHeightRef.current = clampedHeight;
       }
       if (!resizeStateRef.current) {
@@ -1225,44 +1220,51 @@ export default function ThreadTerminalDrawer({
     };
   }, [syncHeight]);
 
-  if (!activeSection || !activeView) {
-    return null;
+  if (normalizedTerminalIds.length === 0) {
+    return (
+      <aside
+        data-terminal-owner={isPanel ? "right-panel" : "drawer"}
+        className={cn(
+          "thread-terminal-drawer relative flex min-w-0 flex-col overflow-hidden bg-background",
+          isPanel ? "h-full flex-1" : "shrink-0 border-t border-border/80",
+        )}
+        style={isPanel ? undefined : { height: `${drawerHeight}px` }}
+      >
+        {!isPanel ? (
+          <div
+            className="absolute inset-x-0 top-0 z-20 h-1.5 cursor-row-resize"
+            onPointerDown={handleResizePointerDown}
+            onPointerMove={handleResizePointerMove}
+            onPointerUp={handleResizePointerEnd}
+            onPointerCancel={handleResizePointerEnd}
+          />
+        ) : null}
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-4 py-6 text-center text-sm text-muted-foreground">
+          <p>No terminal sessions for this thread yet.</p>
+          <button
+            type="button"
+            className="rounded-md border border-border/80 bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent"
+            onClick={onNewTerminalAction}
+          >
+            {newTerminalActionLabel}
+          </button>
+        </div>
+      </aside>
+    );
   }
 
-  const activeOwnerKey = terminalOwnerKey(activeSection.ownerRef);
-  const resolvedActiveTerminalId = activeView.resolvedActiveTerminalId;
-  const visibleTerminalIds = activeView.visibleTerminalIds;
-  const isSplitView = activeView.isSplitView;
-  const activeTerminalLabelById = activeView.terminalLabelById;
-  const hasReachedSplitLimit = activeView.hasReachedSplitLimit;
-  const hasTerminalSidebar = activeView.hasRealTerminals;
-  const allowSplit = activeSection.allowGrouping;
-
-  const splitTerminalActionLabel = hasReachedSplitLimit
-    ? `Split Terminal (max ${MAX_TERMINALS_PER_GROUP} per group)`
-    : splitShortcutLabel
-      ? `Split Terminal (${splitShortcutLabel})`
-      : "Split Terminal";
-  const newTerminalActionLabel = newShortcutLabel
-    ? `New Terminal (${newShortcutLabel})`
-    : "New Terminal";
-  const onSplitTerminalAction = () => {
-    if (activeView.hasReachedSplitLimit) return;
-    activeSection.onSplitTerminal();
-  };
-  const onNewTerminalAction = () => {
-    activeSection.onNewTerminal();
-  };
+  const activeTerminalLaunchLocation = resolveTerminalLaunchLocation(resolvedActiveTerminalId);
 
   return (
     <aside
+      data-terminal-owner={isPanel ? "right-panel" : "drawer"}
       className={cn(
         "thread-terminal-drawer relative flex min-w-0 flex-col overflow-hidden bg-background",
-        mode === "panel" ? "h-full flex-1" : "shrink-0 border-t border-border/80",
+        isPanel ? "h-full flex-1" : "shrink-0 border-t border-border/80",
       )}
-      style={mode === "panel" ? undefined : { height: `${drawerHeight}px` }}
+      style={isPanel ? undefined : { height: `${drawerHeight}px` }}
     >
-      {mode === "drawer" ? (
+      {!isPanel ? (
         <div
           className="absolute inset-x-0 top-0 z-20 h-1.5 cursor-row-resize"
           onPointerDown={handleResizePointerDown}
@@ -1275,37 +1277,44 @@ export default function ThreadTerminalDrawer({
       {!hasTerminalSidebar && (
         <div className="pointer-events-none absolute right-2 top-2 z-20">
           <div className="pointer-events-auto inline-flex items-center overflow-hidden rounded-md border border-border/80 bg-background/70">
-            {allowSplit && (
-              <>
-                <TerminalActionButton
-                  className={`p-1 text-foreground/90 transition-colors ${
-                    hasReachedSplitLimit
-                      ? "cursor-not-allowed opacity-45 hover:bg-transparent"
-                      : "hover:bg-accent"
-                  }`}
-                  onClick={onSplitTerminalAction}
-                  label={splitTerminalActionLabel}
-                >
-                  <SquareSplitHorizontal className="size-3.25" />
-                </TerminalActionButton>
-                <div className="h-4 w-px bg-border/80" />
-              </>
-            )}
-            <TerminalCreateMenuButton
-              className="p-1 text-foreground/90 transition-colors hover:bg-accent"
-              options={createOptions}
-              onFallbackCreate={onNewTerminalAction}
-              label={newTerminalActionLabel}
+            <TerminalActionButton
+              className={`p-1 text-foreground/90 transition-colors ${
+                hasReachedSplitLimit
+                  ? "cursor-not-allowed opacity-45 hover:bg-transparent"
+                  : "hover:bg-accent"
+              }`}
+              onClick={onSplitTerminalAction}
+              label={splitTerminalActionLabel}
             >
-              <Plus className="size-3.25" />
-            </TerminalCreateMenuButton>
+              <SquareSplitHorizontal className="size-3.25" />
+            </TerminalActionButton>
+            <div className="h-4 w-px bg-border/80" />
+            <TerminalActionButton
+              className={`p-1 text-foreground/90 transition-colors ${
+                hasReachedSplitLimit
+                  ? "cursor-not-allowed opacity-45 hover:bg-transparent"
+                  : "hover:bg-accent"
+              }`}
+              onClick={onSplitTerminalVerticalAction}
+              label={splitTerminalVerticalActionLabel}
+            >
+              <SquareSplitVertical className="size-3.25" />
+            </TerminalActionButton>
             <div className="h-4 w-px bg-border/80" />
             <TerminalActionButton
               className="p-1 text-foreground/90 transition-colors hover:bg-accent"
-              onClick={onCloseDrawer}
-              label="Close panel (keep terminals running)"
+              onClick={onNewTerminalAction}
+              label={newTerminalActionLabel}
             >
-              <XIcon className="size-3.25" />
+              <Plus className="size-3.25" />
+            </TerminalActionButton>
+            <div className="h-4 w-px bg-border/80" />
+            <TerminalActionButton
+              className="p-1 text-foreground/90 transition-colors hover:bg-accent"
+              onClick={() => onCloseTerminal(resolvedActiveTerminalId)}
+              label={closeTerminalActionLabel}
+            >
+              <Trash2 className="size-3.25" />
             </TerminalActionButton>
           </div>
         </div>
@@ -1317,66 +1326,81 @@ export default function ThreadTerminalDrawer({
             {isSplitView ? (
               <div
                 className="grid h-full w-full min-w-0 gap-0 overflow-hidden"
-                style={{
-                  gridTemplateColumns: `repeat(${visibleTerminalIds.length}, minmax(0, 1fr))`,
-                }}
-              >
-                {visibleTerminalIds.map((terminalId) => (
-                  <div
-                    key={`${activeOwnerKey}:${terminalId}`}
-                    className={`min-h-0 min-w-0 border-l first:border-l-0 ${
-                      terminalId === resolvedActiveTerminalId ? "border-border" : "border-border/70"
-                    }`}
-                    onMouseDown={() => {
-                      if (terminalId !== resolvedActiveTerminalId) {
-                        activeSection.onActiveTerminalChange(terminalId);
+                style={
+                  splitDirection === "vertical"
+                    ? {
+                        gridTemplateRows: `repeat(${visibleTerminalIds.length}, minmax(0, 1fr))`,
                       }
-                    }}
-                  >
-                    <div className="h-full p-1">
-                      <TerminalViewport
-                        ownerRef={activeSection.ownerRef}
-                        terminalId={terminalId}
-                        terminalLabel={activeTerminalLabelById.get(terminalId) ?? "Terminal"}
-                        cwd={activeSection.cwd}
-                        {...(activeSection.worktreePath !== undefined
-                          ? { worktreePath: activeSection.worktreePath }
-                          : {})}
-                        {...(activeSection.runtimeEnv
-                          ? { runtimeEnv: activeSection.runtimeEnv }
-                          : {})}
-                        onSessionExited={() => activeSection.onCloseTerminal(terminalId)}
-                        onAddTerminalContext={activeSection.onAddTerminalContext}
-                        focusRequestId={activeSection.focusRequestId}
-                        autoFocus={
-                          terminalId === resolvedActiveTerminalId && editingTerminalKey === null
+                    : {
+                        gridTemplateColumns: `repeat(${visibleTerminalIds.length}, minmax(0, 1fr))`,
+                      }
+                }
+              >
+                {visibleTerminalIds.map((terminalId) => {
+                  const terminalLaunchLocation = resolveTerminalLaunchLocation(terminalId);
+                  return (
+                    <div
+                      key={terminalId}
+                      className={`min-h-0 min-w-0 ${
+                        splitDirection === "vertical"
+                          ? "border-t first:border-t-0"
+                          : "border-l first:border-l-0"
+                      } ${
+                        terminalId === resolvedActiveTerminalId
+                          ? "border-border"
+                          : "border-border/70"
+                      }`}
+                      onMouseDown={() => {
+                        if (terminalId !== resolvedActiveTerminalId) {
+                          onActiveTerminalChange(terminalId);
                         }
-                        resizeEpoch={resizeEpoch}
-                        drawerHeight={drawerHeight}
-                        keybindings={keybindings}
-                      />
+                      }}
+                    >
+                      <div className="h-full p-1">
+                        <TerminalViewport
+                          threadRef={threadRef}
+                          threadId={threadId}
+                          terminalId={terminalId}
+                          terminalLabel={terminalLabelById.get(terminalId) ?? "Terminal"}
+                          cwd={terminalLaunchLocation.cwd}
+                          {...(terminalLaunchLocation.worktreePath !== undefined
+                            ? { worktreePath: terminalLaunchLocation.worktreePath }
+                            : {})}
+                          {...(terminalLaunchLocation.runtimeEnv
+                            ? { runtimeEnv: terminalLaunchLocation.runtimeEnv }
+                            : {})}
+                          onSessionExited={() => onCloseTerminal(terminalId)}
+                          onAddTerminalContext={onAddTerminalContext}
+                          focusRequestId={focusRequestId}
+                          autoFocus={terminalId === resolvedActiveTerminalId}
+                          resizeEpoch={resizeEpoch}
+                          drawerHeight={drawerHeight}
+                          keybindings={keybindings}
+                        />
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="h-full p-1">
                 <TerminalViewport
-                  key={`${activeOwnerKey}:${resolvedActiveTerminalId}`}
-                  ownerRef={activeSection.ownerRef}
+                  key={resolvedActiveTerminalId}
+                  threadRef={threadRef}
+                  threadId={threadId}
                   terminalId={resolvedActiveTerminalId}
-                  terminalLabel={
-                    activeTerminalLabelById.get(resolvedActiveTerminalId) ?? "Terminal"
-                  }
-                  cwd={activeSection.cwd}
-                  {...(activeSection.worktreePath !== undefined
-                    ? { worktreePath: activeSection.worktreePath }
+                  terminalLabel={terminalLabelById.get(resolvedActiveTerminalId) ?? "Terminal"}
+                  cwd={activeTerminalLaunchLocation.cwd}
+                  {...(activeTerminalLaunchLocation.worktreePath !== undefined
+                    ? { worktreePath: activeTerminalLaunchLocation.worktreePath }
                     : {})}
-                  {...(activeSection.runtimeEnv ? { runtimeEnv: activeSection.runtimeEnv } : {})}
-                  onSessionExited={() => activeSection.onCloseTerminal(resolvedActiveTerminalId)}
-                  onAddTerminalContext={activeSection.onAddTerminalContext}
-                  focusRequestId={activeSection.focusRequestId}
-                  autoFocus={editingTerminalKey === null}
+                  {...(activeTerminalLaunchLocation.runtimeEnv
+                    ? { runtimeEnv: activeTerminalLaunchLocation.runtimeEnv }
+                    : {})}
+                  onSessionExited={() => onCloseTerminal(resolvedActiveTerminalId)}
+                  onAddTerminalContext={onAddTerminalContext}
+                  focusRequestId={focusRequestId}
+                  autoFocus
                   resizeEpoch={resizeEpoch}
                   drawerHeight={drawerHeight}
                   keybindings={keybindings}
@@ -1389,210 +1413,129 @@ export default function ThreadTerminalDrawer({
             <aside className="flex w-36 min-w-36 flex-col border border-border/70 bg-muted/10">
               <div className="flex h-[22px] items-stretch justify-end border-b border-border/70">
                 <div className="inline-flex h-full items-stretch">
-                  {allowSplit && (
-                    <TerminalActionButton
-                      className={`inline-flex h-full items-center px-1 text-foreground/90 transition-colors ${
-                        hasReachedSplitLimit
-                          ? "cursor-not-allowed opacity-45 hover:bg-transparent"
-                          : "hover:bg-accent/70"
-                      }`}
-                      onClick={onSplitTerminalAction}
-                      label={splitTerminalActionLabel}
-                    >
-                      <SquareSplitHorizontal className="size-3.25" />
-                    </TerminalActionButton>
-                  )}
-                  <TerminalCreateMenuButton
+                  <TerminalActionButton
+                    className={`inline-flex h-full items-center px-1 text-foreground/90 transition-colors ${
+                      hasReachedSplitLimit
+                        ? "cursor-not-allowed opacity-45 hover:bg-transparent"
+                        : "hover:bg-accent/70"
+                    }`}
+                    onClick={onSplitTerminalAction}
+                    label={splitTerminalActionLabel}
+                  >
+                    <SquareSplitHorizontal className="size-3.25" />
+                  </TerminalActionButton>
+                  <TerminalActionButton
+                    className={`inline-flex h-full items-center border-l border-border/70 px-1 text-foreground/90 transition-colors ${
+                      hasReachedSplitLimit
+                        ? "cursor-not-allowed opacity-45 hover:bg-transparent"
+                        : "hover:bg-accent/70"
+                    }`}
+                    onClick={onSplitTerminalVerticalAction}
+                    label={splitTerminalVerticalActionLabel}
+                  >
+                    <SquareSplitVertical className="size-3.25" />
+                  </TerminalActionButton>
+                  <TerminalActionButton
                     className="inline-flex h-full items-center border-l border-border/70 px-1 text-foreground/90 transition-colors hover:bg-accent/70"
-                    options={createOptions}
-                    onFallbackCreate={onNewTerminalAction}
+                    onClick={onNewTerminalAction}
                     label={newTerminalActionLabel}
                   >
                     <Plus className="size-3.25" />
-                  </TerminalCreateMenuButton>
+                  </TerminalActionButton>
                   <TerminalActionButton
                     className="inline-flex h-full items-center border-l border-border/70 px-1 text-foreground/90 transition-colors hover:bg-accent/70"
-                    onClick={onCloseDrawer}
-                    label="Close panel (keep terminals running)"
+                    onClick={() => onCloseTerminal(resolvedActiveTerminalId)}
+                    label={closeTerminalActionLabel}
                   >
-                    <XIcon className="size-3.25" />
+                    <Trash2 className="size-3.25" />
                   </TerminalActionButton>
                 </div>
               </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto px-1 py-1">
-                {sectionViews.map((view) => {
-                  if (!view.hasRealTerminals) return null;
-                  const sec = view.section;
-                  const isActiveSection = sec.id === activeSection.id;
-                  const sectionActiveTerminalId = view.resolvedActiveTerminalId;
-                  const sectionActivate = (terminalId: string) => {
-                    onActiveSectionChange(sec.id);
-                    sec.onActiveTerminalChange(terminalId);
-                  };
-                  return (
-                    <div key={sec.id} className="pb-1.5">
-                      <div className="flex items-center justify-between gap-1 px-1 pb-0.5">
-                        <span className="truncate text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
-                          {sec.label}
-                        </span>
-                        <TerminalActionButton
-                          className="inline-flex size-4 shrink-0 items-center justify-center rounded text-foreground/80 transition-colors hover:bg-accent/70"
-                          onClick={() => {
-                            onActiveSectionChange(sec.id);
-                            sec.onNewTerminal();
-                          }}
-                          label={`New terminal in ${sec.label}`}
-                        >
-                          <Plus className="size-3" />
-                        </TerminalActionButton>
-                      </div>
-                      {view.resolvedTerminalGroups.map((terminalGroup, groupIndex) => {
-                        const isGroupActive =
-                          isActiveSection &&
-                          terminalGroup.terminalIds.includes(sectionActiveTerminalId);
-                        const groupActiveTerminalId = terminalGroup.terminalIds.includes(
-                          sectionActiveTerminalId,
-                        )
-                          ? sectionActiveTerminalId
-                          : (terminalGroup.terminalIds[0] ?? sectionActiveTerminalId);
+                {resolvedTerminalGroups.map((terminalGroup, groupIndex) => {
+                  const isGroupActive =
+                    terminalGroup.terminalIds.includes(resolvedActiveTerminalId);
+                  const groupActiveTerminalId = isGroupActive
+                    ? resolvedActiveTerminalId
+                    : (terminalGroup.terminalIds[0] ?? resolvedActiveTerminalId);
 
-                        return (
-                          <div key={terminalGroup.id} className="pb-0.5">
-                            {view.showGroupHeaders && (
+                  return (
+                    <div key={terminalGroup.id} className="pb-0.5">
+                      {showGroupHeaders && (
+                        <button
+                          type="button"
+                          className={`flex w-full items-center rounded px-1 py-0.5 text-[10px] uppercase tracking-[0.08em] ${
+                            isGroupActive
+                              ? "bg-accent/70 text-foreground"
+                              : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                          }`}
+                          onClick={() => onActiveTerminalChange(groupActiveTerminalId)}
+                        >
+                          Group {groupIndex + 1}
+                        </button>
+                      )}
+
+                      <div
+                        className={showGroupHeaders ? "ml-1 border-l border-border/60 pl-1.5" : ""}
+                      >
+                        {terminalGroup.terminalIds.map((terminalId) => {
+                          const isActive = terminalId === resolvedActiveTerminalId;
+                          const closeTerminalLabel = `Close ${
+                            terminalLabelById.get(terminalId) ?? "terminal"
+                          }${isActive && closeShortcutLabel ? ` (${closeShortcutLabel})` : ""}`;
+                          return (
+                            <div
+                              key={terminalId}
+                              className={`group flex items-center gap-1 rounded px-1 py-0.5 text-[11px] ${
+                                isActive
+                                  ? "bg-accent text-foreground"
+                                  : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                              }`}
+                            >
+                              {showGroupHeaders && (
+                                <span className="text-[10px] text-muted-foreground/80">└</span>
+                              )}
                               <button
                                 type="button"
-                                className={`flex w-full items-center rounded px-1 py-0.5 text-[10px] uppercase tracking-[0.08em] ${
-                                  isGroupActive
-                                    ? "bg-accent/70 text-foreground"
-                                    : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
-                                }`}
-                                onClick={() => sectionActivate(groupActiveTerminalId)}
+                                className="flex min-w-0 flex-1 items-center gap-1 text-left"
+                                onClick={() => onActiveTerminalChange(terminalId)}
                               >
-                                {terminalGroup.terminalIds.length > 1
-                                  ? `Split ${groupIndex + 1}`
-                                  : `Terminal ${groupIndex + 1}`}
+                                <TerminalSquare className="size-3 shrink-0" />
+                                <span className="truncate">
+                                  {terminalLabelById.get(terminalId) ?? "Terminal"}
+                                </span>
                               </button>
-                            )}
-
-                            <div
-                              className={
-                                view.showGroupHeaders ? "ml-1 border-l border-border/60 pl-1.5" : ""
-                              }
-                            >
-                              {terminalGroup.terminalIds.map((terminalId) => {
-                                const isActive =
-                                  isActiveSection && terminalId === sectionActiveTerminalId;
-                                const terminalLabel =
-                                  view.terminalLabelById.get(terminalId) ?? "Terminal";
-                                const closeTerminalLabel = `Close ${terminalLabel}${
-                                  isActive && closeShortcutLabel ? ` (${closeShortcutLabel})` : ""
-                                }`;
-                                const editKey = `${sec.id}:${terminalId}`;
-                                const isEditing = editingTerminalKey === editKey;
-                                const commitRename = () => {
-                                  skipRenameBlurCommitRef.current = true;
-                                  sec.onRenameTerminal(terminalId, editingTerminalDraft);
-                                  setEditingTerminalKey(null);
-                                };
-                                const cancelRename = () => {
-                                  skipRenameBlurCommitRef.current = true;
-                                  setEditingTerminalKey(null);
-                                };
-                                const beginRename = () => {
-                                  setEditingTerminalDraft(
-                                    sec.customNameById.get(terminalId) ?? terminalLabel,
-                                  );
-                                  setEditingTerminalKey(editKey);
-                                };
-                                return (
-                                  <div
-                                    key={terminalId}
-                                    className={`group flex items-center gap-1 rounded px-1 py-0.5 text-[11px] ${
-                                      isActive
-                                        ? "bg-accent text-foreground"
-                                        : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
-                                    }`}
-                                  >
-                                    {view.showGroupHeaders && (
-                                      <span className="text-[10px] text-muted-foreground/80">
-                                        └
-                                      </span>
-                                    )}
-                                    {isEditing ? (
-                                      <div className="flex min-w-0 flex-1 items-center gap-1">
-                                        <TerminalSquare className="size-3 shrink-0" />
-                                        <input
-                                          autoFocus
-                                          value={editingTerminalDraft}
-                                          onChange={(event) =>
-                                            setEditingTerminalDraft(event.target.value)
-                                          }
-                                          onKeyDown={(event) => {
-                                            if (event.key === "Enter") {
-                                              event.preventDefault();
-                                              commitRename();
-                                            } else if (event.key === "Escape") {
-                                              event.preventDefault();
-                                              cancelRename();
-                                            }
-                                          }}
-                                          onBlur={() => {
-                                            if (skipRenameBlurCommitRef.current) {
-                                              skipRenameBlurCommitRef.current = false;
-                                              return;
-                                            }
-                                            sec.onRenameTerminal(terminalId, editingTerminalDraft);
-                                            setEditingTerminalKey(null);
-                                          }}
-                                          className="min-w-0 flex-1 rounded bg-background px-1 text-[11px] text-foreground outline-none ring-1 ring-border"
-                                        />
-                                      </div>
-                                    ) : (
+                              {normalizedTerminalIds.length > 1 && (
+                                <Popover>
+                                  <PopoverTrigger
+                                    openOnHover
+                                    render={
                                       <button
                                         type="button"
-                                        className="flex min-w-0 flex-1 items-center gap-1 text-left"
-                                        onClick={() => sectionActivate(terminalId)}
-                                        onDoubleClick={(event) => {
-                                          event.stopPropagation();
-                                          beginRename();
-                                        }}
-                                      >
-                                        <TerminalSquare className="size-3 shrink-0" />
-                                        <span className="truncate">{terminalLabel}</span>
-                                      </button>
-                                    )}
-                                    <Popover>
-                                      <PopoverTrigger
-                                        openOnHover
-                                        render={
-                                          <button
-                                            type="button"
-                                            className="inline-flex size-3.5 items-center justify-center rounded text-xs font-medium leading-none text-muted-foreground opacity-0 transition hover:bg-accent hover:text-foreground group-hover:opacity-100"
-                                            onClick={() => sec.onCloseTerminal(terminalId)}
-                                            aria-label={closeTerminalLabel}
-                                          />
-                                        }
-                                      >
-                                        <Trash2 className="size-2.5" />
-                                      </PopoverTrigger>
-                                      <PopoverPopup
-                                        tooltipStyle
-                                        side="bottom"
-                                        sideOffset={6}
-                                        align="center"
-                                        className="pointer-events-none select-none"
-                                      >
-                                        {closeTerminalLabel}
-                                      </PopoverPopup>
-                                    </Popover>
-                                  </div>
-                                );
-                              })}
+                                        className="inline-flex size-3.5 items-center justify-center rounded text-xs font-medium leading-none text-muted-foreground opacity-0 transition hover:bg-accent hover:text-foreground group-hover:opacity-100"
+                                        onClick={() => onCloseTerminal(terminalId)}
+                                        aria-label={closeTerminalLabel}
+                                      />
+                                    }
+                                  >
+                                    <XIcon className="size-2.5" />
+                                  </PopoverTrigger>
+                                  <PopoverPopup
+                                    tooltipStyle
+                                    side="bottom"
+                                    sideOffset={6}
+                                    align="center"
+                                    className="pointer-events-none select-none"
+                                  >
+                                    {closeTerminalLabel}
+                                  </PopoverPopup>
+                                </Popover>
+                              )}
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
                   );
                 })}

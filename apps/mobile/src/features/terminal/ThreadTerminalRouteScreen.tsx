@@ -309,7 +309,7 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
       isEnvironmentReady &&
       !shouldRedirectToRunningTerminal
         ? {
-            owner: { type: "thread" as const, threadId: selectedThread.id },
+            threadId: selectedThread.id,
             terminalId,
             cwd: launchLocation.cwd,
             worktreePath: launchLocation.worktreePath,
@@ -386,7 +386,7 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
     void openTerminal({
       environmentId: selectedThread.environmentId,
       input: {
-        owner: { type: "thread", threadId: selectedThread.id },
+        threadId: selectedThread.id,
         terminalId,
         cwd: terminalAttachInput.cwd,
         worktreePath: terminalAttachInput.worktreePath,
@@ -618,7 +618,7 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
     void writeTerminal({
       environmentId: selectedThread.environmentId,
       input: {
-        owner: { type: "thread", threadId: selectedThread.id },
+        threadId: selectedThread.id,
         terminalId,
         data: initialInput,
       },
@@ -701,7 +701,7 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
       void writeTerminal({
         environmentId: selectedThread.environmentId,
         input: {
-          owner: { type: "thread", threadId: selectedThread.id },
+          threadId: selectedThread.id,
           terminalId,
           data,
         },
@@ -762,7 +762,7 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
       void resizeTerminal({
         environmentId: selectedThread.environmentId,
         input: {
-          owner: { type: "thread", threadId: selectedThread.id },
+          threadId: selectedThread.id,
           terminalId,
           cols: size.cols,
           rows: size.rows,
@@ -865,7 +865,7 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
       void closeTerminal({
         environmentId: selectedThread.environmentId,
         input: {
-          owner: { type: "thread", threadId: selectedThread.id },
+          threadId: selectedThread.id,
           terminalId,
         },
       });
@@ -998,7 +998,7 @@ export function ThreadTerminalRouteScreen(props: ThreadTerminalRouteScreenProps)
     void clearTerminal({
       environmentId: selectedThread.environmentId,
       input: {
-        owner: { type: "thread", threadId: selectedThread.id },
+        threadId: selectedThread.id,
         terminalId,
       },
     });

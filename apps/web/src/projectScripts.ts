@@ -1,5 +1,4 @@
 import {
-  DEFAULT_PROJECT_SCRIPT_SCOPE,
   MAX_SCRIPT_ID_LENGTH,
   SCRIPT_RUN_COMMAND_PATTERN,
   type KeybindingCommand,
@@ -24,7 +23,6 @@ export function buildProjectScript(id: string, input: ProjectScriptInput): Proje
     command: input.command,
     icon: input.icon,
     runOnWorktreeCreate: input.runOnWorktreeCreate,
-    defaultScope: DEFAULT_PROJECT_SCRIPT_SCOPE,
     ...(input.previewUrl === null
       ? {}
       : {

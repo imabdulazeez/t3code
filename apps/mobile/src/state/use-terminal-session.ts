@@ -39,9 +39,7 @@ export function useAttachedTerminalSession(input: {
     const summary =
       metadata.data?.find(
         (terminal) =>
-          terminal.owner.type === "thread" &&
-          input.terminal?.owner.type === "thread" &&
-          terminal.owner.threadId === input.terminal.owner.threadId &&
+          terminal.threadId === input.terminal?.threadId &&
           terminal.terminalId === input.terminal?.terminalId,
       ) ?? null;
     const state = combineTerminalSessionState(summary, attach.data ?? EMPTY_TERMINAL_BUFFER_STATE);
@@ -66,16 +64,11 @@ export function useKnownTerminalSessions(input: {
       return [];
     }
     return (metadata.data ?? [])
-      .filter((summary) => summary.owner.type === "thread")
-      .filter(
-        (summary) =>
-          input.threadId === null ||
-          (summary.owner.type === "thread" && summary.owner.threadId === input.threadId),
-      )
+      .filter((summary) => input.threadId === null || summary.threadId === input.threadId)
       .map((summary) => ({
         target: {
           environmentId: input.environmentId!,
-          owner: summary.owner,
+          threadId: ThreadId.make(summary.threadId),
           terminalId: summary.terminalId,
         },
         state: combineTerminalSessionState(summary, EMPTY_TERMINAL_BUFFER_STATE),

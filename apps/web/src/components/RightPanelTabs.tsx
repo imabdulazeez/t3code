@@ -1,8 +1,4 @@
-import type {
-  ContextMenuItem,
-  PreviewSessionSnapshot,
-  ProjectScriptScope,
-} from "@t3tools/contracts";
+import type { ContextMenuItem, PreviewSessionSnapshot } from "@t3tools/contracts";
 import { getTerminalLabel } from "@t3tools/shared/terminalLabels";
 import { ClipboardList, FileDiff, Files, Globe2, Plus, TerminalSquare, X } from "lucide-react";
 import {
@@ -45,13 +41,12 @@ interface RightPanelTabsProps {
   onCloseAllSurfaces: () => void;
   onCopyFilePath: (relativePath: string) => void;
   onAddBrowser: () => void;
-  onAddTerminal: (scope: ProjectScriptScope) => void;
+  onAddTerminal: () => void;
   onAddDiff: () => void;
   onAddFiles: () => void;
   browserAvailable: boolean;
   diffAvailable: boolean;
   filesAvailable: boolean;
-  projectTerminalAvailable: boolean;
   children: ReactNode;
 }
 
@@ -91,79 +86,14 @@ function SurfaceMenuItem(props: {
   return <DisabledReasonTooltip reason={props.disabledReason} trigger={item} />;
 }
 
-const TERMINAL_SCOPE_COPY: Record<ProjectScriptScope, string> = {
-  chat: "Start a shell scoped to this chat.",
-  project: "Start a shell for this project.",
-};
-
-function TerminalScopeToggle({
-  scope,
-  onScopeChange,
-}: {
-  scope: ProjectScriptScope;
-  onScopeChange: (scope: ProjectScriptScope) => void;
-}) {
-  return (
-    <div className="inline-flex rounded-md border border-border/80 p-0.5">
-      {(["chat", "project"] as const).map((value) => (
-        <button
-          key={value}
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            onScopeChange(value);
-          }}
-          className={cn(
-            "rounded px-2 py-0.5 text-xs font-medium capitalize transition",
-            scope === value
-              ? "bg-accent text-foreground"
-              : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          {value}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function TerminalSurfaceCard({
-  projectTerminalAvailable,
-  onAddTerminal,
-}: {
-  projectTerminalAvailable: boolean;
-  onAddTerminal: (scope: ProjectScriptScope) => void;
-}) {
-  const [scope, setScope] = useState<ProjectScriptScope>("chat");
-  return (
-    <button
-      type="button"
-      onClick={() => onAddTerminal(scope)}
-      className="flex min-h-28 w-full flex-col items-start rounded-lg border border-border/80 bg-card/40 p-4 text-left transition hover:border-border hover:bg-accent/60"
-    >
-      <div className="mb-3 flex w-full items-center justify-between gap-2">
-        <TerminalSquare className="size-5" />
-        {projectTerminalAvailable ? (
-          <TerminalScopeToggle scope={scope} onScopeChange={setScope} />
-        ) : null}
-      </div>
-      <span className="text-sm font-medium">Terminal</span>
-      <span className="mt-1 text-xs leading-relaxed text-muted-foreground">
-        {TERMINAL_SCOPE_COPY[scope]}
-      </span>
-    </button>
-  );
-}
-
 function RightPanelEmptyState(props: {
   onAddBrowser: () => void;
-  onAddTerminal: (scope: ProjectScriptScope) => void;
+  onAddTerminal: () => void;
   onAddDiff: () => void;
   onAddFiles: () => void;
   browserAvailable: boolean;
   diffAvailable: boolean;
   filesAvailable: boolean;
-  projectTerminalAvailable: boolean;
 }) {
   const actions = [
     {
@@ -173,6 +103,14 @@ function RightPanelEmptyState(props: {
       available: props.browserAvailable,
       disabledReason: SURFACE_DISABLED_REASONS.browser,
       onClick: props.onAddBrowser,
+    },
+    {
+      label: "Terminal",
+      description: "Start a shell in this workspace.",
+      icon: TerminalSquare,
+      available: true,
+      disabledReason: null,
+      onClick: props.onAddTerminal,
     },
     {
       label: "Files",
@@ -192,47 +130,6 @@ function RightPanelEmptyState(props: {
     },
   ] as const;
 
-  const renderAction = (action: (typeof actions)[number]) => {
-    const Icon = action.icon;
-    const content = (
-      <>
-        <Icon className="mb-3 size-5" />
-        <span className="text-sm font-medium">{action.label}</span>
-        <span className="mt-1 text-xs leading-relaxed text-muted-foreground">
-          {action.description}
-        </span>
-      </>
-    );
-    if (action.available) {
-      return (
-        <button
-          key={action.label}
-          type="button"
-          onClick={action.onClick}
-          className="flex min-h-28 w-full flex-col items-start rounded-lg border border-border/80 bg-card p-4 text-left transition hover:border-border hover:bg-accent/60 dark:border-transparent dark:shadow-none dark:inset-ring-1 dark:inset-ring-white/5"
-        >
-          {content}
-        </button>
-      );
-    }
-    const disabledCard = (
-      <button
-        type="button"
-        className="flex min-h-28 w-full cursor-not-allowed flex-col items-start rounded-lg border border-border/80 bg-card p-4 text-left opacity-40 dark:border-transparent dark:shadow-none dark:inset-ring-1 dark:inset-ring-white/5"
-        aria-disabled="true"
-      >
-        {content}
-      </button>
-    );
-    return (
-      <DisabledReasonTooltip
-        key={action.label}
-        reason={action.disabledReason}
-        trigger={disabledCard}
-      />
-    );
-  };
-
   return (
     <div className="flex min-h-0 flex-1 items-center justify-center p-6">
       <div className="w-full max-w-xl">
@@ -243,12 +140,46 @@ function RightPanelEmptyState(props: {
           </p>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          {actions.slice(0, 1).map(renderAction)}
-          <TerminalSurfaceCard
-            projectTerminalAvailable={props.projectTerminalAvailable}
-            onAddTerminal={props.onAddTerminal}
-          />
-          {actions.slice(1).map(renderAction)}
+          {actions.map((action) => {
+            const Icon = action.icon;
+            const content = (
+              <>
+                <Icon className="mb-3 size-5" />
+                <span className="text-sm font-medium">{action.label}</span>
+                <span className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  {action.description}
+                </span>
+              </>
+            );
+            if (action.available) {
+              return (
+                <button
+                  key={action.label}
+                  type="button"
+                  onClick={action.onClick}
+                  className="flex min-h-28 w-full flex-col items-start rounded-lg border border-border/80 bg-card p-4 text-left transition hover:border-border hover:bg-accent/60 dark:border-transparent dark:shadow-none dark:inset-ring-1 dark:inset-ring-white/5"
+                >
+                  {content}
+                </button>
+              );
+            }
+            const disabledCard = (
+              <button
+                type="button"
+                className="flex min-h-28 w-full cursor-not-allowed flex-col items-start rounded-lg border border-border/80 bg-card p-4 text-left opacity-40 dark:border-transparent dark:shadow-none dark:inset-ring-1 dark:inset-ring-white/5"
+                aria-disabled="true"
+              >
+                {content}
+              </button>
+            );
+            return (
+              <DisabledReasonTooltip
+                key={action.label}
+                reason={action.disabledReason}
+                trigger={disabledCard}
+              />
+            );
+          })}
         </div>
       </div>
     </div>
@@ -519,23 +450,10 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                     <Globe2 />
                     Browser
                   </SurfaceMenuItem>
-                  {props.projectTerminalAvailable ? (
-                    <>
-                      <SurfaceMenuItem available onClick={() => props.onAddTerminal("chat")}>
-                        <TerminalSquare />
-                        Chat terminal
-                      </SurfaceMenuItem>
-                      <SurfaceMenuItem available onClick={() => props.onAddTerminal("project")}>
-                        <TerminalSquare />
-                        Project terminal
-                      </SurfaceMenuItem>
-                    </>
-                  ) : (
-                    <SurfaceMenuItem available onClick={() => props.onAddTerminal("chat")}>
-                      <TerminalSquare />
-                      Terminal
-                    </SurfaceMenuItem>
-                  )}
+                  <SurfaceMenuItem available onClick={props.onAddTerminal}>
+                    <TerminalSquare />
+                    Terminal
+                  </SurfaceMenuItem>
                   <SurfaceMenuItem
                     available={props.filesAvailable}
                     disabledReason={SURFACE_DISABLED_REASONS.files}
@@ -569,7 +487,6 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
             browserAvailable={props.browserAvailable}
             diffAvailable={props.diffAvailable}
             filesAvailable={props.filesAvailable}
-            projectTerminalAvailable={props.projectTerminalAvailable}
           />
         ) : (
           props.children

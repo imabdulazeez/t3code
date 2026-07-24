@@ -140,7 +140,7 @@ export const make = Effect.gen(function* () {
 
     yield* terminalManager
       .open({
-        owner: { type: "thread", threadId: input.threadId },
+        threadId: input.threadId,
         terminalId,
         cwd,
         worktreePath: input.worktreePath,
@@ -158,7 +158,7 @@ export const make = Effect.gen(function* () {
       );
     yield* terminalManager
       .write({
-        owner: { type: "thread", threadId: input.threadId },
+        threadId: input.threadId,
         terminalId,
         data: `${script.command}\r`,
       })
