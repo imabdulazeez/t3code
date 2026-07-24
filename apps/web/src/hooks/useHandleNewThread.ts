@@ -1,3 +1,4 @@
+import { useAtomValue } from "@effect/atom-react";
 import {
   scopedProjectKey,
   scopeProjectRef,
@@ -5,7 +6,6 @@ import {
 } from "@t3tools/client-runtime/environment";
 import {
   DEFAULT_RUNTIME_MODE,
-  DEFAULT_SERVER_SETTINGS,
   type ModelSelection,
   type OrchestrationProposedPlanId,
   type ScopedProjectRef,
@@ -26,8 +26,9 @@ import {
   getProjectOrderKey,
   selectProjectGroupingSettings,
 } from "../logicalProject";
-import { readThreadShell, useProjects, useServerConfigs, useThread } from "../state/entities";
+import { readThreadShell, useProjects, useThread } from "../state/entities";
 import { resolveNewDraftStartFromOrigin } from "../lib/chatThreadActions";
+import { primaryServerSettingsAtom } from "../state/server";
 import { resolveThreadRouteTarget } from "../threadRoutes";
 import { legacyProjectCwdPreferenceKey, useUiStateStore } from "../uiStateStore";
 import { useClientSettings } from "./useSettings";
@@ -80,7 +81,12 @@ export function useStartImplementationDraftFromPlan() {
 
 export function useNewThreadHandler() {
   const projects = useProjects();
-  const serverConfigs = useServerConfigs();
+  // New-thread defaults are a user preference, and the settings UI only ever
+  // edits the primary environment's settings.json. Reading the target
+  // environment's own settings here would silently reset remote projects to
+  // the decoded defaults ("local" mode, current branch), since nothing can
+  // set those values on a remote server.
+  const primaryServerSettings = useAtomValue(primaryServerSettingsAtom);
   const projectGroupingSettings = useClientSettings(selectProjectGroupingSettings);
   const router = useRouter();
   const getCurrentRouteTarget = useCallback(() => {
@@ -113,8 +119,6 @@ export function useNewThreadHandler() {
           candidate.id === projectRef.projectId &&
           candidate.environmentId === projectRef.environmentId,
       );
-      const environmentSettings =
-        serverConfigs.get(projectRef.environmentId)?.settings ?? DEFAULT_SERVER_SETTINGS;
       const logicalProjectKey = project
         ? deriveLogicalProjectKeyFromSettings(project, projectGroupingSettings)
         : scopedProjectKey(projectRef);
@@ -210,7 +214,7 @@ export function useNewThreadHandler() {
       const draftId = newDraftId();
       const threadId = newThreadId();
       const createdAt = new Date().toISOString();
-      const initialEnvMode = options?.envMode ?? environmentSettings.defaultThreadEnvMode;
+      const initialEnvMode = options?.envMode ?? primaryServerSettings.defaultThreadEnvMode;
       return (async () => {
         setLogicalProjectDraftThreadId(logicalProjectKey, projectRef, draftId, {
           threadId,
@@ -222,7 +226,7 @@ export function useNewThreadHandler() {
             options?.startFromOrigin ??
             resolveNewDraftStartFromOrigin({
               envMode: initialEnvMode,
-              newWorktreesStartFromOrigin: environmentSettings.newWorktreesStartFromOrigin,
+              newWorktreesStartFromOrigin: primaryServerSettings.newWorktreesStartFromOrigin,
             }),
           runtimeMode: DEFAULT_RUNTIME_MODE,
         });
@@ -235,7 +239,7 @@ export function useNewThreadHandler() {
         });
       })();
     },
-    [getCurrentRouteTarget, projectGroupingSettings, projects, router, serverConfigs],
+    [getCurrentRouteTarget, primaryServerSettings, projectGroupingSettings, projects, router],
   );
 }
 
