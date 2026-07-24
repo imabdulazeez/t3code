@@ -124,8 +124,8 @@ export const ChatHeader = memo(function ChatHeader({
       <div
         data-chat-header-actions
         className={cn(
-          "flex min-w-0 flex-wrap items-center justify-start gap-3 sm:shrink-0 sm:justify-end @3xl/header-actions:gap-4",
-          rightPanelOpen ? "pr-0" : "pr-24",
+          "flex shrink-0 items-center justify-end gap-2 @3xl/header-actions:gap-3",
+          rightPanelOpen ? "pr-0" : "pr-16",
         )}
       >
         {activeProjectScripts && (
