@@ -4,13 +4,13 @@ import {
   BRAND_ASSET_PATHS,
   DEVELOPMENT_ICON_OVERRIDES,
   DEVELOPMENT_PUBLIC_ICON_OVERRIDES,
-  PUBLISH_ICON_OVERRIDES,
+  resolveWebAssetBrandForPackageVersion,
   resolveWebIconOverrides,
 } from "./brand-assets.ts";
 
 describe("brand-assets", () => {
-  it("maps server publish web assets to production icons", () => {
-    expect(PUBLISH_ICON_OVERRIDES).toEqual([
+  it("maps production web assets into the server package", () => {
+    expect(resolveWebIconOverrides("production", "dist/client")).toEqual([
       {
         sourceRelativePath: BRAND_ASSET_PATHS.productionWebFaviconIco,
         targetRelativePath: "dist/client/favicon.ico",
@@ -70,6 +70,11 @@ describe("brand-assets", () => {
       sourceRelativePath: BRAND_ASSET_PATHS.nightlyWebFaviconIco,
       targetRelativePath: "apps/web/dist/favicon.ico",
     });
+  });
+
+  it("maps package versions to web asset brands", () => {
+    expect(resolveWebAssetBrandForPackageVersion("0.0.29")).toBe("production");
+    expect(resolveWebAssetBrandForPackageVersion("0.0.29-nightly.20260723.882")).toBe("nightly");
   });
 
   it("keeps development, nightly, and production icon families separate", () => {

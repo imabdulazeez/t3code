@@ -56,8 +56,8 @@ export const PanelLayoutControls = memo(function PanelLayoutControls({
                 pressed={terminalOpen}
                 onPressedChange={onToggleTerminal}
                 aria-label="Toggle terminal drawer"
-                variant="ghost"
-                size="sm"
+                variant="outline"
+                size="xs"
                 disabled={!terminalAvailable}
               >
                 <PanelBottomIcon className="size-3.5" />
@@ -79,14 +79,14 @@ export const PanelLayoutControls = memo(function PanelLayoutControls({
               <MenuTrigger
                 render={
                   <Button
-                    size="icon-sm"
-                    variant="ghost"
+                    size="icon-xs"
+                    variant="outline"
                     aria-label="Choose default terminal scope"
                     className="shrink-0 [-webkit-app-region:no-drag]"
                   />
                 }
               >
-                <ChevronDownIcon className="size-3" />
+                <ChevronDownIcon className="size-4" />
               </MenuTrigger>
               <MenuPopup align="end" side="bottom" className="min-w-40">
                 <MenuItem onClick={() => onSetTerminalScope("chat")}>
