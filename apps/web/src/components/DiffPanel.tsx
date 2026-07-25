@@ -12,13 +12,13 @@ import {
   CheckIcon,
   ChevronDownIcon,
   ChevronRightIcon,
+  ChevronsDownUpIcon,
+  ChevronsUpDownIcon,
   Columns2Icon,
-  FoldVerticalIcon,
   PilcrowIcon,
   Rows3Icon,
   SearchIcon,
   TextWrapIcon,
-  UnfoldVerticalIcon,
 } from "lucide-react";
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useOpenInPreferredEditor } from "../editorPreferences";
@@ -35,6 +35,7 @@ import {
   resolveDiffThemeName,
   resolveFileDiffPath,
 } from "../lib/diffRendering";
+import { areAllDiffFilesCollapsed, toggleAllDiffFiles } from "../lib/diffCollapse";
 import { useTurnDiffSummaries } from "../hooks/useTurnDiffSummaries";
 import { useProject, useThread } from "../state/entities";
 import { resolveThreadRouteRef } from "../threadRoutes";
@@ -42,6 +43,7 @@ import { useClientSettings } from "../hooks/useSettings";
 import { formatShortTimestamp } from "../timestampFormat";
 import { DiffPanelLoadingState, DiffPanelShell, type DiffPanelMode } from "./DiffPanelShell";
 import { AnnotatableCodeView, type AnnotatableCodeViewHandle } from "./diffs/AnnotatableCodeView";
+import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { ToggleGroup, Toggle } from "./ui/toggle-group";
 import { Switch } from "./ui/switch";
@@ -469,6 +471,8 @@ export default function DiffPanel({
       }),
     [collapsedDiffFileKeys, renderableFiles],
   );
+  const diffFileKeys = useMemo(() => codeViewFiles.map((file) => file.fileKey), [codeViewFiles]);
+  const allDiffFilesCollapsed = areAllDiffFilesCollapsed(diffFileKeys, collapsedDiffFileKeys);
 
   useEffect(() => {
     if (!selectedFilePath) return;
@@ -509,22 +513,6 @@ export default function DiffPanel({
       scrollToFile(fileSearchMatchPaths[0]!);
     }
   }, [fileSearchMatchPaths, scrollToFile]);
-
-  const allCollapsed = useMemo(
-    () =>
-      renderableFiles.length > 0 &&
-      renderableFiles.every((f) => collapsedDiffFileKeys.has(buildFileDiffRenderKey(f))),
-    [renderableFiles, collapsedDiffFileKeys],
-  );
-
-  const toggleAllDiffFilesCollapsed = useCallback(() => {
-    setCollapsedDiffFiles({
-      scopeKey: collapseScopeKey,
-      fileKeys: allCollapsed
-        ? EMPTY_COLLAPSED_DIFF_FILE_KEYS
-        : new Set(renderableFiles.map(buildFileDiffRenderKey)),
-    });
-  }, [allCollapsed, collapseScopeKey, renderableFiles]);
 
   const openDiffFile = useCallback(
     (filePath: string) => {
@@ -567,6 +555,18 @@ export default function DiffPanel({
     },
     [collapseScopeKey],
   );
+
+  const toggleDiffFileCollapse = useCallback(() => {
+    setCollapsedDiffFiles((current) => {
+      const currentKeys =
+        current.scopeKey === collapseScopeKey ? current.fileKeys : EMPTY_COLLAPSED_DIFF_FILE_KEYS;
+
+      return {
+        scopeKey: collapseScopeKey,
+        fileKeys: toggleAllDiffFiles(diffFileKeys, currentKeys),
+      };
+    });
+  }, [collapseScopeKey, diffFileKeys]);
 
   const selectTurn = (turnId: TurnId) => {
     if (!routeThreadRef) return;
@@ -783,21 +783,30 @@ export default function DiffPanel({
             }}
           />
         </div>
-        <Toggle
-          aria-label={allCollapsed ? "Expand all files" : "Collapse all files"}
-          title={allCollapsed ? "Expand all files" : "Collapse all files"}
-          variant="outline"
-          size="xs"
-          pressed={allCollapsed}
-          onPressedChange={toggleAllDiffFilesCollapsed}
-          disabled={renderableFiles.length === 0}
-        >
-          {allCollapsed ? (
-            <UnfoldVerticalIcon className="size-3" />
-          ) : (
-            <FoldVerticalIcon className="size-3" />
-          )}
-        </Toggle>
+        {codeViewFiles.length > 0 && (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  type="button"
+                  size="icon-xs"
+                  variant="outline"
+                  aria-label={allDiffFilesCollapsed ? "Expand all files" : "Collapse all files"}
+                  onClick={toggleDiffFileCollapse}
+                />
+              }
+            >
+              {allDiffFilesCollapsed ? (
+                <ChevronsUpDownIcon className="size-3" />
+              ) : (
+                <ChevronsDownUpIcon className="size-3" />
+              )}
+            </TooltipTrigger>
+            <TooltipPopup side="top">
+              {allDiffFilesCollapsed ? "Expand all files" : "Collapse all files"}
+            </TooltipPopup>
+          </Tooltip>
+        )}
         <ToggleGroup
           className="shrink-0"
           variant="outline"
@@ -928,7 +937,7 @@ export default function DiffPanel({
                 <AnnotatableCodeView
                   viewerRef={codeViewRef}
                   key={collapseScopeKey ?? reviewSectionId}
-                  className="diff-render-surface h-full min-h-0 overflow-auto"
+                  className="diff-render-surface h-full min-h-0 overflow-auto [&>div>div:last-child]:top-0! [&>div>div:last-child]:bottom-auto!"
                   files={codeViewFiles}
                   sectionId={reviewSectionId}
                   sectionTitle={reviewSectionTitle}
