@@ -31,7 +31,7 @@ import {
   RustRoverIcon,
   WebStormIcon,
 } from "../JetBrainsIcons";
-import { cn, fileManagerLabel } from "~/lib/utils";
+import { cn, isMacPlatform, isWindowsPlatform } from "~/lib/utils";
 import { shellEnvironment } from "~/state/shell";
 import { useAtomCommand } from "~/state/use-atom-command";
 
@@ -165,7 +165,11 @@ const resolveOptions = (platform: string, availableEditors: ReadonlyArray<Editor
       kind: "brand",
     },
     {
-      label: fileManagerLabel(platform),
+      label: isMacPlatform(platform)
+        ? "Finder"
+        : isWindowsPlatform(platform)
+          ? "Explorer"
+          : "Files",
       Icon: FolderClosedIcon,
       value: "file-manager",
       kind: "generic",
