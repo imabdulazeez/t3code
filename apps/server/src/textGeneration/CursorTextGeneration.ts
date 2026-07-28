@@ -173,6 +173,7 @@ export const makeCursorTextGeneration = Effect.fn("makeCursorTextGeneration")(fu
         stagedSummary: input.stagedSummary,
         stagedPatch: input.stagedPatch,
         includeBranch: input.includeBranch === true,
+        policy: input.policy,
         ...(input.instructionsOverride ? { instructionsOverride: input.instructionsOverride } : {}),
         ...(input.branchInstructionsOverride
           ? { branchInstructionsOverride: input.branchInstructionsOverride }
@@ -204,6 +205,8 @@ export const makeCursorTextGeneration = Effect.fn("makeCursorTextGeneration")(fu
         commitSummary: input.commitSummary,
         diffSummary: input.diffSummary,
         diffPatch: input.diffPatch,
+        policy: input.policy,
+        changeRequestTemplate: input.changeRequestTemplate,
         ...(input.instructionsOverride ? { instructionsOverride: input.instructionsOverride } : {}),
       });
 

@@ -445,6 +445,8 @@ export interface DesktopPreviewTabState {
   canGoForward: boolean;
   /** Current zoom factor (1.0 = 100%). */
   zoomFactor: number;
+  /** Whether this tab is currently mirrored into a desktop picture-in-picture window. */
+  pictureInPicture: boolean;
   colorScheme: DesktopPreviewColorScheme;
   controller: "human" | "agent" | "none";
   updatedAt: string;
@@ -482,6 +484,7 @@ export const DesktopPreviewTabStateSchema: Schema.Codec<DesktopPreviewTabState> 
   canGoBack: Schema.Boolean,
   canGoForward: Schema.Boolean,
   zoomFactor: Schema.Number,
+  pictureInPicture: Schema.Boolean,
   colorScheme: DesktopPreviewColorSchemeSchema,
   controller: Schema.Literals(["human", "agent", "none"]),
   updatedAt: Schema.String,
@@ -992,6 +995,10 @@ export interface DesktopPreviewBridge {
   captureScreenshot: (tabId: string) => Promise<DesktopPreviewScreenshotArtifact>;
   revealArtifact: (path: string) => Promise<void>;
   copyArtifactToClipboard: (path: string) => Promise<void>;
+  pictureInPicture: {
+    open: (tabId: string) => Promise<void>;
+    close: (tabId: string) => Promise<void>;
+  };
   recording: {
     startScreencast: (tabId: string) => Promise<void>;
     stopScreencast: (tabId: string) => Promise<void>;

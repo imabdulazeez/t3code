@@ -531,6 +531,7 @@ export const makeOpenCodeTextGeneration = Effect.fn("makeOpenCodeTextGeneration"
         stagedSummary: input.stagedSummary,
         stagedPatch: input.stagedPatch,
         includeBranch: input.includeBranch === true,
+        policy: input.policy,
         ...(input.instructionsOverride ? { instructionsOverride: input.instructionsOverride } : {}),
         ...(input.branchInstructionsOverride
           ? { branchInstructionsOverride: input.branchInstructionsOverride }
@@ -561,6 +562,8 @@ export const makeOpenCodeTextGeneration = Effect.fn("makeOpenCodeTextGeneration"
         commitSummary: input.commitSummary,
         diffSummary: input.diffSummary,
         diffPatch: input.diffPatch,
+        policy: input.policy,
+        changeRequestTemplate: input.changeRequestTemplate,
         ...(input.instructionsOverride ? { instructionsOverride: input.instructionsOverride } : {}),
       });
       const generated = yield* runOpenCodeJson({
