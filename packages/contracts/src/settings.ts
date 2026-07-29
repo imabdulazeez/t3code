@@ -70,6 +70,9 @@ export const GlassOpacity = Schema.Int.check(
 );
 export type GlassOpacity = typeof GlassOpacity.Type;
 export const DEFAULT_GLASS_OPACITY: GlassOpacity = 80;
+export const EnvironmentIdentificationMode = Schema.Literals(["artwork", "pill", "none"]);
+export type EnvironmentIdentificationMode = typeof EnvironmentIdentificationMode.Type;
+export const DEFAULT_ENVIRONMENT_IDENTIFICATION_MODE: EnvironmentIdentificationMode = "artwork";
 
 export const ClientSettingsSchema = Schema.Struct({
   autoCreatePrOnPush: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
@@ -95,6 +98,9 @@ export const ClientSettingsSchema = Schema.Struct({
     Schema.withDecodingDefault(Effect.succeed([])),
   ),
   diffIgnoreWhitespace: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
+  environmentIdentificationMode: EnvironmentIdentificationMode.pipe(
+    Schema.withDecodingDefault(Effect.succeed(DEFAULT_ENVIRONMENT_IDENTIFICATION_MODE)),
+  ),
   glassOpacity: GlassOpacity.pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_GLASS_OPACITY)),
   ),
@@ -682,6 +688,7 @@ export const ClientSettingsPatch = Schema.Struct({
   deleteRemoteBranchOnDelete: Schema.optionalKey(Schema.Boolean),
   diffFontFamily: Schema.optionalKey(Schema.String),
   diffIgnoreWhitespace: Schema.optionalKey(Schema.Boolean),
+  environmentIdentificationMode: Schema.optionalKey(EnvironmentIdentificationMode),
   glassOpacity: Schema.optionalKey(GlassOpacity),
   favorites: Schema.optionalKey(
     Schema.Array(

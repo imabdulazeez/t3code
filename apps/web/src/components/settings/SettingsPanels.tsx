@@ -23,8 +23,10 @@ import {
 import {
   DEFAULT_BRANCH_NAME_PROMPT_INSTRUCTIONS,
   DEFAULT_COMMIT_MESSAGE_PROMPT_INSTRUCTIONS,
+  DEFAULT_ENVIRONMENT_IDENTIFICATION_MODE,
   DEFAULT_PR_CONTENT_PROMPT_INSTRUCTIONS,
   DEFAULT_UNIFIED_SETTINGS,
+  type EnvironmentIdentificationMode,
   MAX_GLASS_OPACITY,
   MIN_GLASS_OPACITY,
 } from "@t3tools/contracts/settings";
@@ -36,6 +38,10 @@ import * as Result from "effect/Result";
 import { APP_VERSION } from "../../branding";
 import { ProviderModelPicker } from "../chat/ProviderModelPicker";
 import { TraitsPicker } from "../chat/TraitsPicker";
+import {
+  resolveEnvironmentIdentificationPillLabel,
+  useEnvironmentStageLabel,
+} from "../SidebarStageBackdrop";
 import { useTheme } from "../../hooks/useTheme";
 import { usePrimarySettings, useUpdatePrimarySettings } from "../../hooks/useSettings";
 import { useThreadActions } from "../../hooks/useThreadActions";
@@ -108,6 +114,12 @@ const THEME_OPTIONS = [
     label: "Dark",
   },
 ] as const;
+
+const ENVIRONMENT_IDENTIFICATION_LABELS: Record<EnvironmentIdentificationMode, string> = {
+  artwork: "Artwork",
+  pill: "Version pill",
+  none: "None",
+};
 
 const TIMESTAMP_FORMAT_LABELS = {
   locale: "System default",
@@ -192,6 +204,10 @@ export function useSettingsRestore(onRestored?: () => void) {
     () => [
       ...(theme !== "system" ? ["Theme"] : []),
       ...(settings.glassOpacity !== DEFAULT_UNIFIED_SETTINGS.glassOpacity ? ["Glass opacity"] : []),
+      ...(settings.environmentIdentificationMode !==
+      DEFAULT_UNIFIED_SETTINGS.environmentIdentificationMode
+        ? ["Environment identification"]
+        : []),
       ...(settings.timestampFormat !== DEFAULT_UNIFIED_SETTINGS.timestampFormat
         ? ["Time format"]
         : []),
@@ -206,16 +222,8 @@ export function useSettingsRestore(onRestored?: () => void) {
       ...(settings.diffIgnoreWhitespace !== DEFAULT_UNIFIED_SETTINGS.diffIgnoreWhitespace
         ? ["Diff whitespace changes"]
         : []),
-      ...(settings.diffFontFamily !== DEFAULT_UNIFIED_SETTINGS.diffFontFamily ? ["Diff font"] : []),
-      ...(settings.terminalFontFamily !== DEFAULT_UNIFIED_SETTINGS.terminalFontFamily
-        ? ["Terminal font"]
-        : []),
       ...(settings.autoOpenPlanSidebar !== DEFAULT_UNIFIED_SETTINGS.autoOpenPlanSidebar
         ? ["Auto-open task panel"]
-        : []),
-      ...(settings.changedFilesExpandedByDefault !==
-      DEFAULT_UNIFIED_SETTINGS.changedFilesExpandedByDefault
-        ? ["Expand changed files by default"]
         : []),
       ...(settings.enableAssistantStreaming !== DEFAULT_UNIFIED_SETTINGS.enableAssistantStreaming
         ? ["Assistant output"]
@@ -244,11 +252,21 @@ export function useSettingsRestore(onRestored?: () => void) {
       ...(settings.confirmThreadDelete !== DEFAULT_UNIFIED_SETTINGS.confirmThreadDelete
         ? ["Delete confirmation"]
         : []),
+      ...(settings.changedFilesExpandedByDefault !==
+      DEFAULT_UNIFIED_SETTINGS.changedFilesExpandedByDefault
+        ? ["Expand changed files by default"]
+        : []),
+      ...(settings.diffFontFamily !== DEFAULT_UNIFIED_SETTINGS.diffFontFamily ? ["Diff font"] : []),
+      ...(settings.terminalFontFamily !== DEFAULT_UNIFIED_SETTINGS.terminalFontFamily
+        ? ["Terminal font"]
+        : []),
+      ...(settings.autoCreatePrOnPush !== DEFAULT_UNIFIED_SETTINGS.autoCreatePrOnPush
+        ? ["Auto-create PR on push"]
+        : []),
       ...(settings.deleteRemoteBranchOnDelete !==
       DEFAULT_UNIFIED_SETTINGS.deleteRemoteBranchOnDelete
         ? ["Delete remote branch"]
         : []),
-      ...(isTextGenerationModelDirty ? ["Text generation model"] : []),
       ...(settings.commitMessagePromptInstructions !==
       DEFAULT_UNIFIED_SETTINGS.commitMessagePromptInstructions
         ? ["Commit message instructions"]
@@ -261,24 +279,26 @@ export function useSettingsRestore(onRestored?: () => void) {
       DEFAULT_UNIFIED_SETTINGS.branchNamePromptInstructions
         ? ["Branch name instructions"]
         : []),
+      ...(isTextGenerationModelDirty ? ["Text generation model"] : []),
     ],
     [
       isTextGenerationModelDirty,
-      settings.branchNamePromptInstructions,
-      settings.commitMessagePromptInstructions,
-      settings.prContentPromptInstructions,
+      settings.autoCreatePrOnPush,
       settings.autoOpenPlanSidebar,
+      settings.branchNamePromptInstructions,
       settings.changedFilesExpandedByDefault,
-      settings.wordWrap,
+      settings.commitMessagePromptInstructions,
+      settings.deleteRemoteBranchOnDelete,
+      settings.diffFontFamily,
+      settings.prContentPromptInstructions,
+      settings.terminalFontFamily,
       settings.confirmThreadArchive,
       settings.confirmThreadDelete,
-      settings.deleteRemoteBranchOnDelete,
       settings.addProjectBaseDirectory,
       settings.defaultThreadEnvMode,
       settings.newWorktreesStartFromOrigin,
-      settings.diffFontFamily,
-      settings.terminalFontFamily,
       settings.diffIgnoreWhitespace,
+      settings.environmentIdentificationMode,
       settings.glassOpacity,
       settings.automaticGitFetchInterval,
       settings.enableAssistantStreaming,
@@ -286,6 +306,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       settings.sidebarProjectGroupingMode,
       settings.sidebarThreadPreviewCount,
       settings.timestampFormat,
+      settings.wordWrap,
       theme,
     ],
   );
@@ -305,13 +326,11 @@ export function useSettingsRestore(onRestored?: () => void) {
       timestampFormat: DEFAULT_UNIFIED_SETTINGS.timestampFormat,
       wordWrap: DEFAULT_UNIFIED_SETTINGS.wordWrap,
       diffIgnoreWhitespace: DEFAULT_UNIFIED_SETTINGS.diffIgnoreWhitespace,
+      environmentIdentificationMode: DEFAULT_UNIFIED_SETTINGS.environmentIdentificationMode,
       glassOpacity: DEFAULT_UNIFIED_SETTINGS.glassOpacity,
       sidebarThreadPreviewCount: DEFAULT_UNIFIED_SETTINGS.sidebarThreadPreviewCount,
       sidebarProjectGroupingMode: DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingMode,
       autoOpenPlanSidebar: DEFAULT_UNIFIED_SETTINGS.autoOpenPlanSidebar,
-      changedFilesExpandedByDefault: DEFAULT_UNIFIED_SETTINGS.changedFilesExpandedByDefault,
-      diffFontFamily: DEFAULT_UNIFIED_SETTINGS.diffFontFamily,
-      terminalFontFamily: DEFAULT_UNIFIED_SETTINGS.terminalFontFamily,
       enableAssistantStreaming: DEFAULT_UNIFIED_SETTINGS.enableAssistantStreaming,
       enableProviderUpdateChecks: DEFAULT_UNIFIED_SETTINGS.enableProviderUpdateChecks,
       automaticGitFetchInterval: DEFAULT_UNIFIED_SETTINGS.automaticGitFetchInterval,
@@ -320,11 +339,15 @@ export function useSettingsRestore(onRestored?: () => void) {
       addProjectBaseDirectory: DEFAULT_UNIFIED_SETTINGS.addProjectBaseDirectory,
       confirmThreadArchive: DEFAULT_UNIFIED_SETTINGS.confirmThreadArchive,
       confirmThreadDelete: DEFAULT_UNIFIED_SETTINGS.confirmThreadDelete,
+      changedFilesExpandedByDefault: DEFAULT_UNIFIED_SETTINGS.changedFilesExpandedByDefault,
+      diffFontFamily: DEFAULT_UNIFIED_SETTINGS.diffFontFamily,
+      terminalFontFamily: DEFAULT_UNIFIED_SETTINGS.terminalFontFamily,
+      autoCreatePrOnPush: DEFAULT_UNIFIED_SETTINGS.autoCreatePrOnPush,
       deleteRemoteBranchOnDelete: DEFAULT_UNIFIED_SETTINGS.deleteRemoteBranchOnDelete,
-      textGenerationModelSelection: DEFAULT_UNIFIED_SETTINGS.textGenerationModelSelection,
       commitMessagePromptInstructions: DEFAULT_UNIFIED_SETTINGS.commitMessagePromptInstructions,
       prContentPromptInstructions: DEFAULT_UNIFIED_SETTINGS.prContentPromptInstructions,
       branchNamePromptInstructions: DEFAULT_UNIFIED_SETTINGS.branchNamePromptInstructions,
+      textGenerationModelSelection: DEFAULT_UNIFIED_SETTINGS.textGenerationModelSelection,
     });
     onRestored?.();
   }, [changedSettingLabels, onRestored, setTheme, updateSettings]);
@@ -414,51 +437,19 @@ function PromptInstructionsRow({
   );
 }
 
-export function GeneralSettingsPanel() {
+export function AppearanceSettingsPanel() {
   const { theme, setTheme } = useTheme();
   const settings = usePrimarySettings();
   const updateSettings = useUpdatePrimarySettings();
-  const lastEnabledProjectGroupingMode = useRef<SidebarProjectGroupingMode>(
-    readLastEnabledProjectGroupingMode(),
-  );
-  const observability = useAtomValue(primaryServerObservabilityAtom);
-  const serverProviders = useAtomValue(primaryServerProvidersAtom);
+  const environmentStageLabel = useEnvironmentStageLabel();
+  const showEnvironmentIdentification =
+    resolveEnvironmentIdentificationPillLabel(environmentStageLabel) !== null;
   const glassOpacityRatio =
     (settings.glassOpacity - MIN_GLASS_OPACITY) / (MAX_GLASS_OPACITY - MIN_GLASS_OPACITY);
   const glassOpacitySliderStyle = {
     "--glass-slider-progress": `${glassOpacityRatio * 100}%`,
     "--glass-slider-fill-offset": `${0.5 - glassOpacityRatio}rem`,
   } as CSSProperties;
-  const diagnosticsDescription = formatDiagnosticsDescription({
-    localTracingEnabled: observability?.localTracingEnabled ?? false,
-    otlpTracesEnabled: observability?.otlpTracesEnabled ?? false,
-    otlpTracesUrl: observability?.otlpTracesUrl,
-    otlpMetricsEnabled: observability?.otlpMetricsEnabled ?? false,
-    otlpMetricsUrl: observability?.otlpMetricsUrl,
-  });
-
-  const textGenerationModelSelection = resolveAppModelSelectionState(settings, serverProviders);
-  const textGenInstanceId = textGenerationModelSelection.instanceId;
-  const textGenModel = textGenerationModelSelection.model;
-  const textGenModelOptions = textGenerationModelSelection.options;
-  const textGenerationModelInstanceEntries = sortProviderInstanceEntries(
-    applyProviderInstanceSettings(deriveProviderInstanceEntries(serverProviders), settings),
-  );
-  const textGenInstanceEntry = textGenerationModelInstanceEntries.find(
-    (entry) => entry.instanceId === textGenInstanceId,
-  );
-  const textGenProvider: ProviderDriverKind =
-    textGenInstanceEntry?.driverKind ?? DEFAULT_DRIVER_KIND;
-  const textGenerationModelOptionsByInstance = getCustomModelOptionsByInstance(
-    settings,
-    serverProviders,
-    textGenInstanceId,
-    textGenModel,
-  );
-  const isTextGenerationModelDirty = !Equal.equals(
-    settings.textGenerationModelSelection ?? null,
-    DEFAULT_UNIFIED_SETTINGS.textGenerationModelSelection ?? null,
-  );
 
   return (
     <SettingsPageContainer>
@@ -542,6 +533,164 @@ export function GeneralSettingsPanel() {
           }
         />
 
+        {showEnvironmentIdentification ? (
+          <SettingsRow
+            title="Environment identification"
+            description="Choose how Dev and Nightly environments are identified."
+            resetAction={
+              settings.environmentIdentificationMode !== DEFAULT_ENVIRONMENT_IDENTIFICATION_MODE ? (
+                <SettingResetButton
+                  label="environment identification"
+                  onClick={() =>
+                    updateSettings({
+                      environmentIdentificationMode: DEFAULT_ENVIRONMENT_IDENTIFICATION_MODE,
+                    })
+                  }
+                />
+              ) : null
+            }
+            control={
+              <Select
+                value={settings.environmentIdentificationMode}
+                onValueChange={(value) => {
+                  if (value === "artwork" || value === "pill" || value === "none") {
+                    updateSettings({ environmentIdentificationMode: value });
+                  }
+                }}
+              >
+                <SelectTrigger className="w-full sm:w-40" aria-label="Environment identification">
+                  <SelectValue>
+                    {ENVIRONMENT_IDENTIFICATION_LABELS[settings.environmentIdentificationMode]}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectPopup align="end" alignItemWithTrigger={false}>
+                  {Object.entries(ENVIRONMENT_IDENTIFICATION_LABELS).map(([value, label]) => (
+                    <SelectItem hideIndicator key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectPopup>
+              </Select>
+            }
+          />
+        ) : null}
+
+        <SettingsRow
+          title="Diff font"
+          description="Choose the font used in the code diff view."
+          resetAction={
+            settings.diffFontFamily !== DEFAULT_UNIFIED_SETTINGS.diffFontFamily ? (
+              <SettingResetButton
+                label="diff font"
+                onClick={() =>
+                  updateSettings({ diffFontFamily: DEFAULT_UNIFIED_SETTINGS.diffFontFamily })
+                }
+              />
+            ) : null
+          }
+          control={
+            <FontPicker
+              value={settings.diffFontFamily}
+              onValueChange={(next) => updateSettings({ diffFontFamily: next })}
+              className="w-full sm:w-64"
+            />
+          }
+        />
+
+        <SettingsRow
+          title="Terminal font"
+          description="Choose the font used in the terminal."
+          resetAction={
+            settings.terminalFontFamily !== DEFAULT_UNIFIED_SETTINGS.terminalFontFamily ? (
+              <SettingResetButton
+                label="terminal font"
+                onClick={() =>
+                  updateSettings({
+                    terminalFontFamily: DEFAULT_UNIFIED_SETTINGS.terminalFontFamily,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <FontPicker
+              value={settings.terminalFontFamily}
+              onValueChange={(next) => updateSettings({ terminalFontFamily: next })}
+              className="w-full sm:w-64"
+            />
+          }
+        />
+
+        <SettingsRow
+          title="Word wrap"
+          description="Wrap long lines in code blocks, tables, diffs, and file previews by default."
+          resetAction={
+            settings.wordWrap !== DEFAULT_UNIFIED_SETTINGS.wordWrap ? (
+              <SettingResetButton
+                label="word wrapping"
+                onClick={() =>
+                  updateSettings({
+                    wordWrap: DEFAULT_UNIFIED_SETTINGS.wordWrap,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <Switch
+              checked={settings.wordWrap}
+              onCheckedChange={(checked) => updateSettings({ wordWrap: Boolean(checked) })}
+              aria-label="Wrap code, tables, diffs, and file previews by default"
+            />
+          }
+        />
+      </SettingsSection>
+    </SettingsPageContainer>
+  );
+}
+
+export function GeneralSettingsPanel() {
+  const settings = usePrimarySettings();
+  const updateSettings = useUpdatePrimarySettings();
+  const lastEnabledProjectGroupingMode = useRef<SidebarProjectGroupingMode>(
+    readLastEnabledProjectGroupingMode(),
+  );
+  const observability = useAtomValue(primaryServerObservabilityAtom);
+  const serverProviders = useAtomValue(primaryServerProvidersAtom);
+  const diagnosticsDescription = formatDiagnosticsDescription({
+    localTracingEnabled: observability?.localTracingEnabled ?? false,
+    otlpTracesEnabled: observability?.otlpTracesEnabled ?? false,
+    otlpTracesUrl: observability?.otlpTracesUrl,
+    otlpMetricsEnabled: observability?.otlpMetricsEnabled ?? false,
+    otlpMetricsUrl: observability?.otlpMetricsUrl,
+  });
+
+  const textGenerationModelSelection = resolveAppModelSelectionState(settings, serverProviders);
+  const textGenInstanceId = textGenerationModelSelection.instanceId;
+  const textGenModel = textGenerationModelSelection.model;
+  const textGenModelOptions = textGenerationModelSelection.options;
+  const textGenerationModelInstanceEntries = sortProviderInstanceEntries(
+    applyProviderInstanceSettings(deriveProviderInstanceEntries(serverProviders), settings),
+  );
+  const textGenInstanceEntry = textGenerationModelInstanceEntries.find(
+    (entry) => entry.instanceId === textGenInstanceId,
+  );
+  const textGenProvider: ProviderDriverKind =
+    textGenInstanceEntry?.driverKind ?? DEFAULT_DRIVER_KIND;
+  const textGenerationModelOptionsByInstance = getCustomModelOptionsByInstance(
+    settings,
+    serverProviders,
+    textGenInstanceId,
+    textGenModel,
+  );
+  const isTextGenerationModelDirty = !Equal.equals(
+    settings.textGenerationModelSelection ?? null,
+    DEFAULT_UNIFIED_SETTINGS.textGenerationModelSelection ?? null,
+  );
+
+  return (
+    <SettingsPageContainer>
+      <SettingsSection title="General">
         <SettingsRow
           title="Project Grouping"
           description="Combine matching repositories across environments."
@@ -621,76 +770,6 @@ export function GeneralSettingsPanel() {
         />
 
         <SettingsRow
-          title="Diff font"
-          description="Choose the font used in the code diff view."
-          resetAction={
-            settings.diffFontFamily !== DEFAULT_UNIFIED_SETTINGS.diffFontFamily ? (
-              <SettingResetButton
-                label="diff font"
-                onClick={() =>
-                  updateSettings({ diffFontFamily: DEFAULT_UNIFIED_SETTINGS.diffFontFamily })
-                }
-              />
-            ) : null
-          }
-          control={
-            <FontPicker
-              value={settings.diffFontFamily}
-              onValueChange={(next) => updateSettings({ diffFontFamily: next })}
-              className="w-full sm:w-64"
-            />
-          }
-        />
-
-        <SettingsRow
-          title="Terminal font"
-          description="Choose the font used in the terminal."
-          resetAction={
-            settings.terminalFontFamily !== DEFAULT_UNIFIED_SETTINGS.terminalFontFamily ? (
-              <SettingResetButton
-                label="terminal font"
-                onClick={() =>
-                  updateSettings({
-                    terminalFontFamily: DEFAULT_UNIFIED_SETTINGS.terminalFontFamily,
-                  })
-                }
-              />
-            ) : null
-          }
-          control={
-            <FontPicker
-              value={settings.terminalFontFamily}
-              onValueChange={(next) => updateSettings({ terminalFontFamily: next })}
-              className="w-full sm:w-64"
-            />
-          }
-        />
-
-        <SettingsRow
-          title="Word wrap"
-          description="Wrap long lines in code blocks, tables, diffs, and file previews by default."
-          resetAction={
-            settings.wordWrap !== DEFAULT_UNIFIED_SETTINGS.wordWrap ? (
-              <SettingResetButton
-                label="word wrapping"
-                onClick={() =>
-                  updateSettings({
-                    wordWrap: DEFAULT_UNIFIED_SETTINGS.wordWrap,
-                  })
-                }
-              />
-            ) : null
-          }
-          control={
-            <Switch
-              checked={settings.wordWrap}
-              onCheckedChange={(checked) => updateSettings({ wordWrap: Boolean(checked) })}
-              aria-label="Wrap code, tables, diffs, and file previews by default"
-            />
-          }
-        />
-
-        <SettingsRow
           title="Hide whitespace changes"
           description="Set whether the diff panel ignores whitespace-only edits by default."
           resetAction={
@@ -715,9 +794,115 @@ export function GeneralSettingsPanel() {
             />
           }
         />
-      </SettingsSection>
 
-      <SettingsSection title="Threads & tasks">
+        <SettingsRow
+          title="Assistant output"
+          description="Show token-by-token output while a response is in progress."
+          resetAction={
+            settings.enableAssistantStreaming !==
+            DEFAULT_UNIFIED_SETTINGS.enableAssistantStreaming ? (
+              <SettingResetButton
+                label="assistant output"
+                onClick={() =>
+                  updateSettings({
+                    enableAssistantStreaming: DEFAULT_UNIFIED_SETTINGS.enableAssistantStreaming,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <Switch
+              checked={settings.enableAssistantStreaming}
+              onCheckedChange={(checked) =>
+                updateSettings({ enableAssistantStreaming: Boolean(checked) })
+              }
+              aria-label="Stream assistant messages"
+            />
+          }
+        />
+
+        <SettingsRow
+          title="Provider update checks"
+          description="Check installed provider CLIs for newer available versions."
+          resetAction={
+            settings.enableProviderUpdateChecks !==
+            DEFAULT_UNIFIED_SETTINGS.enableProviderUpdateChecks ? (
+              <SettingResetButton
+                label="provider update checks"
+                onClick={() =>
+                  updateSettings({
+                    enableProviderUpdateChecks: DEFAULT_UNIFIED_SETTINGS.enableProviderUpdateChecks,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <Switch
+              checked={settings.enableProviderUpdateChecks}
+              onCheckedChange={(checked) =>
+                updateSettings({ enableProviderUpdateChecks: Boolean(checked) })
+              }
+              aria-label="Check provider versions"
+            />
+          }
+        />
+
+        <SettingsRow
+          title="Expand changed files by default"
+          description="When a turn modifies files, show all directories expanded instead of collapsed."
+          resetAction={
+            settings.changedFilesExpandedByDefault !==
+            DEFAULT_UNIFIED_SETTINGS.changedFilesExpandedByDefault ? (
+              <SettingResetButton
+                label="expand changed files by default"
+                onClick={() =>
+                  updateSettings({
+                    changedFilesExpandedByDefault:
+                      DEFAULT_UNIFIED_SETTINGS.changedFilesExpandedByDefault,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <Switch
+              checked={settings.changedFilesExpandedByDefault}
+              onCheckedChange={(checked) =>
+                updateSettings({ changedFilesExpandedByDefault: Boolean(checked) })
+              }
+              aria-label="Expand changed files by default"
+            />
+          }
+        />
+
+        <SettingsRow
+          title="Auto-open task panel"
+          description="Open the right-side plan and task panel automatically when steps appear."
+          resetAction={
+            settings.autoOpenPlanSidebar !== DEFAULT_UNIFIED_SETTINGS.autoOpenPlanSidebar ? (
+              <SettingResetButton
+                label="auto-open task panel"
+                onClick={() =>
+                  updateSettings({
+                    autoOpenPlanSidebar: DEFAULT_UNIFIED_SETTINGS.autoOpenPlanSidebar,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <Switch
+              checked={settings.autoOpenPlanSidebar}
+              onCheckedChange={(checked) =>
+                updateSettings({ autoOpenPlanSidebar: Boolean(checked) })
+              }
+              aria-label="Open the task panel automatically"
+            />
+          }
+        />
+
         <SettingsRow
           title="New threads"
           description="Pick the default workspace mode for newly created draft threads."
@@ -795,109 +980,29 @@ export function GeneralSettingsPanel() {
         ) : null}
 
         <SettingsRow
-          title="Auto-open task panel"
-          description="Open the right-side plan and task panel automatically when steps appear."
+          title="Add project starts in"
+          description='Leave empty to use "~/" when the Add Project browser opens.'
           resetAction={
-            settings.autoOpenPlanSidebar !== DEFAULT_UNIFIED_SETTINGS.autoOpenPlanSidebar ? (
+            settings.addProjectBaseDirectory !==
+            DEFAULT_UNIFIED_SETTINGS.addProjectBaseDirectory ? (
               <SettingResetButton
-                label="auto-open task panel"
+                label="add project base directory"
                 onClick={() =>
                   updateSettings({
-                    autoOpenPlanSidebar: DEFAULT_UNIFIED_SETTINGS.autoOpenPlanSidebar,
+                    addProjectBaseDirectory: DEFAULT_UNIFIED_SETTINGS.addProjectBaseDirectory,
                   })
                 }
               />
             ) : null
           }
           control={
-            <Switch
-              checked={settings.autoOpenPlanSidebar}
-              onCheckedChange={(checked) =>
-                updateSettings({ autoOpenPlanSidebar: Boolean(checked) })
-              }
-              aria-label="Open the task panel automatically"
-            />
-          }
-        />
-
-        <SettingsRow
-          title="Expand changed files by default"
-          description="When a turn modifies files, show all directories expanded instead of collapsed."
-          resetAction={
-            settings.changedFilesExpandedByDefault !==
-            DEFAULT_UNIFIED_SETTINGS.changedFilesExpandedByDefault ? (
-              <SettingResetButton
-                label="expand changed files by default"
-                onClick={() =>
-                  updateSettings({
-                    changedFilesExpandedByDefault:
-                      DEFAULT_UNIFIED_SETTINGS.changedFilesExpandedByDefault,
-                  })
-                }
-              />
-            ) : null
-          }
-          control={
-            <Switch
-              checked={settings.changedFilesExpandedByDefault}
-              onCheckedChange={(checked) =>
-                updateSettings({ changedFilesExpandedByDefault: Boolean(checked) })
-              }
-              aria-label="Expand changed files by default"
-            />
-          }
-        />
-
-        <SettingsRow
-          title="Assistant output"
-          description="Show token-by-token output while a response is in progress."
-          resetAction={
-            settings.enableAssistantStreaming !==
-            DEFAULT_UNIFIED_SETTINGS.enableAssistantStreaming ? (
-              <SettingResetButton
-                label="assistant output"
-                onClick={() =>
-                  updateSettings({
-                    enableAssistantStreaming: DEFAULT_UNIFIED_SETTINGS.enableAssistantStreaming,
-                  })
-                }
-              />
-            ) : null
-          }
-          control={
-            <Switch
-              checked={settings.enableAssistantStreaming}
-              onCheckedChange={(checked) =>
-                updateSettings({ enableAssistantStreaming: Boolean(checked) })
-              }
-              aria-label="Stream assistant messages"
-            />
-          }
-        />
-
-        <SettingsRow
-          title="Provider update checks"
-          description="Check installed provider CLIs for newer available versions."
-          resetAction={
-            settings.enableProviderUpdateChecks !==
-            DEFAULT_UNIFIED_SETTINGS.enableProviderUpdateChecks ? (
-              <SettingResetButton
-                label="provider update checks"
-                onClick={() =>
-                  updateSettings({
-                    enableProviderUpdateChecks: DEFAULT_UNIFIED_SETTINGS.enableProviderUpdateChecks,
-                  })
-                }
-              />
-            ) : null
-          }
-          control={
-            <Switch
-              checked={settings.enableProviderUpdateChecks}
-              onCheckedChange={(checked) =>
-                updateSettings({ enableProviderUpdateChecks: Boolean(checked) })
-              }
-              aria-label="Check provider versions"
+            <DraftInput
+              className="w-full sm:w-72"
+              value={settings.addProjectBaseDirectory}
+              onCommit={(next) => updateSettings({ addProjectBaseDirectory: next })}
+              placeholder="~/"
+              spellCheck={false}
+              aria-label="Add project base directory"
             />
           }
         />
@@ -953,39 +1058,7 @@ export function GeneralSettingsPanel() {
             />
           }
         />
-      </SettingsSection>
 
-      <SettingsSection title="Projects">
-        <SettingsRow
-          title="Add project starts in"
-          description='Leave empty to use "~/" when the Add Project browser opens.'
-          resetAction={
-            settings.addProjectBaseDirectory !==
-            DEFAULT_UNIFIED_SETTINGS.addProjectBaseDirectory ? (
-              <SettingResetButton
-                label="add project base directory"
-                onClick={() =>
-                  updateSettings({
-                    addProjectBaseDirectory: DEFAULT_UNIFIED_SETTINGS.addProjectBaseDirectory,
-                  })
-                }
-              />
-            ) : null
-          }
-          control={
-            <DraftInput
-              className="w-full sm:w-72"
-              value={settings.addProjectBaseDirectory}
-              onCommit={(next) => updateSettings({ addProjectBaseDirectory: next })}
-              placeholder="~/"
-              spellCheck={false}
-              aria-label="Add project base directory"
-            />
-          }
-        />
-      </SettingsSection>
-
-      <SettingsSection title="Version control">
         <SettingsRow
           title="Auto-create PR on push"
           description="When pushing a feature branch with no open PR, also create a pull request automatically."
