@@ -49,7 +49,6 @@ beforeEach(() => {
     });
   }
   Reflect.deleteProperty(testWindow(), "desktopBridge");
-  Reflect.deleteProperty(testWindow(), "nativeApi");
   Object.defineProperty(testWindow(), "localStorage", {
     configurable: true,
     value: createLocalStorageStub(),
@@ -62,16 +61,12 @@ afterEach(() => {
 
 describe("LocalApi", () => {
   // Backend VCS forwarding tests moved with the connection rewrite to client-runtime state atoms.
-  it("keeps backend operations unavailable in the browser facade", async () => {
+  it("keeps backend operations out of the local host facade", async () => {
     const { createLocalApi } = await import("./localApi");
     const api = createLocalApi();
 
-    await expect(api.server.getConfig()).rejects.toThrow(
-      "Local backend API is unavailable before a backend is paired.",
-    );
-    await expect(api.shell.openInEditor("/tmp", "cursor")).rejects.toThrow(
-      "Local backend API is unavailable before a backend is paired.",
-    );
+    expect(api).not.toHaveProperty("server");
+    expect(api.shell).not.toHaveProperty("openInEditor");
   });
 
   it("uses the browser context-menu fallback without a desktop bridge", async () => {
@@ -120,13 +115,5 @@ describe("LocalApi", () => {
 
     await api.persistence.setClientSettings(settings);
     await expect(api.persistence.getClientSettings()).resolves.toEqual(settings);
-  });
-
-  it("prefers the native LocalApi when one is injected", async () => {
-    const nativeApi = { dialogs: {} };
-    testWindow().nativeApi = nativeApi as never;
-    const { readLocalApi } = await import("./localApi");
-
-    expect(readLocalApi()).toBe(nativeApi);
   });
 });

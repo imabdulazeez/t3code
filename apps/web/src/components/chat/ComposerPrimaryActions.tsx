@@ -23,6 +23,7 @@ interface ComposerPrimaryActionsProps {
   isPlanReimplementation: boolean;
   promptHasText: boolean;
   isSendBusy: boolean;
+  sendDisabledReason: string | null;
   isConnecting: boolean;
   isEnvironmentUnavailable: boolean;
   isPreparingWorktree: boolean;
@@ -66,6 +67,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
   isPlanReimplementation,
   promptHasText,
   isSendBusy,
+  sendDisabledReason,
   isConnecting,
   isEnvironmentUnavailable,
   isPreparingWorktree,
@@ -82,6 +84,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
     ? { onPointerDown: preventPointerFocus }
     : undefined;
   const environmentIdentificationMode = useEnvironmentIdentificationMode();
+  const isSendDisabled = sendDisabledReason !== null;
   const stageBackdropVariant = useSidebarStageBackdropVariant(
     environmentIdentificationMode === "artwork",
   );
@@ -161,7 +164,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
           size="sm"
           className={cn("rounded-full", compact ? "h-9 px-3 sm:h-8" : "h-9 px-4 sm:h-8")}
           {...pointerFocusProps}
-          disabled={isSendBusy || isConnecting || isEnvironmentUnavailable}
+          disabled={isSendBusy || isSendDisabled || isConnecting || isEnvironmentUnavailable}
         >
           {isConnecting || isSendBusy ? "Sending..." : "Refine"}
         </Button>
@@ -173,7 +176,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
         <PlanImplementActions
           isReimplementation={isPlanReimplementation}
           isBusy={isConnecting || isSendBusy}
-          disabled={isSendBusy || isConnecting || isEnvironmentUnavailable}
+          disabled={isSendBusy || isSendDisabled || isConnecting || isEnvironmentUnavailable}
           canRevertPlan={canRevertPlan}
           preserveFocusOnPointerDown={preserveComposerFocusOnPointerDown}
           onImplementInNewThread={onImplementPlanInNewThread}
@@ -194,17 +197,25 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
           : "bg-primary/90 enabled:shadow-primary/24 hover:bg-primary",
       )}
       {...pointerFocusProps}
-      disabled={isSendBusy || isConnecting || isEnvironmentUnavailable || !hasSendableContent}
+      disabled={
+        isSendBusy ||
+        isSendDisabled ||
+        isConnecting ||
+        isEnvironmentUnavailable ||
+        !hasSendableContent
+      }
       aria-label={
         isEnvironmentUnavailable
           ? "Environment disconnected"
-          : isConnecting
-            ? "Connecting"
-            : isPreparingWorktree
-              ? "Preparing worktree"
-              : isSendBusy
-                ? "Sending"
-                : "Send message"
+          : sendDisabledReason
+            ? sendDisabledReason
+            : isConnecting
+              ? "Connecting"
+              : isPreparingWorktree
+                ? "Preparing worktree"
+                : isSendBusy
+                  ? "Sending"
+                  : "Send message"
       }
     >
       {stageBackdropVariant ? (
