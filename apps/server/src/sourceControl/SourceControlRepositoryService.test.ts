@@ -372,6 +372,7 @@ it.effect("publish succeeds with status remote_added when the local repo has no 
             Effect.succeed({
               isRepo: true,
               hasOriginRemote: true,
+              originRemoteUrl: "git@github.com:owner/repo.git",
               isDefaultBranch: true,
               branch: "main",
               upstreamRef: null,

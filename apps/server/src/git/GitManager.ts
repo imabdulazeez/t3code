@@ -832,6 +832,7 @@ export const make = Effect.gen(function* () {
   const nonRepositoryStatusDetails = {
     isRepo: false,
     hasOriginRemote: false,
+    originRemoteUrl: null,
     isDefaultBranch: false,
     branch: null,
     upstreamRef: null,
@@ -856,6 +857,7 @@ export const make = Effect.gen(function* () {
       isRepo: details.isRepo,
       ...(hostingProvider ? { sourceControlProvider: hostingProvider } : {}),
       hasPrimaryRemote: details.hasOriginRemote,
+      ...(details.originRemoteUrl ? { primaryRemoteUrl: details.originRemoteUrl } : {}),
       isDefaultRef: details.isDefaultBranch,
       refName: details.branch,
       hasWorkingTreeChanges: details.hasWorkingTreeChanges,

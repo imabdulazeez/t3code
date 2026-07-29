@@ -15,6 +15,7 @@ import type {
   SourceControlRepositoryVisibility,
   VcsStatusResult,
 } from "@t3tools/contracts";
+import { deriveRepositoryWebUrlFromRemoteUrl } from "@t3tools/shared/git";
 import { useNavigate } from "@tanstack/react-router";
 import * as Option from "effect/Option";
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
@@ -1104,6 +1105,13 @@ export default function GitActionsControl({
   const isRepo = gitStatus?.isRepo ?? true;
   const hasPrimaryRemote = gitStatus?.hasPrimaryRemote ?? false;
   const gitStatusForActions = gitStatus;
+  const repositoryWebUrl = useMemo(
+    () =>
+      gitStatus?.primaryRemoteUrl
+        ? deriveRepositoryWebUrlFromRemoteUrl(gitStatus.primaryRemoteUrl)
+        : null,
+    [gitStatus?.primaryRemoteUrl],
+  );
 
   const allFiles = gitStatusForActions?.workingTree.files ?? [];
   const selectedFiles = allFiles.filter((f) => !excludedFiles.has(f.path));
@@ -1254,6 +1262,19 @@ export default function GitActionsControl({
       );
     });
   }, [gitStatusForActions, threadToastData]);
+
+  const openRepository = useCallback(() => {
+    const api = readLocalApi();
+    if (!api || !repositoryWebUrl) {
+      toastManager.add({
+        type: "error",
+        title: "Repository opening is unavailable.",
+        data: threadToastData,
+      });
+      return;
+    }
+    void api.shell.openExternal(repositoryWebUrl);
+  }, [repositoryWebUrl, threadToastData]);
 
   runGitActionWithToast = useEffectEvent(
     async ({
@@ -1804,6 +1825,28 @@ export default function GitActionsControl({
                   Publish repository...
                 </MenuItem>
               ) : null}
+              {repositoryWebUrl === null ? (
+                <Popover>
+                  <PopoverTrigger
+                    openOnHover
+                    nativeButton={false}
+                    render={<span className="block w-max cursor-not-allowed" />}
+                  >
+                    <MenuItem className="w-full" disabled>
+                      <ExternalLinkIcon />
+                      Open repository
+                    </MenuItem>
+                  </PopoverTrigger>
+                  <PopoverPopup tooltipStyle side="left" align="center">
+                    Add an upstream remote to open this repository.
+                  </PopoverPopup>
+                </Popover>
+              ) : (
+                <MenuItem onClick={openRepository}>
+                  <ExternalLinkIcon />
+                  Open repository
+                </MenuItem>
+              )}
               {gitStatusForActions?.refName === null && (
                 <p className="px-2 py-1.5 text-xs text-warning">
                   Detached HEAD: create and checkout a branch to enable push and pull request

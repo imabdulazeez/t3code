@@ -61,6 +61,7 @@ export interface GitStatusDetails {
   isRepo: boolean;
   sourceControlProvider?: VcsStatusResult["sourceControlProvider"];
   hasOriginRemote: boolean;
+  originRemoteUrl: string | null;
   isDefaultBranch: boolean;
   branch: string | null;
   upstreamRef: string | null;

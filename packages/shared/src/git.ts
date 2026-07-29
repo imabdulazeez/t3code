@@ -175,6 +175,53 @@ export function normalizeGitRemoteUrl(value: string): string {
   return normalized;
 }
 
+function parseRemoteUrlPathSegments(remoteUrl: string): ReadonlyArray<string> {
+  const trimmed = remoteUrl
+    .trim()
+    .replace(/\/+$/g, "")
+    .replace(/\.git$/i, "");
+  if (trimmed.length === 0) {
+    return [];
+  }
+
+  const rawPath = /^(?:ssh|https?|git):\/\//i.test(trimmed)
+    ? (() => {
+        try {
+          return new URL(trimmed).pathname;
+        } catch {
+          return "";
+        }
+      })()
+    : (/^[^@/\s]+@[^:/\s]+[:/](.+)$/.exec(trimmed)?.[1] ?? "");
+
+  return rawPath.split("/").filter((segment) => segment.length > 0);
+}
+
+/**
+ * Best-effort browsable web URL for a git remote, used to open a repository in
+ * its hosting provider. Returns null when the remote shape is unrecognized.
+ */
+export function deriveRepositoryWebUrlFromRemoteUrl(remoteUrl: string): string | null {
+  const provider = detectSourceControlProviderFromRemoteUrl(remoteUrl);
+  if (!provider || provider.baseUrl.length === 0) {
+    return null;
+  }
+
+  const segments = parseRemoteUrlPathSegments(remoteUrl);
+  if (segments.length === 0) {
+    return null;
+  }
+
+  // Azure DevOps SSH remotes are `v3/<org>/<project>/<repo>`, while its web URLs
+  // put the repo behind a `_git` segment.
+  const pathSegments =
+    provider.kind === "azure-devops" && segments[0]?.toLowerCase() === "v3"
+      ? [...segments.slice(1, -1), "_git", segments[segments.length - 1] ?? ""]
+      : segments;
+
+  return `${provider.baseUrl}/${pathSegments.join("/")}`;
+}
+
 /**
  * Best-effort parse of a GitHub `owner/repo` identifier from common remote URL shapes.
  */
@@ -284,6 +331,7 @@ function toLocalStatusPart(status: VcsStatusResult): VcsStatusLocalResult {
       ? { sourceControlProvider: status.sourceControlProvider }
       : {}),
     hasPrimaryRemote: status.hasPrimaryRemote,
+    ...(status.primaryRemoteUrl ? { primaryRemoteUrl: status.primaryRemoteUrl } : {}),
     isDefaultRef: status.isDefaultRef,
     refName: status.refName,
     hasWorkingTreeChanges: status.hasWorkingTreeChanges,

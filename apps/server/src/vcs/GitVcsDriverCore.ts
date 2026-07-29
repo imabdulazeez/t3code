@@ -109,6 +109,7 @@ const commandHoldsIndexLock = (subcommand: string, env: NodeJS.ProcessEnv | unde
 const NON_REPOSITORY_STATUS_DETAILS = Object.freeze<GitVcsDriver.GitStatusDetails>({
   isRepo: false,
   hasOriginRemote: false,
+  originRemoteUrl: null,
   isDefaultBranch: false,
   branch: null,
   upstreamRef: null,
@@ -1344,10 +1345,19 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       },
     ).pipe(Effect.map((result) => result.exitCode === 0));
 
-  const originRemoteExists = (cwd: string): Effect.Effect<boolean, GitCommandError> =>
+  const readOriginRemoteUrl = (cwd: string): Effect.Effect<string | null, GitCommandError> =>
     executeGit("GitVcsDriver.originRemoteExists", cwd, ["remote", "get-url", "origin"], {
       allowNonZeroExit: true,
-    }).pipe(Effect.map((result) => result.exitCode === 0));
+    }).pipe(
+      Effect.map((result) => {
+        if (result.exitCode !== 0) return null;
+        const remoteUrl = result.stdout.trim();
+        return remoteUrl.length > 0 ? remoteUrl : null;
+      }),
+    );
+
+  const originRemoteExists = (cwd: string): Effect.Effect<boolean, GitCommandError> =>
+    readOriginRemoteUrl(cwd).pipe(Effect.map((remoteUrl) => remoteUrl !== null));
 
   const listRemoteNames = (cwd: string): Effect.Effect<ReadonlyArray<string>, GitCommandError> =>
     runGitStdout("GitVcsDriver.listRemoteNames", cwd, ["remote"]).pipe(
@@ -1638,7 +1648,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       });
     }
 
-    const [unstagedNumstatStdout, stagedNumstatStdout, defaultRefResult, hasPrimaryRemote] =
+    const [unstagedNumstatStdout, stagedNumstatStdout, defaultRefResult, originRemoteUrl] =
       yield* Effect.all(
         [
           runGitStdout("GitVcsDriver.statusDetails.unstagedNumstat", cwd, ["diff", "--numstat"]),
@@ -1655,7 +1665,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
               allowNonZeroExit: true,
             },
           ),
-          originRemoteExists(cwd).pipe(Effect.orElseSucceed(() => false)),
+          readOriginRemoteUrl(cwd).pipe(Effect.orElseSucceed(() => null)),
         ],
         { concurrency: "unbounded" },
       );
@@ -1747,7 +1757,8 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
 
     return {
       isRepo: true,
-      hasOriginRemote: hasPrimaryRemote,
+      hasOriginRemote: originRemoteUrl !== null,
+      originRemoteUrl,
       isDefaultBranch,
       branch: refName,
       upstreamRef,
@@ -1802,6 +1813,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       Effect.map((details) => ({
         isRepo: details.isRepo,
         hasPrimaryRemote: details.hasOriginRemote,
+        ...(details.originRemoteUrl ? { primaryRemoteUrl: details.originRemoteUrl } : {}),
         isDefaultRef: details.isDefaultBranch,
         refName: details.branch,
         hasWorkingTreeChanges: details.hasWorkingTreeChanges,
