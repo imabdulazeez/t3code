@@ -1665,6 +1665,49 @@ it.layer(GitManagerTestLayer)("GitManager", (it) => {
     }),
   );
 
+  it.effect("carries recent commit subjects as policy examples, not instructions", () =>
+    Effect.gen(function* () {
+      const repoDir = yield* makeTempDir("t3code-git-manager-");
+      yield* runGit(repoDir, ["init", "--initial-branch=main"]);
+      yield* runGit(repoDir, ["config", "user.email", "test@example.com"]);
+      yield* runGit(repoDir, ["config", "user.name", "Test User"]);
+      NodeFS.writeFileSync(NodePath.join(repoDir, "README.md"), "hello\n");
+      yield* runGit(repoDir, ["add", "README.md"]);
+      yield* runGit(repoDir, ["commit", "-m", "fix(web): trim sidebar labels"]);
+      NodeFS.writeFileSync(NodePath.join(repoDir, "README.md"), "hello\nagain\n");
+      yield* runGit(repoDir, ["add", "README.md"]);
+      let generatedPolicy: TextGeneration.CommitMessageGenerationInput["policy"] = undefined;
+
+      const { manager } = yield* makeManager({
+        serverSettings: {
+          sourceControlWritingStyle: {
+            mode: "repo_conventions" as const,
+          },
+        },
+        textGeneration: {
+          generateCommitMessage: (input) => {
+            generatedPolicy = input.policy;
+            return Effect.succeed({ subject: "Update readme", body: "" });
+          },
+        },
+      });
+      yield* runStackedAction(manager, {
+        cwd: repoDir,
+        action: "commit",
+      });
+
+      expect(generatedPolicy).toEqual({
+        kind: "repo_conventions",
+        commitInstructions:
+          "Follow the repository's established commit message style when examples are available.",
+        changeRequestInstructions:
+          "Follow the repository's established change request title and body style when examples are available.",
+        conventionExamples: expect.stringContaining("fix(web): trim sidebar labels"),
+        inferRepositoryConventions: true,
+      });
+    }),
+  );
+
   it.effect("preserves repository conventions style when recent history is empty", () =>
     Effect.gen(function* () {
       const repoDir = yield* makeTempDir("t3code-git-manager-");

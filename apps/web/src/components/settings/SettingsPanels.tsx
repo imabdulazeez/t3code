@@ -8,9 +8,8 @@ import {
   SettingsIcon,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
-import type React from "react";
 import type { CSSProperties } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useAtomValue } from "@effect/atom-react";
 import {
   defaultInstanceIdForDriver,
@@ -31,10 +30,7 @@ import {
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
 import {
-  DEFAULT_BRANCH_NAME_PROMPT_INSTRUCTIONS,
-  DEFAULT_COMMIT_MESSAGE_PROMPT_INSTRUCTIONS,
   DEFAULT_ENVIRONMENT_IDENTIFICATION_MODE,
-  DEFAULT_PR_CONTENT_PROMPT_INSTRUCTIONS,
   DEFAULT_UNIFIED_SETTINGS,
   type EnvironmentIdentificationMode,
   MAX_GLASS_OPACITY,
@@ -90,7 +86,6 @@ import {
   DialogTitle,
 } from "../ui/dialog";
 import { DraftInput } from "../ui/draft-input";
-import { Textarea } from "../ui/textarea";
 import {
   NumberField,
   NumberFieldDecrement,
@@ -778,85 +773,6 @@ function BackgroundActivityAdvancedDialog({
         </DialogFooter>
       </DialogPopup>
     </Dialog>
-  );
-}
-
-function DraftTextarea({
-  value,
-  onCommit,
-  className,
-  ...rest
-}: Omit<React.ComponentProps<typeof Textarea>, "value" | "onChange" | "defaultValue"> & {
-  readonly value: string;
-  readonly onCommit: (next: string) => void;
-}) {
-  const [draft, setDraft] = useState(value);
-  const focusedRef = useRef(false);
-
-  useEffect(() => {
-    if (!focusedRef.current) setDraft(value);
-  }, [value]);
-
-  return (
-    <Textarea
-      {...rest}
-      className={className}
-      value={draft}
-      onChange={(event) => setDraft(event.target.value)}
-      onFocus={() => {
-        focusedRef.current = true;
-      }}
-      onBlur={() => {
-        focusedRef.current = false;
-        if (draft !== value) onCommit(draft);
-      }}
-    />
-  );
-}
-
-function PromptInstructionsRow({
-  title,
-  value,
-  defaultValue,
-  onChange,
-  ariaLabel,
-}: {
-  readonly title: string;
-  readonly value: string;
-  readonly defaultValue: string;
-  readonly onChange: (next: string) => void;
-  readonly ariaLabel: string;
-}) {
-  const isCustom = value.length > 0;
-  return (
-    <div className="border-t border-border/60 px-4 py-3.5 sm:px-5">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex min-h-5 items-center gap-1.5">
-          <h3 className="text-[13px] font-semibold tracking-[-0.01em] text-foreground">{title}</h3>
-          <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center">
-            {isCustom ? (
-              <SettingResetButton label={ariaLabel} onClick={() => onChange("")} />
-            ) : null}
-          </span>
-        </div>
-        <Button
-          size="xs"
-          variant="outline"
-          disabled={isCustom}
-          onClick={() => onChange(defaultValue)}
-        >
-          Edit default
-        </Button>
-      </div>
-      <DraftTextarea
-        className="w-full [&_textarea]:min-h-[140px]"
-        value={value}
-        onCommit={onChange}
-        placeholder={defaultValue}
-        spellCheck={false}
-        aria-label={ariaLabel}
-      />
-    </div>
   );
 }
 
@@ -1703,37 +1619,6 @@ export function GeneralSettingsPanel() {
               />
             </div>
           }
-        />
-        <div className="border-t border-border/60 px-4 pt-4 pb-2 sm:px-5">
-          <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-foreground/60">
-            Version control prompts
-          </h3>
-          <p className="mt-1 text-xs text-muted-foreground/80">
-            Replace the default natural-language instructions used by version-control text
-            generation. The JSON output format and dynamic context (diff, branch, etc.) are always
-            included automatically. Leave empty to use the built-in instructions.
-          </p>
-        </div>
-        <PromptInstructionsRow
-          title="Commit message"
-          value={settings.commitMessagePromptInstructions}
-          defaultValue={DEFAULT_COMMIT_MESSAGE_PROMPT_INSTRUCTIONS}
-          onChange={(next) => updateSettings({ commitMessagePromptInstructions: next })}
-          ariaLabel="Commit message instructions"
-        />
-        <PromptInstructionsRow
-          title="PR content"
-          value={settings.prContentPromptInstructions}
-          defaultValue={DEFAULT_PR_CONTENT_PROMPT_INSTRUCTIONS}
-          onChange={(next) => updateSettings({ prContentPromptInstructions: next })}
-          ariaLabel="PR content instructions"
-        />
-        <PromptInstructionsRow
-          title="Branch name"
-          value={settings.branchNamePromptInstructions}
-          defaultValue={DEFAULT_BRANCH_NAME_PROMPT_INSTRUCTIONS}
-          onChange={(next) => updateSettings({ branchNamePromptInstructions: next })}
-          ariaLabel="Branch name instructions"
         />
       </SettingsSection>
 

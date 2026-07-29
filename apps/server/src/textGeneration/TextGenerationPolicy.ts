@@ -14,6 +14,12 @@ export const TextGenerationPolicy = Schema.Struct({
   changeRequestInstructions: Schema.optional(Schema.String),
   branchInstructions: Schema.optional(Schema.String),
   threadTitleInstructions: Schema.optional(Schema.String),
+  /**
+   * Repository-derived examples (recent commit subjects and similar). Context
+   * rather than instruction, so prompt builders keep these even when a custom
+   * prompt override replaces the instruction block.
+   */
+  conventionExamples: Schema.optional(Schema.String),
   inferRepositoryConventions: Schema.Boolean,
 });
 export type TextGenerationPolicy = typeof TextGenerationPolicy.Type;

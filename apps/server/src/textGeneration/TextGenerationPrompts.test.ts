@@ -66,6 +66,31 @@ describe("buildCommitMessagePrompt", () => {
     expect(result.prompt).toContain("Additional instructions:");
     expect(result.prompt).toContain("Use a terse repository-specific subject.");
   });
+
+  it("keeps repository examples but drops policy instructions when overridden", () => {
+    const result = buildCommitMessagePrompt({
+      branch: "main",
+      stagedSummary: "M a.ts",
+      stagedPatch: "diff",
+      includeBranch: false,
+      instructionsOverride: "Write commit subjects in Latin.",
+      policy: {
+        kind: "repo_conventions",
+        commitInstructions: "Follow the repository's established commit message style.",
+        conventionExamples: "Recent commit subjects from this repository:\nfix(web): trim labels",
+        inferRepositoryConventions: true,
+      },
+    });
+
+    expect(result.prompt).toContain("Write commit subjects in Latin.");
+    expect(result.prompt).toContain("Repository examples:");
+    expect(result.prompt).toContain("fix(web): trim labels");
+    expect(result.prompt).not.toContain("Additional instructions:");
+    expect(result.prompt).not.toContain(
+      "Follow the repository's established commit message style.",
+    );
+    expect(result.prompt).not.toContain("You write concise git commit messages.");
+  });
 });
 
 describe("buildPrContentPrompt", () => {
@@ -110,6 +135,34 @@ describe("buildPrContentPrompt", () => {
     expect(result.prompt).toContain("Repository change request template:");
     expect(result.prompt).toContain("<!-- remove me -->\n## What changed\n\n## Verification");
     expect(result.prompt).not.toContain("include headings '## Summary' and '## Testing'");
+  });
+
+  it("keeps repository examples and the template when instructions are overridden", () => {
+    const result = buildPrContentPrompt({
+      baseBranch: "main",
+      headBranch: "feature/auth",
+      commitSummary: "feat: add login page",
+      diffSummary: "3 files changed",
+      diffPatch: "diff",
+      changeRequestTemplate: "## What changed",
+      instructionsOverride: "Write the change request as a haiku.",
+      policy: {
+        kind: "repo_conventions",
+        changeRequestInstructions: "Follow the repository's established change request style.",
+        conventionExamples: "Recent commit subjects from this repository:\nfix(web): trim labels",
+        inferRepositoryConventions: true,
+      },
+    });
+
+    expect(result.prompt).toContain("Write the change request as a haiku.");
+    expect(result.prompt).toContain("Repository examples:");
+    expect(result.prompt).toContain("fix(web): trim labels");
+    expect(result.prompt).toContain("Repository change request template:");
+    expect(result.prompt).not.toContain("Additional instructions:");
+    expect(result.prompt).not.toContain(
+      "Follow the repository's established change request style.",
+    );
+    expect(result.prompt).not.toContain("You write source control change request content.");
   });
 });
 

@@ -620,11 +620,11 @@ export const make = Effect.gen(function* () {
           if (subjects.length === 0) {
             return repositoryConventionsTextGenerationPolicy;
           }
-          const examples = ["Recent commit subjects from this repository:", ...subjects].join("\n");
           return {
             ...repositoryConventionsTextGenerationPolicy,
-            commitInstructions: `${repositoryConventionsTextGenerationPolicy.commitInstructions}\n\n${examples}`,
-            changeRequestInstructions: `${repositoryConventionsTextGenerationPolicy.changeRequestInstructions}\n\n${examples}`,
+            conventionExamples: ["Recent commit subjects from this repository:", ...subjects].join(
+              "\n",
+            ),
           };
         }
       }

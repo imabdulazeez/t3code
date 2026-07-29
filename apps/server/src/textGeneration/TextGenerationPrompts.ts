@@ -17,6 +17,15 @@ function policyInstruction(instruction: string | undefined): ReadonlyArray<strin
   return trimmed ? ["", "Additional instructions:", limitSection(trimmed, 4_000)] : [];
 }
 
+/**
+ * Repository-derived examples are context, not instruction, so they survive an
+ * `instructionsOverride` the same way the diff and change request template do.
+ */
+function policyExamples(examples: string | undefined): ReadonlyArray<string> {
+  const trimmed = examples?.trim();
+  return trimmed ? ["", "Repository examples:", limitSection(trimmed, 4_000)] : [];
+}
+
 function buildPromptSections(input: {
   instructions: ReadonlyArray<string>;
   instructionsOverride: string | undefined;
@@ -79,6 +88,7 @@ export function buildCommitMessagePrompt(input: CommitMessagePromptInput) {
 
   const contextLines = [
     ...policyInstruction(input.instructionsOverride ? undefined : input.policy?.commitInstructions),
+    ...policyExamples(input.policy?.conventionExamples),
     "",
     `Branch: ${input.branch ?? "(detached)"}`,
     "",
@@ -161,6 +171,7 @@ export function buildPrContentPrompt(input: PrContentPromptInput) {
     ...policyInstruction(
       input.instructionsOverride ? undefined : input.policy?.changeRequestInstructions,
     ),
+    ...policyExamples(input.policy?.conventionExamples),
     ...(changeRequestTemplate
       ? ["", "Repository change request template:", limitSection(changeRequestTemplate, 8_000)]
       : []),
