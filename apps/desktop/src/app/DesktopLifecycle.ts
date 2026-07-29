@@ -1,14 +1,12 @@
 import * as Context from "effect/Context";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
 
-// @effect-diagnostics nodeBuiltinImport:off globalTimers:off
-import * as NodeTimers from "node:timers";
-
-import { app as electronAppModule, type Event as ElectronEvent } from "electron";
 import type * as Electron from "electron";
 
 import * as DesktopEnvironment from "./DesktopEnvironment.ts";
@@ -76,6 +74,8 @@ function addScopedListener<Args extends ReadonlyArray<unknown>>(
   ).pipe(Effect.asVoid);
 }
 
+const SHUTDOWN_COMPLETE_TIMEOUT = Duration.seconds(5);
+
 const requestDesktopShutdownAndWait = Effect.fn("desktop.lifecycle.requestShutdownAndWait")(
   function* (): Effect.fn.Return<
     void,
@@ -86,53 +86,42 @@ const requestDesktopShutdownAndWait = Effect.fn("desktop.lifecycle.requestShutdo
     const desktopWindow = yield* DesktopWindow.DesktopWindow;
     yield* desktopWindow.flushMainWindowBounds;
     yield* shutdown.request;
-    yield* shutdown.awaitComplete;
+    const completed = yield* shutdown.awaitComplete.pipe(
+      Effect.timeoutOption(SHUTDOWN_COMPLETE_TIMEOUT),
+    );
+    if (Option.isNone(completed)) {
+      yield* logLifecycleInfo("shutdown did not complete in time, continuing quit", {
+        timeoutMs: Duration.toMillis(SHUTDOWN_COMPLETE_TIMEOUT),
+      });
+    }
   },
 );
 
-const SHUTDOWN_EXIT_TIMEOUT_MS = 5000;
-
 function handleBeforeQuit(
-  event: ElectronEvent,
+  event: Electron.Event,
   runEffect: <A, E>(effect: Effect.Effect<A, E, DesktopLifecycleRuntimeServices>) => Promise<A>,
-  getShutdownPromise: () => Promise<void> | null,
-  setShutdownPromise: (promise: Promise<void>) => void,
+  quitInFlight: () => boolean,
+  markQuitInFlight: () => void,
 ): void {
-  if (getShutdownPromise() !== null) {
-    event.preventDefault();
-    return;
-  }
-
   event.preventDefault();
+  if (quitInFlight()) return;
+  markQuitInFlight();
 
-  const shutdownEffect = runEffect(
+  void runEffect(
     Effect.gen(function* () {
       const state = yield* DesktopState.DesktopState;
       yield* Ref.set(state.quitting, true);
       yield* logLifecycleInfo("before-quit received");
       yield* requestDesktopShutdownAndWait();
     }).pipe(Effect.withSpan("desktop.lifecycle.beforeQuit")),
-  );
-
-  let timeoutHandle: ReturnType<typeof NodeTimers.setTimeout> | null = null;
-  const timeoutPromise = new Promise<void>((resolve) => {
-    timeoutHandle = NodeTimers.setTimeout(resolve, SHUTDOWN_EXIT_TIMEOUT_MS);
+  ).finally(() => {
+    void runEffect(
+      Effect.gen(function* () {
+        const electronApp = yield* ElectronApp.ElectronApp;
+        yield* electronApp.exit(0);
+      }).pipe(Effect.withSpan("desktop.lifecycle.quitAfterShutdown")),
+    );
   });
-
-  const racePromise = Promise.race([
-    shutdownEffect.then(
-      () => undefined,
-      () => undefined,
-    ),
-    timeoutPromise,
-  ]).finally(() => {
-    if (timeoutHandle !== null) {
-      NodeTimers.clearTimeout(timeoutHandle);
-    }
-    electronAppModule.exit(0);
-  });
-
-  setShutdownPromise(racePromise);
 }
 
 function quitFromSignal(
@@ -188,7 +177,7 @@ export const make = DesktopLifecycle.of({
     const environment = yield* DesktopEnvironment.DesktopEnvironment;
     const context = yield* Effect.context<DesktopLifecycleRuntimeServices>();
     const runEffect = Effect.runPromiseWith(context);
-    let shutdownPromise: Promise<void> | null = null;
+    let quitInFlight = false;
     yield* electronTheme.onUpdated(() => {
       void runEffect(
         desktopWindow.syncAppearance.pipe(Effect.withSpan("desktop.lifecycle.themeUpdated")),
@@ -198,9 +187,9 @@ export const make = DesktopLifecycle.of({
       handleBeforeQuit(
         event,
         runEffect,
-        () => shutdownPromise,
-        (promise) => {
-          shutdownPromise = promise;
+        () => quitInFlight,
+        () => {
+          quitInFlight = true;
         },
       );
     });
