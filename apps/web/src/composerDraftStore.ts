@@ -1363,6 +1363,10 @@ function createDraftThreadState(
     pendingSourceProposedPlan?: { threadId: ThreadId; planId: OrchestrationProposedPlanId } | null;
   },
 ): DraftThreadState {
+  // A project change (including switching environments within a logical
+  // project) invalidates machine-specific context: the branch may not exist
+  // there and the worktree path certainly doesn't. The user's *intent* —
+  // env mode and start-from-origin — is machine-independent and carries.
   const projectChanged =
     existingThread !== undefined &&
     (existingThread.environmentId !== projectRef.environmentId ||
@@ -1381,9 +1385,7 @@ function createDraftThreadState(
       : (options.branch ?? null);
   const nextStartFromOrigin =
     options?.startFromOrigin === undefined
-      ? projectChanged
-        ? false
-        : (existingThread?.startFromOrigin ?? false)
+      ? (existingThread?.startFromOrigin ?? false)
       : options.startFromOrigin;
   return {
     threadId,
@@ -1397,12 +1399,7 @@ function createDraftThreadState(
     branch: nextBranch,
     worktreePath: nextWorktreePath,
     envMode:
-      options?.envMode ??
-      (nextWorktreePath
-        ? "worktree"
-        : projectChanged
-          ? "local"
-          : (existingThread?.envMode ?? "local")),
+      options?.envMode ?? (nextWorktreePath ? "worktree" : (existingThread?.envMode ?? "local")),
     startFromOrigin: nextStartFromOrigin,
     promotedTo: null,
     pendingSourceProposedPlan:
@@ -2399,6 +2396,9 @@ const composerDraftStore = create<ComposerDraftStoreState>()(
             ) {
               return state;
             }
+            // Mirrors createDraftThreadState: a project/environment change
+            // drops machine-specific context (branch, worktree path) but
+            // keeps the user's env mode and start-from-origin intent.
             const projectChanged =
               nextProjectRef.environmentId !== existing.environmentId ||
               nextProjectRef.projectId !== existing.projectId;
@@ -2416,9 +2416,7 @@ const composerDraftStore = create<ComposerDraftStoreState>()(
                 : (options.branch ?? null);
             const nextStartFromOrigin =
               options.startFromOrigin === undefined
-                ? projectChanged
-                  ? false
-                  : existing.startFromOrigin
+                ? existing.startFromOrigin
                 : options.startFromOrigin;
             const nextDraftThread: DraftThreadState = {
               threadId: existing.threadId,
@@ -2434,12 +2432,7 @@ const composerDraftStore = create<ComposerDraftStoreState>()(
               branch: nextBranch,
               worktreePath: nextWorktreePath,
               envMode:
-                options.envMode ??
-                (nextWorktreePath
-                  ? "worktree"
-                  : projectChanged
-                    ? "local"
-                    : (existing.envMode ?? "local")),
+                options.envMode ?? (nextWorktreePath ? "worktree" : (existing.envMode ?? "local")),
               startFromOrigin: nextStartFromOrigin,
               promotedTo: existing.promotedTo ?? null,
               pendingSourceProposedPlan:
