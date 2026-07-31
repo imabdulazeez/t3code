@@ -7,9 +7,9 @@ for (const stream of [process.stdout, process.stderr]) {
 import * as NodeHttpClient from "@effect/platform-node/NodeHttpClient";
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
+import * as NodeFS from "node:fs";
 import * as NodeOS from "node:os";
 import * as Effect from "effect/Effect";
-import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
@@ -72,19 +72,19 @@ const desktopEnvironmentLayer = Layer.unwrap(
     let buildTimestamp = process.env.T3CODE_BUILD_TIMESTAMP;
     if (!buildTimestamp && metadata.isPackaged) {
       const path = yield* Path.Path;
-      const fs = yield* FileSystem.FileSystem;
       const packagePath = path.join(metadata.appPath, "package.json");
-      const fileContent = yield* fs.readFileString(packagePath).pipe(Effect.option);
-      if (Option.isSome(fileContent)) {
-        // @effect-diagnostics-next-line tryCatchInEffectGen:off
-        try {
-          // @effect-diagnostics-next-line preferSchemaOverJson:off
-          const packageJson = JSON.parse(fileContent.value);
-          if (typeof packageJson?.t3codeBuildTimestamp === "string") {
-            buildTimestamp = packageJson.t3codeBuildTimestamp;
-          }
-        } catch {}
-      }
+      // Read synchronously: this layer is built before the Clerk bridge takes
+      // Electron's single-instance lock, and the bridge's
+      // protocol.registerSchemesAsPrivileged throws once the app is ready — so
+      // awaiting I/O here can let Electron finish initializing first.
+      // @effect-diagnostics-next-line tryCatchInEffectGen:off
+      try {
+        // @effect-diagnostics-next-line preferSchemaOverJson:off
+        const packageJson = JSON.parse(NodeFS.readFileSync(packagePath, "utf8"));
+        if (typeof packageJson?.t3codeBuildTimestamp === "string") {
+          buildTimestamp = packageJson.t3codeBuildTimestamp;
+        }
+      } catch {}
     }
     // @effect-diagnostics-next-line globalDateInEffect:off
     buildTimestamp = buildTimestamp || formatBuildTimestamp(new Date());

@@ -93,7 +93,11 @@ export const make = Effect.gen(function* () {
   // directory here — under the default productName-derived path, acquiring
   // the lock would create "T3 Code (Alpha)" and make the legacy-install
   // detection in resolveUserDataPath match on fresh installs.
-  const userDataPath = yield* DesktopAppIdentity.resolveUserDataPath;
+  //
+  // Everything up to the bridge must stay synchronous: the bridge calls
+  // protocol.registerSchemesAsPrivileged, which throws once the app is ready,
+  // and awaiting even one I/O call here lets Electron finish initializing.
+  const userDataPath = yield* DesktopAppIdentity.resolveUserDataPathSync;
   yield* electronApp.setPath("userData", userDataPath);
 
   const bridge = yield* Effect.acquireRelease(
