@@ -1,5 +1,3 @@
-import * as NodeFS from "node:fs";
-
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -48,20 +46,13 @@ const normalizeCommitHash = (value: string): Option.Option<string> => {
     : Option.none();
 };
 
-const userDataPathCandidates = Effect.gen(function* () {
-  const environment = yield* DesktopEnvironment.DesktopEnvironment;
-  return {
-    legacyPath: environment.path.join(
-      environment.appDataDirectory,
-      environment.legacyUserDataDirName,
-    ),
-    currentPath: environment.path.join(environment.appDataDirectory, environment.userDataDirName),
-  };
-});
-
 export const resolveUserDataPath = Effect.gen(function* () {
-  const { legacyPath, currentPath } = yield* userDataPathCandidates;
+  const environment = yield* DesktopEnvironment.DesktopEnvironment;
   const fileSystem = yield* FileSystem.FileSystem;
+  const legacyPath = environment.path.join(
+    environment.appDataDirectory,
+    environment.legacyUserDataDirName,
+  );
   const legacyPathExists = yield* fileSystem.exists(legacyPath).pipe(
     Effect.mapError(
       (cause) =>
@@ -71,23 +62,10 @@ export const resolveUserDataPath = Effect.gen(function* () {
         }),
     ),
   );
-  return legacyPathExists ? legacyPath : currentPath;
+  return legacyPathExists
+    ? legacyPath
+    : environment.path.join(environment.appDataDirectory, environment.userDataDirName);
 }).pipe(Effect.withSpan("desktop.appIdentity.resolveUserDataPath"));
-
-// Resolves without touching the event loop, for the pre-`ready` window where a
-// single awaited I/O call would let Electron finish initializing.
-export const resolveUserDataPathSync = Effect.gen(function* () {
-  const { legacyPath, currentPath } = yield* userDataPathCandidates;
-  const legacyPathExists = yield* Effect.try({
-    try: () => NodeFS.existsSync(legacyPath),
-    catch: (cause) =>
-      new DesktopUserDataPathResolutionError({
-        legacyPath,
-        cause,
-      }),
-  });
-  return legacyPathExists ? legacyPath : currentPath;
-});
 
 export const make = Effect.gen(function* () {
   const assets = yield* DesktopAssets.DesktopAssets;
