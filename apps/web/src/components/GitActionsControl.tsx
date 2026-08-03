@@ -985,11 +985,8 @@ export default function GitActionsControl({
     serverConfig?.availableEditors ?? [],
   );
   const threadToastData = useMemo(
-    () =>
-      activeEnvironmentId && gitCwd
-        ? { projectRef: { environmentId: activeEnvironmentId, cwd: gitCwd } }
-        : undefined,
-    [activeEnvironmentId, gitCwd],
+    () => (activeThreadRef ? { threadRef: activeThreadRef } : undefined),
+    [activeThreadRef],
   );
   const activeDraftThread = useComposerDraftStore((store) =>
     draftId

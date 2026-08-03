@@ -11,13 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { useParams } from "@tanstack/react-router";
-import {
-  type EnvironmentId,
-  type ScopedProjectRef,
-  type ScopedThreadRef,
-  type ThreadId,
-} from "@t3tools/contracts";
-import { scopeProjectRef } from "@t3tools/client-runtime/environment";
+import { type ScopedThreadRef, type ThreadId } from "@t3tools/contracts";
 import {
   CheckIcon,
   ChevronDownIcon,
@@ -36,7 +30,6 @@ import { buttonVariants } from "~/components/ui/button";
 import { useComposerDraftStore } from "~/composerDraftStore";
 import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
 import { resolveThreadRouteTarget } from "~/threadRoutes";
-import { useProject, useThread } from "~/state/entities";
 import {
   buildVisibleToastLayout,
   shouldHideCollapsedToastContent,
@@ -47,7 +40,6 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "./tooltip";
 export type ThreadToastData = {
   threadRef?: ScopedThreadRef | null;
   threadId?: ThreadId | null;
-  projectRef?: { environmentId: EnvironmentId; cwd: string } | null;
   leadingIcon?: ReactNode;
   tooltipStyle?: boolean;
   onClose?: (() => void) | undefined;
@@ -455,10 +447,7 @@ interface ToastProviderProps extends Toast.Provider.Props {
   position?: ToastPosition;
 }
 
-function useActiveThreadAndProjectRefs(): {
-  activeThreadRef: ScopedThreadRef | null;
-  activeProjectRef: { environmentId: EnvironmentId; cwd: string } | null;
-} {
+function useActiveThreadRefFromRoute(): ScopedThreadRef | null {
   const routeTarget = useParams({
     strict: false,
     select: (params) => resolveThreadRouteTarget(params),
@@ -467,7 +456,7 @@ function useActiveThreadAndProjectRefs(): {
     routeTarget?.kind === "draft" ? store.getDraftSession(routeTarget.draftId) : null,
   );
 
-  const activeThreadRef = useMemo(() => {
+  return useMemo(() => {
     if (routeTarget?.kind === "server") {
       return routeTarget.threadRef;
     }
@@ -479,30 +468,6 @@ function useActiveThreadAndProjectRefs(): {
     }
     return null;
   }, [activeDraftSession, routeTarget]);
-
-  const activeThread = useThread(activeThreadRef);
-
-  const projectRef = useMemo<ScopedProjectRef | null>(() => {
-    if (activeThread) {
-      return scopeProjectRef(activeThread.environmentId, activeThread.projectId);
-    }
-    if (activeDraftSession) {
-      return scopeProjectRef(activeDraftSession.environmentId, activeDraftSession.projectId);
-    }
-    return null;
-  }, [activeThread, activeDraftSession]);
-
-  const activeProject = useProject(projectRef);
-
-  const activeProjectRef = useMemo(
-    () =>
-      activeProject
-        ? { environmentId: activeProject.environmentId, cwd: activeProject.workspaceRoot }
-        : null,
-    [activeProject],
-  );
-
-  return { activeThreadRef, activeProjectRef };
 }
 
 function ThreadToastVisibleAutoDismiss({
@@ -594,10 +559,10 @@ function ToastProvider({ children, position = "top-right", ...props }: ToastProv
 
 function Toasts({ position }: { position: ToastPosition }) {
   const { toasts } = Toast.useToastManager<ThreadToastData>();
-  const { activeThreadRef, activeProjectRef } = useActiveThreadAndProjectRefs();
+  const activeThreadRef = useActiveThreadRefFromRoute();
   const isTop = position.startsWith("top");
   const visibleToasts = toasts.filter((toast) =>
-    shouldRenderThreadScopedToast(toast.data, activeThreadRef, activeProjectRef),
+    shouldRenderThreadScopedToast(toast.data, activeThreadRef),
   );
   const visibleToastLayout = buildVisibleToastLayout(visibleToasts);
 
@@ -787,15 +752,13 @@ function AnchoredToastProvider({ children, ...props }: Toast.Provider.Props) {
 
 function AnchoredToasts() {
   const { toasts } = Toast.useToastManager<ThreadToastData>();
-  const { activeThreadRef, activeProjectRef } = useActiveThreadAndProjectRefs();
+  const activeThreadRef = useActiveThreadRefFromRoute();
 
   return (
     <Toast.Portal data-slot="toast-portal-anchored">
       <Toast.Viewport className="outline-none" data-slot="toast-viewport-anchored">
         {toasts
-          .filter((toast) =>
-            shouldRenderThreadScopedToast(toast.data, activeThreadRef, activeProjectRef),
-          )
+          .filter((toast) => shouldRenderThreadScopedToast(toast.data, activeThreadRef))
           .map((toast) => {
             const tooltipStyle = toast.data?.tooltipStyle ?? false;
             const positionerProps = toast.positionerProps;
