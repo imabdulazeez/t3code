@@ -77,6 +77,7 @@ import {
   selectProjectGroupingSettings,
 } from "../logicalProject";
 import {
+  buildSidebarProjectPickerEntries,
   buildSidebarProjectSnapshots,
   type SidebarProjectGroupMember,
   type SidebarProjectSnapshot,
@@ -86,7 +87,7 @@ import { useThreadSelectionStore } from "../threadSelectionStore";
 import { useThreadActions } from "../hooks/useThreadActions";
 import { useHandleNewThread } from "../hooks/useHandleNewThread";
 import { openCommandPalette } from "../commandPaletteBus";
-import { startNewThreadFromContext } from "../lib/chatThreadActions";
+import { resolveThreadActionProjectRef, startNewThreadFromContext } from "../lib/chatThreadActions";
 import { useClientSettings, useUpdateClientSettings } from "../hooks/useSettings";
 import { useCopyToClipboard } from "../hooks/useCopyToClipboard";
 import { useNowMinute } from "../hooks/useNowMinute";
@@ -155,7 +156,7 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 import { Input } from "./ui/input";
-import { Menu, MenuPopup, MenuRadioGroup, MenuRadioItem, MenuTrigger } from "./ui/menu";
+import { Menu, MenuItem, MenuPopup, MenuRadioGroup, MenuRadioItem, MenuTrigger } from "./ui/menu";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "./ui/select";
 import { SidebarContent, SidebarGroup, SidebarMenuButton, useSidebar } from "./ui/sidebar";
 import { SidebarChromeFooter, SidebarChromeHeader } from "./sidebar/SidebarChrome";
@@ -2560,25 +2561,43 @@ export default function SidebarV2() {
     autoAnimate(node, { duration: 150, easing: "ease-out" });
   }, []);
 
-  // New thread defaults to the project you're in (active thread's project,
-  // falling back to the top project) — same resolution the command palette
-  // uses. The command palette already offers a "New thread in..." submenu
-  // for multi-project setups.
+  // New thread always creates in the project you're in (active thread's
+  // project, falling back to the top project) — same resolution the command
+  // palette uses. Picking a different project is the adjacent chevron, so the
+  // common case never costs a dialog.
   const handleNewThreadClick = useCallback(() => {
-    // One project: nothing to pick, create immediately.
-    if (projectGroups.length <= 1) {
-      if (isMobile) setOpenMobile(false);
-      void startNewThreadFromContext({
-        activeDraftThread: newThreadContext.activeDraftThread,
-        activeThread: newThreadContext.activeThread ?? undefined,
-        defaultProjectRef: newThreadContext.defaultProjectRef,
-        handleNewThread: newThreadContext.handleNewThread,
-      });
-      return;
-    }
     if (isMobile) setOpenMobile(false);
-    openCommandPalette({ open: "new-thread-in" });
-  }, [isMobile, newThreadContext, projectGroups.length, setOpenMobile]);
+    void startNewThreadFromContext({
+      activeDraftThread: newThreadContext.activeDraftThread,
+      activeThread: newThreadContext.activeThread ?? undefined,
+      defaultProjectRef: newThreadContext.defaultProjectRef,
+      handleNewThread: newThreadContext.handleNewThread,
+    });
+  }, [isMobile, newThreadContext, setOpenMobile]);
+
+  // The chevron's project list, current project hoisted first — same entries
+  // and ordering the command palette's "New thread in..." view uses.
+  const newThreadProjectEntries = useMemo(
+    () =>
+      buildSidebarProjectPickerEntries({
+        groups: projectGroups,
+        preferredProjectRef: resolveThreadActionProjectRef({
+          activeDraftThread: newThreadContext.activeDraftThread,
+          activeThread: newThreadContext.activeThread ?? undefined,
+          defaultProjectRef: newThreadContext.defaultProjectRef,
+          handleNewThread: newThreadContext.handleNewThread,
+        }),
+      }),
+    [newThreadContext, projectGroups],
+  );
+
+  const handleNewThreadInProject = useCallback(
+    (project: SidebarProjectGroupMember) => {
+      if (isMobile) setOpenMobile(false);
+      void handleNewThreadRef.current(scopeProjectRef(project.environmentId, project.id));
+    },
+    [isMobile, setOpenMobile],
+  );
 
   // Same resolution as v1: prefer the local-thread binding, fall back to
   // chat.new, no platform gating — web users have working shortcuts too.
@@ -2639,7 +2658,7 @@ export default function SidebarV2() {
                   </Button>
                 ) : null}
               </div>
-              <div className="shrink-0">
+              <div className="flex shrink-0 items-center">
                 <Tooltip>
                   <TooltipTrigger
                     render={
@@ -2665,6 +2684,39 @@ export default function SidebarV2() {
                       : "New thread"}
                   </TooltipPopup>
                 </Tooltip>
+                {newThreadProjectEntries.length > 1 ? (
+                  <Menu>
+                    <MenuTrigger
+                      render={
+                        <SidebarMenuButton
+                          size="icon"
+                          type="button"
+                          className="w-5 focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
+                          disabled={projects.length === 0}
+                          aria-label="New thread in project"
+                        />
+                      }
+                    >
+                      <ChevronDownIcon className="size-3.5" />
+                    </MenuTrigger>
+                    <MenuPopup align="end">
+                      {newThreadProjectEntries.map(({ group, targetProject }) => (
+                        <MenuItem
+                          key={group.projectKey}
+                          className="h-8 min-h-8 py-0 text-sm font-medium"
+                          onClick={() => handleNewThreadInProject(targetProject)}
+                        >
+                          <ProjectFavicon
+                            environmentId={group.environmentId}
+                            cwd={group.workspaceRoot}
+                            className="size-4 shrink-0"
+                          />
+                          <span className="min-w-0 truncate">{group.displayName}</span>
+                        </MenuItem>
+                      ))}
+                    </MenuPopup>
+                  </Menu>
+                ) : null}
               </div>
             </div>
             {projectGroups.length > 0 ? (
