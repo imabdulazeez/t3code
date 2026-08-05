@@ -56,13 +56,28 @@ export const SETTINGS_SEARCH_ITEMS = [
     targetId: "appearance",
   },
   {
-    id: "diff-font",
-    title: "Diff font",
+    id: "interface-font",
+    title: "Interface font",
+    to: "/settings/appearance",
+  },
+  {
+    id: "prompt-font",
+    title: "Prompt font",
+    to: "/settings/appearance",
+  },
+  {
+    id: "code-font",
+    title: "Code font",
     to: "/settings/appearance",
   },
   {
     id: "terminal-font",
     title: "Terminal font",
+    to: "/settings/appearance",
+  },
+  {
+    id: "font-smoothing",
+    title: "Font smoothing",
     to: "/settings/appearance",
   },
   {
