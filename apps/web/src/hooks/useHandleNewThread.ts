@@ -4,13 +4,7 @@ import {
   scopeProjectRef,
   scopeThreadRef,
 } from "@t3tools/client-runtime/environment";
-import {
-  DEFAULT_RUNTIME_MODE,
-  type ModelSelection,
-  type OrchestrationProposedPlanId,
-  type ScopedProjectRef,
-  type ThreadId,
-} from "@t3tools/contracts";
+import { DEFAULT_RUNTIME_MODE, type ScopedProjectRef } from "@t3tools/contracts";
 import { useParams, useRouter } from "@tanstack/react-router";
 import { useCallback, useMemo } from "react";
 import {
@@ -32,52 +26,6 @@ import { primaryServerSettingsAtom } from "../state/server";
 import { resolveThreadRouteTarget } from "../threadRoutes";
 import { legacyProjectCwdPreferenceKey, useUiStateStore } from "../uiStateStore";
 import { useClientSettings } from "./useSettings";
-
-export function useStartImplementationDraftFromPlan() {
-  const router = useRouter();
-  return useCallback(
-    async (options: {
-      projectRef: ScopedProjectRef;
-      logicalProjectKey: string;
-      prompt: string;
-      modelSelection: ModelSelection;
-      sourceThreadId: ThreadId;
-      sourcePlanId: OrchestrationProposedPlanId;
-      branch?: string | null;
-      worktreePath?: string | null;
-      envMode?: DraftThreadEnvMode;
-    }) => {
-      const { setLogicalProjectDraftThreadId, setPrompt, setModelSelection } =
-        useComposerDraftStore.getState();
-      const draftId = newDraftId();
-      const threadId = newThreadId();
-      const createdAt = new Date().toISOString();
-      const worktreePath = options.worktreePath ?? null;
-      const envMode: DraftThreadEnvMode = options.envMode ?? (worktreePath ? "worktree" : "local");
-
-      setLogicalProjectDraftThreadId(options.logicalProjectKey, options.projectRef, draftId, {
-        threadId,
-        createdAt,
-        branch: options.branch ?? null,
-        worktreePath,
-        envMode,
-        runtimeMode: DEFAULT_RUNTIME_MODE,
-        pendingSourceProposedPlan: {
-          threadId: options.sourceThreadId,
-          planId: options.sourcePlanId,
-        },
-      });
-      setPrompt(draftId, options.prompt);
-      setModelSelection(draftId, options.modelSelection);
-
-      await router.navigate({
-        to: "/draft/$draftId",
-        params: { draftId },
-      });
-    },
-    [router],
-  );
-}
 
 export function useNewThreadHandler() {
   const projects = useProjects();

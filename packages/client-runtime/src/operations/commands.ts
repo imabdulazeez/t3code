@@ -50,8 +50,6 @@ export type RespondToThreadApprovalInput = CommandInput<"thread.approval.respond
 export type RespondToThreadUserInputInput = CommandInput<"thread.user-input.respond">;
 export type RevertThreadCheckpointInput = CommandInput<"thread.checkpoint.revert">;
 export type StopThreadSessionInput = CommandInput<"thread.session.stop">;
-export type PromoteThreadProposedPlanInput = CommandInput<"thread.proposed-plan.promote">;
-export type RevertThreadProposedPlanInput = CommandInput<"thread.proposed-plan.revert">;
 
 type DispatchTag = typeof ORCHESTRATION_WS_METHODS.dispatchCommand;
 type CommandEffect = Effect.Effect<
@@ -322,25 +320,3 @@ export const stopThreadSession: (input: StopThreadSessionInput) => CommandEffect
     createdAt: metadata.createdAt,
   });
 });
-
-export const promoteThreadProposedPlan: (input: PromoteThreadProposedPlanInput) => CommandEffect =
-  Effect.fn("EnvironmentCommands.promoteThreadProposedPlan")(function* (input) {
-    const metadata = yield* timestampedCommandMetadata(input);
-    return yield* dispatch({
-      ...input,
-      type: "thread.proposed-plan.promote",
-      commandId: metadata.commandId,
-      createdAt: metadata.createdAt,
-    });
-  });
-
-export const revertThreadProposedPlan: (input: RevertThreadProposedPlanInput) => CommandEffect =
-  Effect.fn("EnvironmentCommands.revertThreadProposedPlan")(function* (input) {
-    const metadata = yield* timestampedCommandMetadata(input);
-    return yield* dispatch({
-      ...input,
-      type: "thread.proposed-plan.revert",
-      commandId: metadata.commandId,
-      createdAt: metadata.createdAt,
-    });
-  });

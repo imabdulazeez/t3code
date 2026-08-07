@@ -1,11 +1,11 @@
 import { memo, type PointerEventHandler } from "react";
-import { ChevronLeftIcon } from "lucide-react";
+import { ChevronDownIcon, ChevronLeftIcon } from "lucide-react";
 import { useEnvironmentIdentificationMode } from "~/hooks/useSettings";
 import { cn } from "~/lib/utils";
 import { StageBackdropButtonArt, useSidebarStageBackdropVariant } from "../SidebarStageBackdrop";
 import { Button } from "../ui/button";
+import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
 import { Spinner } from "../ui/spinner";
-import { PlanImplementActions } from "./PlanImplementActions";
 
 interface PendingActionState {
   questionIndex: number;
@@ -20,7 +20,6 @@ interface ComposerPrimaryActionsProps {
   pendingAction: PendingActionState | null;
   isRunning: boolean;
   showPlanFollowUpPrompt: boolean;
-  isPlanReimplementation: boolean;
   promptHasText: boolean;
   isSendBusy: boolean;
   sendDisabledReason: string | null;
@@ -29,12 +28,9 @@ interface ComposerPrimaryActionsProps {
   isPreparingWorktree: boolean;
   hasSendableContent: boolean;
   preserveComposerFocusOnPointerDown?: boolean;
-  canRevertPlan?: boolean;
   onPreviousPendingQuestion: () => void;
   onInterrupt: () => void;
   onImplementPlanInNewThread: () => void;
-  onImplementPlanInNewThreadDraft: () => void;
-  onRevertPlan?: () => void;
 }
 
 export const formatPendingPrimaryActionLabel = (input: {
@@ -64,7 +60,6 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
   pendingAction,
   isRunning,
   showPlanFollowUpPrompt,
-  isPlanReimplementation,
   promptHasText,
   isSendBusy,
   sendDisabledReason,
@@ -73,12 +68,9 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
   isPreparingWorktree,
   hasSendableContent,
   preserveComposerFocusOnPointerDown = false,
-  canRevertPlan = false,
   onPreviousPendingQuestion,
   onInterrupt,
   onImplementPlanInNewThread,
-  onImplementPlanInNewThreadDraft,
-  onRevertPlan,
 }: ComposerPrimaryActionsProps) {
   const pointerFocusProps = preserveComposerFocusOnPointerDown
     ? { onPointerDown: preventPointerFocus }
@@ -173,16 +165,39 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
 
     return (
       <div data-chat-composer-implement-actions="true" className="flex items-center justify-end">
-        <PlanImplementActions
-          isReimplementation={isPlanReimplementation}
-          isBusy={isConnecting || isSendBusy}
+        <Button
+          type="submit"
+          size="sm"
+          className="h-9 rounded-l-full rounded-r-none px-4 sm:h-8"
+          {...pointerFocusProps}
           disabled={isSendBusy || isSendDisabled || isConnecting || isEnvironmentUnavailable}
-          canRevertPlan={canRevertPlan}
-          preserveFocusOnPointerDown={preserveComposerFocusOnPointerDown}
-          onImplementInNewThread={onImplementPlanInNewThread}
-          onImplementInNewThreadDraft={onImplementPlanInNewThreadDraft}
-          {...(onRevertPlan ? { onRevertPlan } : {})}
-        />
+        >
+          {isConnecting || isSendBusy ? "Sending..." : "Implement"}
+        </Button>
+        <Menu>
+          <MenuTrigger
+            render={
+              <Button
+                size="sm"
+                variant="default"
+                className="h-9 rounded-l-none rounded-r-full border-l-white/12 px-2 sm:h-8"
+                aria-label="Implementation actions"
+                {...pointerFocusProps}
+                disabled={isSendBusy || isSendDisabled || isConnecting || isEnvironmentUnavailable}
+              />
+            }
+          >
+            <ChevronDownIcon className="size-3.5" />
+          </MenuTrigger>
+          <MenuPopup align="end" side="top">
+            <MenuItem
+              disabled={isSendBusy || isSendDisabled || isConnecting || isEnvironmentUnavailable}
+              onClick={() => void onImplementPlanInNewThread()}
+            >
+              Implement in a new thread
+            </MenuItem>
+          </MenuPopup>
+        </Menu>
       </div>
     );
   }

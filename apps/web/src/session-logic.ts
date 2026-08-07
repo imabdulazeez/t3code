@@ -136,7 +136,6 @@ export interface LatestProposedPlanState {
   planMarkdown: string;
   implementedAt: string | null;
   implementationThreadId: ThreadId | null;
-  revertedAt: string | null;
 }
 
 export type TimelineEntry =
@@ -151,6 +150,12 @@ export type TimelineEntry =
       kind: "proposed-plan";
       createdAt: string;
       proposedPlan: ProposedPlan;
+    }
+  | {
+      id: string;
+      kind: "turn-plan";
+      createdAt: string;
+      turnPlan: TurnPlanEntry;
     }
   | {
       id: string;
@@ -533,26 +538,10 @@ export function derivePendingUserInputs(
   );
 }
 
-export function deriveActivePlanState(
-  activities: ReadonlyArray<OrchestrationThreadActivity>,
-  latestTurnId: TurnId | undefined,
-): ActivePlanState | null {
-  const ordered = [...activities].toSorted(compareActivitiesByOrder);
-  const allPlanActivities = ordered.filter((activity) => activity.kind === "turn.plan.updated");
-  // Prefer plan from the current turn; fall back to the most recent plan from any turn
-  // so that TodoWrite tasks persist across follow-up messages.
-  const latest = Option.firstSomeOf([
-    ...(latestTurnId
-      ? Arr.findLast(allPlanActivities, (activity) => activity.turnId === latestTurnId)
-      : Option.none()),
-    Arr.last(allPlanActivities),
-  ]).pipe(Option.getOrNull);
-  if (!latest) {
-    return null;
-  }
+function planStateFromActivity(activity: OrchestrationThreadActivity): ActivePlanState | null {
   const payload =
-    latest.payload && typeof latest.payload === "object"
-      ? (latest.payload as Record<string, unknown>)
+    activity.payload && typeof activity.payload === "object"
+      ? (activity.payload as Record<string, unknown>)
       : null;
   const rawPlan = payload?.plan;
   if (!Array.isArray(rawPlan)) {
@@ -581,8 +570,8 @@ export function deriveActivePlanState(
     return null;
   }
   return {
-    createdAt: latest.createdAt,
-    turnId: latest.turnId,
+    createdAt: activity.createdAt,
+    turnId: activity.turnId,
     ...(payload && "explanation" in payload
       ? { explanation: payload.explanation as string | null }
       : {}),
@@ -590,13 +579,78 @@ export function deriveActivePlanState(
   };
 }
 
+export function deriveActivePlanState(
+  activities: ReadonlyArray<OrchestrationThreadActivity>,
+  latestTurnId: TurnId | undefined,
+): ActivePlanState | null {
+  const ordered = [...activities].toSorted(compareActivitiesByOrder);
+  const allPlanActivities = ordered.filter((activity) => activity.kind === "turn.plan.updated");
+  // Prefer plan from the current turn; fall back to the most recent plan from any turn
+  // so that TodoWrite tasks persist across follow-up messages.
+  const latest = Option.firstSomeOf([
+    ...(latestTurnId
+      ? Arr.findLast(allPlanActivities, (activity) => activity.turnId === latestTurnId)
+      : Option.none()),
+    Arr.last(allPlanActivities),
+  ]).pipe(Option.getOrNull);
+  if (!latest) {
+    return null;
+  }
+  return planStateFromActivity(latest);
+}
+
+export interface TurnPlanEntry {
+  /** Stable per-turn row id (plans rewrite constantly; the row must not churn). */
+  id: string;
+  /** Anchor timestamp: the turn's FIRST plan activity, so the chip renders where planning began. */
+  createdAt: string;
+  turnId: TurnId | null;
+  plan: ActivePlanState;
+}
+
+/**
+ * One inline plan chip per turn that produced plan/todo steps: the latest
+ * snapshot for the turn, anchored at the first snapshot's timestamp. Turn-less
+ * plan activities collapse into a single chip keyed by thread order.
+ */
+export function deriveTurnPlans(
+  activities: ReadonlyArray<OrchestrationThreadActivity>,
+): TurnPlanEntry[] {
+  const ordered = [...activities].toSorted(compareActivitiesByOrder);
+  const byTurn = new Map<string, TurnPlanEntry>();
+  for (const activity of ordered) {
+    if (activity.kind !== "turn.plan.updated") {
+      continue;
+    }
+    const plan = planStateFromActivity(activity);
+    const key = activity.turnId ?? "no-turn";
+    if (!plan) {
+      // A later snapshot with no steps clears the turn's plan; keeping the
+      // stale entry would freeze the chip on a withdrawn plan.
+      byTurn.delete(key);
+      continue;
+    }
+    const existing = byTurn.get(key);
+    if (existing) {
+      existing.plan = plan;
+    } else {
+      byTurn.set(key, {
+        id: `turn-plan:${key}`,
+        createdAt: activity.createdAt,
+        turnId: activity.turnId,
+        plan,
+      });
+    }
+  }
+  return [...byTurn.values()];
+}
+
 export function findLatestProposedPlan(
   proposedPlans: ReadonlyArray<ProposedPlan>,
   latestTurnId: TurnId | string | null | undefined,
 ): LatestProposedPlanState | null {
-  const activePlans = proposedPlans.filter((entry) => entry.revertedAt === null);
   if (latestTurnId) {
-    const matchingTurnPlan = [...activePlans]
+    const matchingTurnPlan = [...proposedPlans]
       .filter((proposedPlan) => proposedPlan.turnId === latestTurnId)
       .toSorted(
         (left, right) =>
@@ -608,7 +662,7 @@ export function findLatestProposedPlan(
     }
   }
 
-  const latestPlan = [...activePlans]
+  const latestPlan = [...proposedPlans]
     .toSorted(
       (left, right) =>
         left.updatedAt.localeCompare(right.updatedAt) || left.id.localeCompare(right.id),
@@ -621,42 +675,10 @@ export function findLatestProposedPlan(
   return toLatestProposedPlanState(latestPlan);
 }
 
-export function findSidebarProposedPlan(input: {
-  threads: ReadonlyArray<Pick<Thread, "id" | "proposedPlans">>;
-  latestTurn: Pick<OrchestrationLatestTurn, "turnId" | "sourceProposedPlan"> | null;
-  latestTurnSettled: boolean;
-  threadId: ThreadId | string | null | undefined;
-}): LatestProposedPlanState | null {
-  const activeThreadPlans =
-    input.threads.find((thread) => thread.id === input.threadId)?.proposedPlans ?? [];
-
-  if (!input.latestTurnSettled) {
-    const sourceProposedPlan = input.latestTurn?.sourceProposedPlan;
-    if (sourceProposedPlan) {
-      const sourcePlan = input.threads
-        .find((thread) => thread.id === sourceProposedPlan.threadId)
-        ?.proposedPlans.find((plan) => plan.id === sourceProposedPlan.planId);
-      if (sourcePlan) {
-        return toLatestProposedPlanState(sourcePlan);
-      }
-    }
-  }
-
-  return findLatestProposedPlan(activeThreadPlans, input.latestTurn?.turnId ?? null);
-}
-
 export function hasActionableProposedPlan(
-  proposedPlan: LatestProposedPlanState | Pick<ProposedPlan, "implementedAt" | "revertedAt"> | null,
+  proposedPlan: LatestProposedPlanState | Pick<ProposedPlan, "implementedAt"> | null,
 ): boolean {
-  return (
-    proposedPlan !== null && proposedPlan.implementedAt === null && proposedPlan.revertedAt === null
-  );
-}
-
-export function hasReimplementableProposedPlan(
-  proposedPlan: LatestProposedPlanState | Pick<ProposedPlan, "implementedAt" | "revertedAt"> | null,
-): boolean {
-  return proposedPlan !== null && proposedPlan.revertedAt === null;
+  return proposedPlan !== null && proposedPlan.implementedAt === null;
 }
 
 /**
@@ -1086,7 +1108,6 @@ function toLatestProposedPlanState(proposedPlan: ProposedPlan): LatestProposedPl
     planMarkdown: proposedPlan.planMarkdown,
     implementedAt: proposedPlan.implementedAt,
     implementationThreadId: proposedPlan.implementationThreadId,
-    revertedAt: proposedPlan.revertedAt,
   };
 }
 
@@ -1553,38 +1574,33 @@ export function deriveTimelineEntries(
   messages: ReadonlyArray<ChatMessage>,
   proposedPlans: ReadonlyArray<ProposedPlan>,
   workEntries: ReadonlyArray<WorkLogEntry>,
+  turnPlans: ReadonlyArray<TurnPlanEntry> = [],
 ): TimelineEntry[] {
-  const promotedSourceMessageIds = new Set<string>();
-  for (const proposedPlan of proposedPlans) {
-    if (proposedPlan.revertedAt !== null) continue;
-    const match = /:promoted:(.+)$/.exec(proposedPlan.id);
-    if (match && match[1]) {
-      promotedSourceMessageIds.add(match[1]);
-    }
-  }
-  const messageRows: TimelineEntry[] = messages
-    .filter((message) => !promotedSourceMessageIds.has(message.id))
-    .map((message) => ({
-      id: message.id,
-      kind: "message",
-      createdAt: message.createdAt,
-      message,
-    }));
-  const proposedPlanRows: TimelineEntry[] = proposedPlans
-    .filter((proposedPlan) => proposedPlan.revertedAt === null)
-    .map((proposedPlan) => ({
-      id: proposedPlan.id,
-      kind: "proposed-plan",
-      createdAt: proposedPlan.createdAt,
-      proposedPlan,
-    }));
+  const messageRows: TimelineEntry[] = messages.map((message) => ({
+    id: message.id,
+    kind: "message",
+    createdAt: message.createdAt,
+    message,
+  }));
+  const proposedPlanRows: TimelineEntry[] = proposedPlans.map((proposedPlan) => ({
+    id: proposedPlan.id,
+    kind: "proposed-plan",
+    createdAt: proposedPlan.createdAt,
+    proposedPlan,
+  }));
+  const turnPlanRows: TimelineEntry[] = turnPlans.map((turnPlan) => ({
+    id: turnPlan.id,
+    kind: "turn-plan",
+    createdAt: turnPlan.createdAt,
+    turnPlan,
+  }));
   const workRows: TimelineEntry[] = workEntries.map((entry) => ({
     id: entry.id,
     kind: "work",
     createdAt: entry.createdAt,
     entry,
   }));
-  return [...messageRows, ...proposedPlanRows, ...workRows].toSorted((a, b) =>
+  return [...messageRows, ...proposedPlanRows, ...turnPlanRows, ...workRows].toSorted((a, b) =>
     a.createdAt.localeCompare(b.createdAt),
   );
 }

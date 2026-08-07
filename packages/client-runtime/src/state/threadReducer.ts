@@ -446,22 +446,6 @@ export function applyThreadDetailEvent(
       };
     }
 
-    case "thread.proposed-plan-removed": {
-      const proposedPlans = pipe(
-        thread.proposedPlans,
-        Arr.filter((entry) => entry.id !== event.payload.planId),
-      );
-
-      if (proposedPlans.length === thread.proposedPlans.length) {
-        return { kind: "unchanged" };
-      }
-
-      return {
-        kind: "updated",
-        thread: { ...thread, proposedPlans, updatedAt: event.occurredAt },
-      };
-    }
-
     // ── Checkpoints / turn diffs ────────────────────────────────────
     case "thread.turn-diff-completed": {
       const checkpoint: OrchestrationCheckpointSummary = {

@@ -5,7 +5,6 @@ import * as SqlSchema from "effect/unstable/sql/SqlSchema";
 
 import { toPersistenceSqlError } from "../Errors.ts";
 import {
-  DeleteProjectionThreadProposedPlanByIdInput,
   DeleteProjectionThreadProposedPlansInput,
   ListProjectionThreadProposedPlansInput,
   ProjectionThreadProposedPlan,
@@ -26,7 +25,6 @@ const makeProjectionThreadProposedPlanRepository = Effect.gen(function* () {
         plan_markdown,
         implemented_at,
         implementation_thread_id,
-        reverted_at,
         created_at,
         updated_at
       )
@@ -37,7 +35,6 @@ const makeProjectionThreadProposedPlanRepository = Effect.gen(function* () {
         ${row.planMarkdown},
         ${row.implementedAt},
         ${row.implementationThreadId},
-        ${row.revertedAt},
         ${row.createdAt},
         ${row.updatedAt}
       )
@@ -48,7 +45,6 @@ const makeProjectionThreadProposedPlanRepository = Effect.gen(function* () {
         plan_markdown = excluded.plan_markdown,
         implemented_at = excluded.implemented_at,
         implementation_thread_id = excluded.implementation_thread_id,
-        reverted_at = excluded.reverted_at,
         created_at = excluded.created_at,
         updated_at = excluded.updated_at
     `,
@@ -65,7 +61,6 @@ const makeProjectionThreadProposedPlanRepository = Effect.gen(function* () {
         plan_markdown AS "planMarkdown",
         implemented_at AS "implementedAt",
         implementation_thread_id AS "implementationThreadId",
-        reverted_at AS "revertedAt",
         created_at AS "createdAt",
         updated_at AS "updatedAt"
       FROM projection_thread_proposed_plans
@@ -79,14 +74,6 @@ const makeProjectionThreadProposedPlanRepository = Effect.gen(function* () {
     execute: ({ threadId }) => sql`
       DELETE FROM projection_thread_proposed_plans
       WHERE thread_id = ${threadId}
-    `,
-  });
-
-  const deleteProjectionThreadProposedPlanRowById = SqlSchema.void({
-    Request: DeleteProjectionThreadProposedPlanByIdInput,
-    execute: ({ planId }) => sql`
-      DELETE FROM projection_thread_proposed_plans
-      WHERE plan_id = ${planId}
     `,
   });
 
@@ -111,18 +98,10 @@ const makeProjectionThreadProposedPlanRepository = Effect.gen(function* () {
       ),
     );
 
-  const deleteByPlanId: ProjectionThreadProposedPlanRepositoryShape["deleteByPlanId"] = (input) =>
-    deleteProjectionThreadProposedPlanRowById(input).pipe(
-      Effect.mapError(
-        toPersistenceSqlError("ProjectionThreadProposedPlanRepository.deleteByPlanId:query"),
-      ),
-    );
-
   return {
     upsert,
     listByThreadId,
     deleteByThreadId,
-    deleteByPlanId,
   } satisfies ProjectionThreadProposedPlanRepositoryShape;
 });
 

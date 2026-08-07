@@ -250,7 +250,6 @@ export const OrchestrationProposedPlan = Schema.Struct({
   implementationThreadId: Schema.NullOr(ThreadId).pipe(
     Schema.withDecodingDefault(Effect.succeed(null)),
   ),
-  revertedAt: Schema.NullOr(IsoDateTime).pipe(Schema.withDecodingDefault(Effect.succeed(null))),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 });
@@ -447,6 +446,20 @@ export const OrchestrationThreadShell = Schema.Struct({
    * live work. Optional so old servers/clients interop; absent = none.
    */
   backgroundLiveness: Schema.optional(Schema.NullOr(Schema.Literals(["working", "monitoring"]))),
+  /**
+   * Current plan step while a turn runs, for the Working indicators
+   * (sidebar row, in-chat working line). Cleared when the turn settles —
+   * never persists as stale UI. Optional so old servers/clients interop.
+   */
+  planProgress: Schema.optional(
+    Schema.NullOr(
+      Schema.Struct({
+        step: TrimmedNonEmptyString,
+        completedSteps: NonNegativeInt,
+        totalSteps: NonNegativeInt,
+      }),
+    ),
+  ),
 });
 export type OrchestrationThreadShell = typeof OrchestrationThreadShell.Type;
 
@@ -838,21 +851,6 @@ const ThreadSessionStopCommand = Schema.Struct({
   createdAt: IsoDateTime,
 });
 
-const ThreadProposedPlanPromoteCommand = Schema.Struct({
-  type: Schema.Literal("thread.proposed-plan.promote"),
-  commandId: CommandId,
-  threadId: ThreadId,
-  createdAt: IsoDateTime,
-});
-
-const ThreadProposedPlanRevertCommand = Schema.Struct({
-  type: Schema.Literal("thread.proposed-plan.revert"),
-  commandId: CommandId,
-  threadId: ThreadId,
-  planId: OrchestrationProposedPlanId,
-  createdAt: IsoDateTime,
-});
-
 const DispatchableClientOrchestrationCommand = Schema.Union([
   ProjectCreateCommand,
   ProjectMetaUpdateCommand,
@@ -876,8 +874,6 @@ const DispatchableClientOrchestrationCommand = Schema.Union([
   ThreadUserInputRespondCommand,
   ThreadCheckpointRevertCommand,
   ThreadSessionStopCommand,
-  ThreadProposedPlanPromoteCommand,
-  ThreadProposedPlanRevertCommand,
 ]);
 export type DispatchableClientOrchestrationCommand =
   typeof DispatchableClientOrchestrationCommand.Type;
@@ -905,8 +901,6 @@ export const ClientOrchestrationCommand = Schema.Union([
   ThreadUserInputRespondCommand,
   ThreadCheckpointRevertCommand,
   ThreadSessionStopCommand,
-  ThreadProposedPlanPromoteCommand,
-  ThreadProposedPlanRevertCommand,
 ]);
 export type ClientOrchestrationCommand = typeof ClientOrchestrationCommand.Type;
 
@@ -1028,7 +1022,6 @@ export const OrchestrationEventType = Schema.Literals([
   "thread.session-stop-requested",
   "thread.session-set",
   "thread.proposed-plan-upserted",
-  "thread.proposed-plan-removed",
   "thread.turn-diff-completed",
   "thread.activity-appended",
 ]);
@@ -1236,11 +1229,6 @@ export const ThreadProposedPlanUpsertedPayload = Schema.Struct({
   proposedPlan: OrchestrationProposedPlan,
 });
 
-export const ThreadProposedPlanRemovedPayload = Schema.Struct({
-  threadId: ThreadId,
-  planId: OrchestrationProposedPlanId,
-});
-
 export const ThreadTurnDiffCompletedPayload = Schema.Struct({
   threadId: ThreadId,
   turnId: TurnId,
@@ -1408,11 +1396,6 @@ export const OrchestrationEvent = Schema.Union([
     ...EventBaseFields,
     type: Schema.Literal("thread.proposed-plan-upserted"),
     payload: ThreadProposedPlanUpsertedPayload,
-  }),
-  Schema.Struct({
-    ...EventBaseFields,
-    type: Schema.Literal("thread.proposed-plan-removed"),
-    payload: ThreadProposedPlanRemovedPayload,
   }),
   Schema.Struct({
     ...EventBaseFields,

@@ -16,7 +16,6 @@ import {
   type ScopedProjectRef,
   type ScopedThreadRef,
   ThreadId,
-  OrchestrationProposedPlanId,
 } from "@t3tools/contracts";
 import {
   parseScopedProjectKey,
@@ -225,14 +224,6 @@ const PersistedDraftThreadState = Schema.Struct({
       }),
     ),
   ),
-  pendingSourceProposedPlan: Schema.optionalKey(
-    Schema.NullOr(
-      Schema.Struct({
-        threadId: ThreadId,
-        planId: OrchestrationProposedPlanId,
-      }),
-    ),
-  ),
 });
 type PersistedDraftThreadState = typeof PersistedDraftThreadState.Type;
 
@@ -305,7 +296,6 @@ export interface DraftSessionState {
   envMode: DraftThreadEnvMode;
   startFromOrigin: boolean;
   promotedTo?: ScopedThreadRef | null;
-  pendingSourceProposedPlan?: { threadId: ThreadId; planId: OrchestrationProposedPlanId } | null;
 }
 
 export type DraftThreadState = DraftSessionState;
@@ -369,10 +359,6 @@ interface ComposerDraftStoreState {
       startFromOrigin?: boolean;
       runtimeMode?: RuntimeMode;
       interactionMode?: ProviderInteractionMode;
-      pendingSourceProposedPlan?: {
-        threadId: ThreadId;
-        planId: OrchestrationProposedPlanId;
-      } | null;
     },
   ) => void;
   /** Creates or updates the draft session tracked for a concrete project ref. */
@@ -388,10 +374,6 @@ interface ComposerDraftStoreState {
       startFromOrigin?: boolean;
       runtimeMode?: RuntimeMode;
       interactionMode?: ProviderInteractionMode;
-      pendingSourceProposedPlan?: {
-        threadId: ThreadId;
-        planId: OrchestrationProposedPlanId;
-      } | null;
     },
   ) => void;
   /** Updates mutable draft-session metadata without touching composer content. */
@@ -406,10 +388,6 @@ interface ComposerDraftStoreState {
       startFromOrigin?: boolean;
       runtimeMode?: RuntimeMode;
       interactionMode?: ProviderInteractionMode;
-      pendingSourceProposedPlan?: {
-        threadId: ThreadId;
-        planId: OrchestrationProposedPlanId;
-      } | null;
     },
   ) => void;
   clearProjectDraftThreadId: (projectRef: ScopedProjectRef) => void;
@@ -1360,7 +1338,6 @@ function createDraftThreadState(
     startFromOrigin?: boolean;
     runtimeMode?: RuntimeMode;
     interactionMode?: ProviderInteractionMode;
-    pendingSourceProposedPlan?: { threadId: ThreadId; planId: OrchestrationProposedPlanId } | null;
   },
 ): DraftThreadState {
   // A project change (including switching environments within a logical
@@ -1402,10 +1379,6 @@ function createDraftThreadState(
       options?.envMode ?? (nextWorktreePath ? "worktree" : (existingThread?.envMode ?? "local")),
     startFromOrigin: nextStartFromOrigin,
     promotedTo: null,
-    pendingSourceProposedPlan:
-      options?.pendingSourceProposedPlan !== undefined
-        ? options.pendingSourceProposedPlan
-        : (existingThread?.pendingSourceProposedPlan ?? null),
   };
 }
 
@@ -1417,16 +1390,6 @@ function scopedThreadRefsEqual(
     return left === right;
   }
   return left.environmentId === right.environmentId && left.threadId === right.threadId;
-}
-
-function pendingSourceProposedPlansEqual(
-  left: { threadId: ThreadId; planId: OrchestrationProposedPlanId } | null | undefined,
-  right: { threadId: ThreadId; planId: OrchestrationProposedPlanId } | null | undefined,
-): boolean {
-  if (!left || !right) {
-    return left === right;
-  }
-  return left.threadId === right.threadId && left.planId === right.planId;
 }
 
 function isDraftThreadPromoting(draftThread: DraftThreadState | null | undefined): boolean {
@@ -1447,8 +1410,7 @@ function draftThreadsEqual(left: DraftThreadState | undefined, right: DraftThrea
     left.worktreePath === right.worktreePath &&
     left.envMode === right.envMode &&
     left.startFromOrigin === right.startFromOrigin &&
-    scopedThreadRefsEqual(left.promotedTo, right.promotedTo) &&
-    pendingSourceProposedPlansEqual(left.pendingSourceProposedPlan, right.pendingSourceProposedPlan)
+    scopedThreadRefsEqual(left.promotedTo, right.promotedTo)
   );
 }
 
@@ -1560,22 +1522,6 @@ function normalizePersistedDraftThreads(
               promotedToRecord.threadId as ThreadId,
             )
           : null;
-      const pendingSourceProposedPlanCandidate = candidateDraftThread.pendingSourceProposedPlan;
-      const pendingSourceProposedPlanRecord =
-        pendingSourceProposedPlanCandidate && typeof pendingSourceProposedPlanCandidate === "object"
-          ? (pendingSourceProposedPlanCandidate as Record<string, unknown>)
-          : null;
-      const pendingSourceProposedPlan =
-        pendingSourceProposedPlanRecord &&
-        typeof pendingSourceProposedPlanRecord.threadId === "string" &&
-        pendingSourceProposedPlanRecord.threadId.length > 0 &&
-        typeof pendingSourceProposedPlanRecord.planId === "string" &&
-        pendingSourceProposedPlanRecord.planId.length > 0
-          ? {
-              threadId: pendingSourceProposedPlanRecord.threadId as ThreadId,
-              planId: pendingSourceProposedPlanRecord.planId as OrchestrationProposedPlanId,
-            }
-          : null;
       if (typeof projectId !== "string" || projectId.length === 0 || environmentId === undefined) {
         continue;
       }
@@ -1608,7 +1554,6 @@ function normalizePersistedDraftThreads(
         envMode: normalizeDraftThreadEnvMode(candidateDraftThread.envMode, normalizedWorktreePath),
         startFromOrigin,
         promotedTo,
-        ...(pendingSourceProposedPlan ? { pendingSourceProposedPlan } : {}),
       };
     }
   }
@@ -2231,7 +2176,6 @@ function toHydratedDraftThreadState(
           persistedDraftThread.promotedTo.threadId as ThreadId,
         )
       : null,
-    pendingSourceProposedPlan: persistedDraftThread.pendingSourceProposedPlan ?? null,
   };
 }
 
@@ -2435,10 +2379,6 @@ const composerDraftStore = create<ComposerDraftStoreState>()(
                 options.envMode ?? (nextWorktreePath ? "worktree" : (existing.envMode ?? "local")),
               startFromOrigin: nextStartFromOrigin,
               promotedTo: existing.promotedTo ?? null,
-              pendingSourceProposedPlan:
-                options.pendingSourceProposedPlan !== undefined
-                  ? options.pendingSourceProposedPlan
-                  : (existing.pendingSourceProposedPlan ?? null),
             };
             const isUnchanged =
               nextDraftThread.environmentId === existing.environmentId &&
@@ -2451,11 +2391,7 @@ const composerDraftStore = create<ComposerDraftStoreState>()(
               nextDraftThread.worktreePath === existing.worktreePath &&
               nextDraftThread.envMode === existing.envMode &&
               nextDraftThread.startFromOrigin === existing.startFromOrigin &&
-              scopedThreadRefsEqual(nextDraftThread.promotedTo, existing.promotedTo) &&
-              pendingSourceProposedPlansEqual(
-                nextDraftThread.pendingSourceProposedPlan,
-                existing.pendingSourceProposedPlan,
-              );
+              scopedThreadRefsEqual(nextDraftThread.promotedTo, existing.promotedTo);
             if (isUnchanged) {
               return state;
             }

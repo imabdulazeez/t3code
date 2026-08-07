@@ -141,7 +141,6 @@ interface ClaudeTurnState {
   readonly assistantTextBlocks: Map<number, AssistantTextBlockState>;
   readonly assistantTextBlockOrder: Array<AssistantTextBlockState>;
   readonly capturedProposedPlanKeys: Set<string>;
-  readonly interactionMode: "plan" | "default";
   nextSyntheticAssistantBlockIndex: number;
 }
 
@@ -246,7 +245,6 @@ interface ClaudeSessionContext {
   lastKnownTotalProcessedTokens: number | undefined;
   lastAssistantUuid: string | undefined;
   lastThreadStartedId: string | undefined;
-  currentInteractionMode: "plan" | "default";
   stopped: boolean;
 }
 
@@ -2089,7 +2087,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
     input: {
       readonly planMarkdown: string;
       readonly toolUseId?: string | undefined;
-      readonly rawSource: "claude.sdk.message" | "claude.sdk.permission" | "client.user-promoted";
+      readonly rawSource: "claude.sdk.message" | "claude.sdk.permission";
       readonly rawMethod: string;
       readonly rawPayload: unknown;
     },
@@ -2868,7 +2866,6 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         assistantTextBlocks: new Map(),
         assistantTextBlockOrder: [],
         capturedProposedPlanKeys: new Set(),
-        interactionMode: context.currentInteractionMode,
         nextSyntheticAssistantBlockIndex: -1,
       };
       context.session = {
@@ -4216,7 +4213,6 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         lastKnownTotalProcessedTokens: undefined,
         lastAssistantUuid: resumeState?.resumeSessionAt,
         lastThreadStartedId: undefined,
-        currentInteractionMode: permissionMode === "plan" ? "plan" : "default",
         stopped: false,
       };
       yield* Ref.set(contextRef, context);
@@ -4345,13 +4341,11 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         try: () => context.query.setPermissionMode("plan"),
         catch: (cause) => toRequestError(input.threadId, "turn/setPermissionMode", cause),
       });
-      context.currentInteractionMode = "plan";
     } else if (input.interactionMode === "default") {
       yield* Effect.tryPromise({
         try: () => context.query.setPermissionMode(context.basePermissionMode ?? "default"),
         catch: (cause) => toRequestError(input.threadId, "turn/setPermissionMode", cause),
       });
-      context.currentInteractionMode = "default";
     }
 
     const turnId = steeringTurnState?.turnId ?? TurnId.make(yield* randomUUIDv4);
@@ -4363,7 +4357,6 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         assistantTextBlocks: new Map(),
         assistantTextBlockOrder: [],
         capturedProposedPlanKeys: new Set(),
-        interactionMode: context.currentInteractionMode,
         nextSyntheticAssistantBlockIndex: -1,
       };
 

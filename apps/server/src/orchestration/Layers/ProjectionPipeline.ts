@@ -196,11 +196,11 @@ function deriveHasActionableProposedPlan(input: {
     }
   }
   if (latestForTurn !== null) {
-    return latestForTurn.implementedAt === null && latestForTurn.revertedAt === null;
+    return latestForTurn.implementedAt === null;
   }
 
   const latestPlan = sorted.at(-1) ?? null;
-  return latestPlan !== null && latestPlan.implementedAt === null && latestPlan.revertedAt === null;
+  return latestPlan !== null && latestPlan.implementedAt === null;
 }
 
 function retainProjectionMessagesAfterRevert(
@@ -824,7 +824,6 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
 
         case "thread.message-sent":
         case "thread.proposed-plan-upserted":
-        case "thread.proposed-plan-removed":
         case "thread.activity-appended":
         case "thread.approval-response-requested":
         case "thread.user-input-response-requested": {
@@ -1009,15 +1008,8 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
             planMarkdown: event.payload.proposedPlan.planMarkdown,
             implementedAt: event.payload.proposedPlan.implementedAt,
             implementationThreadId: event.payload.proposedPlan.implementationThreadId,
-            revertedAt: event.payload.proposedPlan.revertedAt,
             createdAt: event.payload.proposedPlan.createdAt,
             updatedAt: event.payload.proposedPlan.updatedAt,
-          });
-          return;
-
-        case "thread.proposed-plan-removed":
-          yield* projectionThreadProposedPlanRepository.deleteByPlanId({
-            planId: event.payload.planId,
           });
           return;
 

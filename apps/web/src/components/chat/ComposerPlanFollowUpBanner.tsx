@@ -3,10 +3,8 @@ import { Badge } from "../ui/badge";
 
 export const ComposerPlanFollowUpBanner = memo(function ComposerPlanFollowUpBanner({
   planTitle,
-  isReimplementation = false,
 }: {
   planTitle: string | null;
-  isReimplementation?: boolean;
 }) {
   return (
     <div className="px-4 py-3.5 sm:px-5 sm:py-4">
@@ -16,7 +14,7 @@ export const ComposerPlanFollowUpBanner = memo(function ComposerPlanFollowUpBann
           size="sm"
           className="rounded-md px-1.5 py-0 font-semibold tracking-wide uppercase"
         >
-          {isReimplementation ? "Plan Implemented" : "Plan Ready"}
+          Plan Ready
         </Badge>
         {planTitle ? (
           <span className="min-w-0 flex-1 truncate text-sm font-medium">{planTitle}</span>

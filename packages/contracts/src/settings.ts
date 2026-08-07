@@ -124,7 +124,6 @@ export type FontFamilyPreference = typeof FontFamilyPreference.Type;
 
 export const ClientSettingsSchema = Schema.Struct({
   autoCreatePrOnPush: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
-  autoOpenPlanSidebar: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   branchListSortKey: BranchListSortKey.pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_BRANCH_LIST_SORT_KEY)),
   ),
@@ -194,6 +193,10 @@ export const ClientSettingsSchema = Schema.Struct({
       modelOrder: Schema.Array(Schema.String).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
     }),
   ).pipe(Schema.withDecodingDefault(Effect.succeed({}))),
+  // Legacy plan mode. The composer's Build/Plan toggle was removed from the
+  // default UI; this beta flag restores it (plus the /plan and /default slash
+  // commands) for users who still rely on the old workflow.
+  planModeEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   sidebarAutoSettleAfterDays: Schema.NullOr(SidebarAutoSettleAfterDays).pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_SIDEBAR_AUTO_SETTLE_AFTER_DAYS)),
   ),
@@ -518,9 +521,6 @@ export const SourceControlWritingStyleSettings = Schema.Struct({
 });
 export type SourceControlWritingStyleSettings = typeof SourceControlWritingStyleSettings.Type;
 
-export const DEFAULT_AUTOMATIC_GIT_FETCH_INTERVAL = Duration.seconds(30);
-export const DEFAULT_PROVIDER_HEALTH_REFRESH_INTERVAL = Duration.minutes(5);
-
 export const DEFAULT_COMMIT_MESSAGE_PROMPT_INSTRUCTIONS = [
   "You write concise git commit messages.",
   "Rules:",
@@ -548,6 +548,9 @@ export const DEFAULT_BRANCH_NAME_PROMPT_INSTRUCTIONS = [
   "- Use plain words only, no issue prefixes and no punctuation-heavy text.",
   "- If images are attached, use them as primary context for visual/UI issues.",
 ].join("\n");
+
+export const DEFAULT_AUTOMATIC_GIT_FETCH_INTERVAL = Duration.seconds(30);
+export const DEFAULT_PROVIDER_HEALTH_REFRESH_INTERVAL = Duration.minutes(5);
 
 export const BackgroundActivityProfile = Schema.Literals([
   "balanced",
@@ -810,7 +813,6 @@ export type ServerSettingsPatch = typeof ServerSettingsPatch.Type;
 
 export const ClientSettingsPatch = Schema.Struct({
   autoCreatePrOnPush: Schema.optionalKey(Schema.Boolean),
-  autoOpenPlanSidebar: Schema.optionalKey(Schema.Boolean),
   branchListSortKey: Schema.optionalKey(BranchListSortKey),
   branchListSortDirection: Schema.optionalKey(BranchListSortDirection),
   branchRemoteSyncMode: Schema.optionalKey(BranchRemoteSyncMode),
@@ -851,6 +853,7 @@ export const ClientSettingsPatch = Schema.Struct({
       }),
     ),
   ),
+  planModeEnabled: Schema.optionalKey(Schema.Boolean),
   sidebarAutoSettleAfterDays: Schema.optionalKey(Schema.NullOr(SidebarAutoSettleAfterDays)),
   sidebarProjectGroupingMode: Schema.optionalKey(SidebarProjectGroupingMode),
   sidebarProjectGroupingOverrides: Schema.optionalKey(

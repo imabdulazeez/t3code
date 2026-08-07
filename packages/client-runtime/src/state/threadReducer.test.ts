@@ -596,7 +596,6 @@ describe("applyThreadDetailEvent", () => {
             planMarkdown: "## Plan\n- Do stuff",
             implementedAt: null,
             implementationThreadId: null,
-            revertedAt: null,
             createdAt: "2026-04-01T10:00:00.000Z",
             updatedAt: "2026-04-01T10:00:00.000Z",
           },

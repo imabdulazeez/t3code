@@ -14,7 +14,6 @@ import * as DesktopClientSettings from "./DesktopClientSettings.ts";
 
 const clientSettings: ClientSettings = {
   autoCreatePrOnPush: true,
-  autoOpenPlanSidebar: false,
   branchListSortKey: "lastCommit",
   branchListSortDirection: "desc",
   branchRemoteSyncMode: "fetch",
@@ -36,6 +35,7 @@ const clientSettings: ClientSettings = {
   fontSizeTerminal: 12,
   fontSmoothing: true,
   glassOpacity: 80,
+  planModeEnabled: false,
   providerModelPreferences: {},
   sidebarAutoSettleAfterDays: 3,
   sidebarProjectGroupingMode: "repository_path",
