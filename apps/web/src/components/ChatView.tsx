@@ -5777,26 +5777,6 @@ function ChatViewContent(props: ChatViewProps) {
     composerRef,
   ]);
 
-  const onDismissActivePendingUserInput = useCallback(async () => {
-    if (!activeThread) return;
-    if (activePendingUserInput) {
-      const requestId = activePendingUserInput.requestId;
-      setRespondingUserInputRequestIds((existing) => existing.filter((id) => id !== requestId));
-      setPendingUserInputAnswersByRequestId((existing) => {
-        const { [requestId]: _removed, ...rest } = existing;
-        return rest;
-      });
-      setPendingUserInputQuestionIndexByRequestId((existing) => {
-        const { [requestId]: _removed, ...rest } = existing;
-        return rest;
-      });
-    }
-    await interruptThreadTurn({
-      environmentId,
-      input: { threadId: activeThread.id },
-    });
-  }, [activePendingUserInput, activeThread, environmentId, interruptThreadTurn]);
-
   const getModelDisabledReason = useCallback(
     (instanceId: ProviderInstanceId, model: string): string | null => {
       if (!activeThread) {
@@ -6337,7 +6317,6 @@ function ChatViewContent(props: ChatViewProps) {
                               onSelectActivePendingUserInputOption
                             }
                             onAdvanceActivePendingUserInput={onAdvanceActivePendingUserInput}
-                            onDismissPendingUserInput={onDismissActivePendingUserInput}
                             onPreviousActivePendingUserInputQuestion={
                               onPreviousActivePendingUserInputQuestion
                             }
