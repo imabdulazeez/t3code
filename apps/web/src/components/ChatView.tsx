@@ -111,7 +111,6 @@ import {
   DEFAULT_RUNTIME_MODE,
   DEFAULT_THREAD_TERMINAL_ID,
   MAX_TERMINALS_PER_GROUP,
-  type ChatAttachment,
   type ChatMessage,
   type SessionPhase,
   type Thread,
@@ -1165,36 +1164,6 @@ type LocalThreadErrorEntry = {
 
 function chatActionErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "An error occurred.";
-}
-
-async function chatImageAttachmentsToComposerImages(
-  attachments: ReadonlyArray<ChatAttachment>,
-): Promise<ComposerImageAttachment[]> {
-  const restoredImages: ComposerImageAttachment[] = [];
-  for (const attachment of attachments) {
-    if (attachment.type !== "image" || !attachment.previewUrl) {
-      continue;
-    }
-    try {
-      const response = await fetch(attachment.previewUrl);
-      const blob = await response.blob();
-      const file = new File([blob], attachment.name, {
-        type: attachment.mimeType,
-      });
-      restoredImages.push({
-        type: "image",
-        id: attachment.id,
-        name: attachment.name,
-        mimeType: attachment.mimeType,
-        sizeBytes: attachment.sizeBytes,
-        previewUrl: attachment.previewUrl,
-        file,
-      });
-    } catch {
-      continue;
-    }
-  }
-  return restoredImages;
 }
 
 function ChatViewContent(props: ChatViewProps) {
@@ -2577,17 +2546,6 @@ function ChatViewContent(props: ChatViewProps) {
 
     return byUserMessageId;
   }, [inferredCheckpointTurnCountByTurnId, timelineEntries, turnDiffSummaryByAssistantMessageId]);
-
-  const userMessageById = useMemo(() => {
-    const byMessageId = new Map<MessageId, ChatMessage>();
-    for (const entry of timelineEntries) {
-      if (!entry || entry.kind !== "message" || entry.message.role !== "user") {
-        continue;
-      }
-      byMessageId.set(entry.message.id, entry.message);
-    }
-    return byMessageId;
-  }, [timelineEntries]);
 
   const gitCwd = activeProject
     ? projectScriptCwd({
@@ -4766,20 +4724,20 @@ function ChatViewContent(props: ChatViewProps) {
   ]);
 
   const onRevertToTurnCount = useCallback(
-    async (turnCount: number): Promise<boolean> => {
+    async (turnCount: number) => {
       const localApi = readLocalApi();
-      if (!localApi || !activeThread || isRevertingCheckpoint) return false;
+      if (!localApi || !activeThread || isRevertingCheckpoint) return;
 
       if (activeEnvironmentUnavailable && activeEnvironmentUnavailableLabel) {
         setThreadError(
           activeThread.id,
           `Reconnect ${activeEnvironmentUnavailableLabel} before reverting checkpoints.`,
         );
-        return false;
+        return;
       }
       if (phase === "running" || isSendBusy || isConnecting) {
         setThreadError(activeThread.id, "Interrupt the current turn before reverting checkpoints.");
-        return false;
+        return;
       }
       const confirmed = await localApi.dialogs.confirm(
         [
@@ -4789,7 +4747,7 @@ function ChatViewContent(props: ChatViewProps) {
         ].join("\n"),
       );
       if (!confirmed) {
-        return false;
+        return;
       }
 
       setIsRevertingCheckpoint(true);
@@ -4809,7 +4767,6 @@ function ChatViewContent(props: ChatViewProps) {
         );
       }
       setIsRevertingCheckpoint(false);
-      return true;
     },
     [
       activeThread,
@@ -5933,37 +5890,14 @@ function ChatViewContent(props: ChatViewProps) {
   // the callback reference is fully stable and never busts context identity.
   const revertTurnCountRef = useRef(revertTurnCountByUserMessageId);
   revertTurnCountRef.current = revertTurnCountByUserMessageId;
-  const userMessageByIdRef = useRef(userMessageById);
-  userMessageByIdRef.current = userMessageById;
   const onRevertToTurnCountRef = useRef(onRevertToTurnCount);
   onRevertToTurnCountRef.current = onRevertToTurnCount;
-  const setComposerDraftPromptRef = useRef(setComposerDraftPrompt);
-  setComposerDraftPromptRef.current = setComposerDraftPrompt;
-  const addComposerDraftImagesRef = useRef(addComposerDraftImages);
-  addComposerDraftImagesRef.current = addComposerDraftImages;
-  const composerDraftTargetRef = useRef(composerDraftTarget);
-  composerDraftTargetRef.current = composerDraftTarget;
-
-  const onRevertUserMessage = useCallback(async (messageId: MessageId) => {
+  const onRevertUserMessage = useCallback((messageId: MessageId) => {
     const targetTurnCount = revertTurnCountRef.current.get(messageId);
     if (typeof targetTurnCount !== "number") {
       return;
     }
-    const didProceed = await onRevertToTurnCountRef.current(targetTurnCount);
-    if (!didProceed) {
-      return;
-    }
-
-    const userMessage = userMessageByIdRef.current.get(messageId);
-    if (userMessage) {
-      setComposerDraftPromptRef.current(composerDraftTargetRef.current, userMessage.text);
-      if (userMessage.attachments && userMessage.attachments.length > 0) {
-        const restoredImages = await chatImageAttachmentsToComposerImages(userMessage.attachments);
-        if (restoredImages.length > 0) {
-          addComposerDraftImagesRef.current(composerDraftTargetRef.current, restoredImages);
-        }
-      }
-    }
+    void onRevertToTurnCountRef.current(targetTurnCount);
   }, []);
 
   // Empty state: no active thread
