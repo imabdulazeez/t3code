@@ -190,6 +190,8 @@ export const VcsDeleteBranchInput = Schema.Struct({
   remoteName: Schema.optional(TrimmedNonEmptyStringSchema),
   force: Schema.optional(Schema.Boolean),
   deleteRemote: Schema.optional(Schema.Boolean),
+  removeWorktree: Schema.optional(Schema.Boolean),
+  forceRemoveWorktree: Schema.optional(Schema.Boolean),
 });
 export type VcsDeleteBranchInput = typeof VcsDeleteBranchInput.Type;
 
@@ -197,6 +199,7 @@ export const VcsDeleteBranchResult = Schema.Struct({
   refName: TrimmedNonEmptyStringSchema,
   deletedLocal: Schema.Boolean,
   deletedRemote: Schema.Boolean,
+  removedWorktreePath: Schema.optional(Schema.NullOr(TrimmedNonEmptyStringSchema)),
 });
 export type VcsDeleteBranchResult = typeof VcsDeleteBranchResult.Type;
 

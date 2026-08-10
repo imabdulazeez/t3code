@@ -1363,6 +1363,95 @@ it.layer(TestLayer)("GitVcsDriver core integration", (it) => {
         assert.equal(yield* fileSystem.exists(worktreePath), false);
       }),
     );
+
+    it.effect("refuses to delete a branch checked out in a worktree and names that worktree", () =>
+      Effect.gen(function* () {
+        const cwd = yield* makeTmpDir();
+        const { initialBranch } = yield* initRepoWithCommit(cwd);
+        const pathService = yield* Path.Path;
+        const worktreePath = pathService.join(yield* makeTmpDir("git-worktrees-"), "linked");
+        const driver = yield* GitVcsDriver.GitVcsDriver;
+        yield* driver.createWorktree({
+          cwd,
+          path: worktreePath,
+          refName: initialBranch,
+          newRefName: "feature/linked",
+        });
+
+        const error = yield* driver
+          .deleteBranch({ cwd, refName: "feature/linked", force: true })
+          .pipe(Effect.flip);
+
+        assert.equal(error.operation, "GitVcsDriver.deleteBranch.local");
+        assert.include(error.detail, worktreePath);
+        assert.include(yield* git(cwd, ["branch", "--list", "feature/linked"]), "feature/linked");
+      }),
+    );
+
+    it.effect("removes the linked worktree before deleting the branch when asked", () =>
+      Effect.gen(function* () {
+        const cwd = yield* makeTmpDir();
+        const { initialBranch } = yield* initRepoWithCommit(cwd);
+        const pathService = yield* Path.Path;
+        const worktreePath = pathService.join(yield* makeTmpDir("git-worktrees-"), "linked");
+        const driver = yield* GitVcsDriver.GitVcsDriver;
+        yield* driver.createWorktree({
+          cwd,
+          path: worktreePath,
+          refName: initialBranch,
+          newRefName: "feature/linked",
+        });
+
+        const result = yield* driver.deleteBranch({
+          cwd,
+          refName: "feature/linked",
+          force: true,
+          removeWorktree: true,
+        });
+
+        assert.equal(result.deletedLocal, true);
+        assert.isNotNull(result.removedWorktreePath ?? null);
+        const fileSystem = yield* FileSystem.FileSystem;
+        assert.equal(yield* fileSystem.exists(worktreePath), false);
+        assert.equal(yield* git(cwd, ["branch", "--list", "feature/linked"]), "");
+      }),
+    );
+
+    it.effect("keeps a dirty worktree unless the caller opts into forcing its removal", () =>
+      Effect.gen(function* () {
+        const cwd = yield* makeTmpDir();
+        const { initialBranch } = yield* initRepoWithCommit(cwd);
+        const pathService = yield* Path.Path;
+        const worktreePath = pathService.join(yield* makeTmpDir("git-worktrees-"), "linked");
+        const driver = yield* GitVcsDriver.GitVcsDriver;
+        yield* driver.createWorktree({
+          cwd,
+          path: worktreePath,
+          refName: initialBranch,
+          newRefName: "feature/linked",
+        });
+        yield* writeTextFile(worktreePath, "README.md", "# uncommitted\n");
+
+        const error = yield* driver
+          .deleteBranch({ cwd, refName: "feature/linked", force: true, removeWorktree: true })
+          .pipe(Effect.flip);
+
+        assert.equal(error.operation, "GitVcsDriver.deleteBranch.removeWorktree");
+        const fileSystem = yield* FileSystem.FileSystem;
+        assert.equal(yield* fileSystem.exists(worktreePath), true);
+
+        const forced = yield* driver.deleteBranch({
+          cwd,
+          refName: "feature/linked",
+          force: true,
+          removeWorktree: true,
+          forceRemoveWorktree: true,
+        });
+
+        assert.equal(forced.deletedLocal, true);
+        assert.equal(yield* fileSystem.exists(worktreePath), false);
+      }),
+    );
   });
 
   describe("remote operations", () => {

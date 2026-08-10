@@ -46,6 +46,7 @@ import { vcsEnvironment } from "../state/vcs";
 import { cn } from "../lib/utils";
 import { parsePullRequestReference } from "../pullRequestReference";
 import { getSourceControlPresentation } from "../sourceControlPresentation";
+import { formatWorktreePathForDisplay } from "../worktreeCleanup";
 import {
   deriveLocalBranchNameFromRemoteRef,
   resolveBranchTriggerLabel,
@@ -114,6 +115,15 @@ function isGitCommandError(error: unknown): boolean {
     error !== null &&
     "_tag" in error &&
     (error as { _tag?: unknown })._tag === "GitCommandError"
+  );
+}
+
+const WORKTREE_REMOVE_OPERATION = "GitVcsDriver.deleteBranch.removeWorktree";
+
+function failedRemovingWorktree(error: unknown): boolean {
+  return (
+    isGitCommandError(error) &&
+    (error as { operation?: unknown }).operation === WORKTREE_REMOVE_OPERATION
   );
 }
 
@@ -259,6 +269,7 @@ export function BranchToolbarBranchSelector({
   const updateClientSettings = useUpdateClientSettings();
   const [pendingDelete, setPendingDelete] = useState<VcsRef | null>(null);
   const [forceDeleteTarget, setForceDeleteTarget] = useState<VcsRef | null>(null);
+  const [forceWorktreeTarget, setForceWorktreeTarget] = useState<VcsRef | null>(null);
 
   const branchStatusQuery = useEnvironmentQuery(
     branchCwd === null
@@ -558,11 +569,16 @@ export function BranchToolbarBranchSelector({
     });
   };
 
-  const deleteBranch = (ref: VcsRef, force: boolean) => {
+  const deleteBranch = (
+    ref: VcsRef,
+    options: { force: boolean; forceRemoveWorktree?: boolean },
+  ) => {
     if (!branchCwd) return;
 
+    const { force, forceRemoveWorktree = false } = options;
     setPendingDelete(null);
     setForceDeleteTarget(null);
+    setForceWorktreeTarget(null);
 
     const toastId = toastManager.add({
       type: "loading",
@@ -580,6 +596,8 @@ export function BranchToolbarBranchSelector({
           ...(ref.remoteName === undefined ? {} : { remoteName: ref.remoteName }),
           force,
           deleteRemote: deleteRemoteBranchOnDelete,
+          removeWorktree: ref.worktreePath !== null,
+          forceRemoveWorktree,
         },
       });
       if (deleteResult._tag === "Success") {
@@ -590,12 +608,18 @@ export function BranchToolbarBranchSelector({
             input: { cwd: branchCwd, prune: true },
           }).catch(() => undefined);
         }
+        const notes = [
+          result.deletedRemote ? "Remote branch also deleted." : null,
+          result.removedWorktreePath
+            ? `Removed worktree ${formatWorktreePathForDisplay(result.removedWorktreePath)}.`
+            : null,
+        ].filter((note) => note !== null);
         toastManager.update(
           toastId,
           stackedThreadToast({
             type: "success",
             title: `Deleted branch "${ref.name}".`,
-            ...(result.deletedRemote ? { description: "Remote branch also deleted." } : {}),
+            ...(notes.length > 0 ? { description: notes.join(" ") } : {}),
           }),
         );
         return;
@@ -605,7 +629,13 @@ export function BranchToolbarBranchSelector({
         return;
       }
       const error = squashAtomCommandFailure(deleteResult);
-      if (!force && isGitCommandError(error)) {
+      if (failedRemovingWorktree(error)) {
+        if (!forceRemoveWorktree) {
+          toastManager.close(toastId);
+          setForceWorktreeTarget(ref);
+          return;
+        }
+      } else if (!force && isGitCommandError(error)) {
         toastManager.close(toastId);
         setForceDeleteTarget(ref);
         return;
@@ -1213,6 +1243,9 @@ export function BranchToolbarBranchSelector({
               {deleteRemoteBranchOnDelete
                 ? "This will delete the branch locally and its remote counterpart."
                 : "This will delete the branch locally."}
+              {pendingDelete?.worktreePath
+                ? ` The worktree at ${formatWorktreePathForDisplay(pendingDelete.worktreePath)} is checked out on this branch and will be removed too.`
+                : null}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1220,10 +1253,10 @@ export function BranchToolbarBranchSelector({
             <Button
               variant="destructive"
               onClick={() => {
-                if (pendingDelete) deleteBranch(pendingDelete, false);
+                if (pendingDelete) deleteBranch(pendingDelete, { force: false });
               }}
             >
-              Delete
+              {pendingDelete?.worktreePath ? "Delete branch & worktree" : "Delete"}
             </Button>
           </AlertDialogFooter>
         </AlertDialogPopup>
@@ -1247,10 +1280,45 @@ export function BranchToolbarBranchSelector({
             <Button
               variant="destructive"
               onClick={() => {
-                if (forceDeleteTarget) deleteBranch(forceDeleteTarget, true);
+                if (forceDeleteTarget) deleteBranch(forceDeleteTarget, { force: true });
               }}
             >
               Force delete
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogPopup>
+      </AlertDialog>
+
+      <AlertDialog
+        open={forceWorktreeTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setForceWorktreeTarget(null);
+        }}
+      >
+        <AlertDialogPopup>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Discard the worktree for &quot;{forceWorktreeTarget?.name}&quot;?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {forceWorktreeTarget?.worktreePath
+                ? `The worktree at ${formatWorktreePathForDisplay(forceWorktreeTarget.worktreePath)} has uncommitted or untracked changes. Removing it discards that work permanently.`
+                : "This worktree has uncommitted or untracked changes. Removing it discards that work permanently."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (forceWorktreeTarget)
+                  deleteBranch(forceWorktreeTarget, {
+                    force: false,
+                    forceRemoveWorktree: true,
+                  });
+              }}
+            >
+              Discard & delete
             </Button>
           </AlertDialogFooter>
         </AlertDialogPopup>

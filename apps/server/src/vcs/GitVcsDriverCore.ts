@@ -432,6 +432,15 @@ function isMissingRemoteBranchError(stderr: string): boolean {
   );
 }
 
+function isDirtyWorktreeError(stderr: string): boolean {
+  const normalized = stderr.toLowerCase();
+  return (
+    normalized.includes("contains modified or untracked files") ||
+    normalized.includes("is dirty") ||
+    normalized.includes("use --force")
+  );
+}
+
 function parseDefaultBranchFromRemoteHeadRef(value: string, remoteName: string): string | null {
   const trimmed = value.trim();
   const prefix = `refs/remotes/${remoteName}/`;
@@ -3147,22 +3156,79 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     },
   );
 
+  /**
+   * Resolves the worktree a local branch is checked out in, if any. Git refuses to delete such a
+   * branch even with `-D`, so callers either remove the worktree first or report why they cannot.
+   */
+  const findWorktreePathForBranch = Effect.fn("findWorktreePathForBranch")(function* (
+    cwd: string,
+    refName: string,
+  ) {
+    const result = yield* executeGit(
+      "GitVcsDriver.deleteBranch.worktreeList",
+      cwd,
+      ["worktree", "list", "--porcelain", "-z"],
+      { timeoutMs: 10_000, allowNonZeroExit: true },
+    );
+    if (result.exitCode !== 0) {
+      return null;
+    }
+    const worktreePath = parseWorktreeBranchPaths(result.stdout).get(refName);
+    return worktreePath === undefined ? null : path.normalize(path.resolve(worktreePath));
+  });
+
   const deleteBranch: GitVcsDriver.GitVcsDriver["Service"]["deleteBranch"] = Effect.fn(
     "deleteBranch",
   )(function* (input) {
     const isRemoteRef = input.isRemote === true;
 
     let deletedLocal = false;
+    let removedWorktreePath: string | null = null;
     if (!isRemoteRef) {
-      yield* executeGit(
-        "GitVcsDriver.deleteBranch.local",
-        input.cwd,
-        ["branch", input.force ? "-D" : "-d", "--", input.refName],
-        {
-          timeoutMs: 10_000,
-          fallbackErrorDetail: "git branch delete failed",
-        },
-      );
+      const branchArgs = ["branch", input.force ? "-D" : "-d", "--", input.refName];
+      const worktreePath = yield* findWorktreePathForBranch(input.cwd, input.refName);
+      if (worktreePath !== null) {
+        if (input.removeWorktree !== true) {
+          return yield* new GitCommandError({
+            ...gitCommandContext({
+              operation: "GitVcsDriver.deleteBranch.local",
+              cwd: input.cwd,
+              args: branchArgs,
+            }),
+            detail: `Branch is checked out in the worktree at ${worktreePath}. Remove that worktree before deleting the branch.`,
+          });
+        }
+        const removeArgs = [
+          "worktree",
+          "remove",
+          ...(input.forceRemoveWorktree === true ? ["--force"] : []),
+          worktreePath,
+        ];
+        const removeResult = yield* executeGit(
+          "GitVcsDriver.deleteBranch.removeWorktree",
+          input.cwd,
+          removeArgs,
+          { timeoutMs: 15_000, allowNonZeroExit: true },
+        );
+        if (removeResult.exitCode !== 0) {
+          return yield* new GitCommandError({
+            ...gitCommandContext({
+              operation: "GitVcsDriver.deleteBranch.removeWorktree",
+              cwd: input.cwd,
+              args: removeArgs,
+            }),
+            detail: isDirtyWorktreeError(removeResult.stderr)
+              ? `The worktree at ${worktreePath} has uncommitted or untracked changes.`
+              : `Could not remove the worktree at ${worktreePath}.`,
+          });
+        }
+        removedWorktreePath = worktreePath;
+      }
+
+      yield* executeGit("GitVcsDriver.deleteBranch.local", input.cwd, branchArgs, {
+        timeoutMs: 10_000,
+        fallbackErrorDetail: "git branch delete failed",
+      });
       deletedLocal = true;
     }
 
@@ -3197,7 +3263,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       }
     }
 
-    return { refName: input.refName, deletedLocal, deletedRemote };
+    return { refName: input.refName, deletedLocal, deletedRemote, removedWorktreePath };
   });
 
   const fetch: GitVcsDriver.GitVcsDriver["Service"]["fetch"] = Effect.fn("fetch")(
