@@ -14,6 +14,7 @@ import type {
   OrchestrationThread,
   ProjectContentMatch,
   ProjectEntryKind,
+  ScopedProjectRef,
   ThreadId,
   VcsListRefsResult,
   VcsRef,
@@ -129,6 +130,27 @@ export function useBranches(target: VcsRefTarget) {
         })
       : null,
   );
+}
+
+export function useLiveWorktreePaths(
+  projectRef: ScopedProjectRef | null,
+  cwd: string | null,
+  candidatePaths: ReadonlyArray<string>,
+): ReadonlySet<string> | null {
+  const normalizedCandidatePaths = useMemo(
+    () => [...new Set(candidatePaths)].sort(),
+    [candidatePaths],
+  );
+  const query = useEnvironmentQuery(
+    projectRef !== null && cwd !== null && normalizedCandidatePaths.length > 0
+      ? vcsEnvironment.listWorktrees({
+          environmentId: projectRef.environmentId,
+          input: { cwd, candidatePaths: normalizedCandidatePaths },
+        })
+      : null,
+  );
+  const livePaths = query.error === null ? query.data?.livePaths : undefined;
+  return useMemo(() => (livePaths === undefined ? null : new Set(livePaths)), [livePaths]);
 }
 
 export function usePaginatedBranches(target: VcsRefTarget) {

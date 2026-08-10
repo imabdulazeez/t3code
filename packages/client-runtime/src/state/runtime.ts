@@ -477,14 +477,10 @@ export function followStreamInEnvironment<A, E, R>(
   );
 }
 
-function createEnvironmentQueryAtomFamily<R, ER, Input, A, E>(
+export function createEnvironmentRpcGenerationAtomFamily<R, ER>(
   runtime: Atom.AtomRuntime<EnvironmentRegistry | R, ER>,
-  options: EnvironmentQueryAtomOptions<Input, A, E, EnvironmentSupervisor | R>,
-): (target: {
-  readonly environmentId: EnvironmentIdType;
-  readonly input: Input;
-}) => Atom.Atom<AsyncResult.AsyncResult<A, E | ER | Error>> {
-  const rpcGenerationAtom = Atom.family((environmentId: EnvironmentIdType) =>
+) {
+  return Atom.family((environmentId: EnvironmentIdType) =>
     runtime.atom(
       followStreamInEnvironment(
         environmentId,
@@ -505,6 +501,16 @@ function createEnvironmentQueryAtomFamily<R, ER, Input, A, E>(
       { initialValue: null },
     ),
   );
+}
+
+function createEnvironmentQueryAtomFamily<R, ER, Input, A, E>(
+  runtime: Atom.AtomRuntime<EnvironmentRegistry | R, ER>,
+  options: EnvironmentQueryAtomOptions<Input, A, E, EnvironmentSupervisor | R>,
+): (target: {
+  readonly environmentId: EnvironmentIdType;
+  readonly input: Input;
+}) => Atom.Atom<AsyncResult.AsyncResult<A, E | ER | Error>> {
+  const rpcGenerationAtom = createEnvironmentRpcGenerationAtomFamily(runtime);
   const family = Atom.family((key: string) => {
     const target = parseEnvironmentRpcKey<Input>(key);
     const idleTtlMs = options.idleTtlMs ?? 5 * 60_000;

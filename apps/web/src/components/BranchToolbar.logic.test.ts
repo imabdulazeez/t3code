@@ -96,6 +96,62 @@ describe("resolvePreviousWorktreeSeed", () => {
       }),
     ).toEqual({ branch: "t3/live", worktreePath: "/repo/.t3/worktrees/live" });
   });
+
+  it("skips a thread whose worktree no longer exists and falls back to a live one", () => {
+    expect(
+      resolvePreviousWorktreeSeed({
+        threads: [
+          {
+            branch: "t3/deleted-branch",
+            worktreePath: "/repo/.t3/worktrees/gone",
+            updatedAt: "2026-07-24T00:00:00.000Z",
+          },
+          {
+            branch: "t3/still-here",
+            worktreePath: "/repo/.t3/worktrees/live",
+            updatedAt: "2026-07-21T00:00:00.000Z",
+          },
+        ],
+        currentWorktreePath: null,
+        liveWorktreePaths: new Set(["/repo/.t3/worktrees/live"]),
+      }),
+    ).toEqual({ branch: "t3/still-here", worktreePath: "/repo/.t3/worktrees/live" });
+  });
+
+  it("returns null when every recorded worktree is gone", () => {
+    expect(
+      resolvePreviousWorktreeSeed({
+        threads: [
+          {
+            branch: "t3/deleted-branch",
+            worktreePath: "/repo/.t3/worktrees/gone",
+            updatedAt: "2026-07-24T00:00:00.000Z",
+          },
+        ],
+        currentWorktreePath: null,
+        liveWorktreePaths: new Set<string>(),
+      }),
+    ).toBeNull();
+  });
+
+  it("leaves the seed unfiltered while the live worktree list is still unknown", () => {
+    const threads = [
+      {
+        branch: "t3/unconfirmed",
+        worktreePath: "/repo/.t3/worktrees/unconfirmed",
+        updatedAt: "2026-07-24T00:00:00.000Z",
+      },
+    ];
+    const expected = {
+      branch: "t3/unconfirmed",
+      worktreePath: "/repo/.t3/worktrees/unconfirmed",
+    };
+
+    expect(
+      resolvePreviousWorktreeSeed({ threads, currentWorktreePath: null, liveWorktreePaths: null }),
+    ).toEqual(expected);
+    expect(resolvePreviousWorktreeSeed({ threads, currentWorktreePath: null })).toEqual(expected);
+  });
 });
 
 describe("resolvePreviousWorktreeLabel", () => {

@@ -92,13 +92,16 @@ export function resolvePreviousWorktreeSeed(input: {
     archivedAt?: string | null;
   }>;
   currentWorktreePath: string | null;
+  liveWorktreePaths?: ReadonlySet<string> | null;
 }): PreviousWorktreeSeed | null {
   let latest: { branch: string | null; worktreePath: string; updatedAt: number } | null = null;
+  const liveWorktreePaths = input.liveWorktreePaths ?? null;
   for (const thread of input.threads) {
     if (
       !thread.worktreePath ||
       thread.worktreePath === input.currentWorktreePath ||
-      (thread.archivedAt ?? null) !== null
+      (thread.archivedAt ?? null) !== null ||
+      (liveWorktreePaths !== null && !liveWorktreePaths.has(thread.worktreePath))
     ) {
       continue;
     }

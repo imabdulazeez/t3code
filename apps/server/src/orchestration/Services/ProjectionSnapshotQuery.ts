@@ -140,6 +140,10 @@ export interface ProjectionSnapshotQueryShape {
     projectId: ProjectId,
   ) => Effect.Effect<Option.Option<ThreadId>, ProjectionRepositoryError>;
 
+  readonly getThreadIdsByWorktreePath: (
+    worktreePath: string,
+  ) => Effect.Effect<ReadonlyArray<ThreadId>, ProjectionRepositoryError>;
+
   /**
    * Read the checkpoint context needed to resolve a single thread diff.
    */

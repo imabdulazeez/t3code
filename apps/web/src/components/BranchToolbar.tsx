@@ -13,6 +13,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useComposerDraftStore, type DraftId } from "../composerDraftStore";
 import { useProject, useThread, useThreadShellsForProjectRefs } from "../state/entities";
+import { useLiveWorktreePaths } from "../state/queries";
 import { useIsMobile } from "../hooks/useMediaQuery";
 import {
   type EnvMode,
@@ -340,15 +341,8 @@ export const BranchToolbar = memo(function BranchToolbar({
       : null;
   const activeProject = useProject(activeProjectRef);
   const hasActiveThread = serverThread !== null || draftThread !== null;
-  const activeWorktreePath = serverThread?.worktreePath ?? draftThread?.worktreePath ?? null;
-  const effectiveEnvMode =
-    effectiveEnvModeOverride ??
-    resolveEffectiveEnvMode({
-      activeWorktreePath,
-      hasServerThread: serverThread !== null,
-      draftThreadEnvMode: draftThread?.envMode,
-    });
-  const envModeLocked = envLocked || (serverThread !== null && activeWorktreePath !== null);
+  const recordedWorktreePath = serverThread?.worktreePath ?? draftThread?.worktreePath ?? null;
+  const envModeLocked = envLocked || (serverThread !== null && recordedWorktreePath !== null);
 
   // "Previous worktree" hops a draft into the most recently active worktree
   // of this project — the "keep going where I just was" follow-up flow. Only
@@ -359,15 +353,46 @@ export const BranchToolbar = memo(function BranchToolbar({
     [canUsePreviousWorktree, activeProjectRef],
   );
   const projectThreads = useThreadShellsForProjectRefs(projectRefsForWorktreeLookup);
+  const candidateWorktreePaths = useMemo(() => {
+    const paths = new Set<string>();
+    if (recordedWorktreePath !== null) {
+      paths.add(recordedWorktreePath);
+    }
+    for (const thread of projectThreads) {
+      if (thread.worktreePath && (thread.archivedAt ?? null) === null) {
+        paths.add(thread.worktreePath);
+      }
+    }
+    return [...paths];
+  }, [projectThreads, recordedWorktreePath]);
+  const liveWorktreePaths = useLiveWorktreePaths(
+    canUsePreviousWorktree ? activeProjectRef : null,
+    activeProject?.workspaceRoot ?? null,
+    candidateWorktreePaths,
+  );
+  const activeWorktreePath =
+    recordedWorktreePath !== null &&
+    liveWorktreePaths !== null &&
+    !liveWorktreePaths.has(recordedWorktreePath)
+      ? null
+      : recordedWorktreePath;
+  const effectiveEnvMode =
+    effectiveEnvModeOverride ??
+    resolveEffectiveEnvMode({
+      activeWorktreePath,
+      hasServerThread: serverThread !== null,
+      draftThreadEnvMode: draftThread?.envMode,
+    });
   const previousWorktreeSeed = useMemo(
     () =>
       canUsePreviousWorktree
         ? resolvePreviousWorktreeSeed({
             threads: projectThreads,
             currentWorktreePath: activeWorktreePath,
+            liveWorktreePaths,
           })
         : null,
-    [activeWorktreePath, canUsePreviousWorktree, projectThreads],
+    [activeWorktreePath, canUsePreviousWorktree, liveWorktreePaths, projectThreads],
   );
   const previousWorktreeLabel = previousWorktreeSeed
     ? resolvePreviousWorktreeLabel(previousWorktreeSeed)

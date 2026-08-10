@@ -275,14 +275,24 @@ function paginateBranches(input: {
 }
 
 function parseWorktreeBranchPaths(stdout: string): ReadonlyMap<string, string> {
-  const worktreePaths = new Map<string, string>();
+  return new Map(
+    parseWorktreeEntries(stdout).flatMap((entry) =>
+      entry.refName === null ? [] : [[entry.refName, entry.path] as const],
+    ),
+  );
+}
+
+function parseWorktreeEntries(
+  stdout: string,
+): ReadonlyArray<{ readonly path: string; readonly refName: string | null }> {
+  const worktrees: Array<{ path: string; refName: string | null }> = [];
   let currentPath: string | null = null;
   let currentBranch: string | null = null;
   let currentPrunable = false;
 
   const flush = () => {
-    if (currentPath !== null && currentBranch !== null && !currentPrunable) {
-      worktreePaths.set(currentBranch, currentPath);
+    if (currentPath !== null && !currentPrunable) {
+      worktrees.push({ path: currentPath, refName: currentBranch });
     }
     currentPath = null;
     currentBranch = null;
@@ -302,7 +312,7 @@ function parseWorktreeBranchPaths(stdout: string): ReadonlyMap<string, string> {
   }
   flush();
 
-  return worktreePaths;
+  return worktrees;
 }
 
 function splitNullSeparatedPaths(input: string, truncated: boolean): string[] {
@@ -3039,6 +3049,46 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     });
   });
 
+  const listWorktrees: GitVcsDriver.GitVcsDriver["Service"]["listWorktrees"] = Effect.fn(
+    "listWorktrees",
+  )(function* (input) {
+    const result = yield* executeGit(
+      "GitVcsDriver.listWorktrees",
+      input.cwd,
+      ["worktree", "list", "--porcelain", "-z"],
+      {
+        timeoutMs: 30_000,
+        maxOutputBytes: 16 * 1024 * 1024,
+        fallbackErrorDetail: "git worktree list failed",
+      },
+    );
+
+    const candidatePaths = input.candidatePaths ?? [];
+    if (candidatePaths.length === 0) {
+      return { livePaths: [] };
+    }
+    const realPathOrNull = (value: string) =>
+      fileSystem.realPath(value).pipe(Effect.orElseSucceed(() => null));
+    const liveRealPaths = new Set(
+      (yield* Effect.forEach(
+        parseWorktreeEntries(result.stdout),
+        (entry) => realPathOrNull(entry.path),
+        { concurrency: 16 },
+      )).filter((value) => value !== null),
+    );
+    const resolvedCandidates = yield* Effect.forEach(
+      candidatePaths,
+      (candidate) =>
+        realPathOrNull(candidate).pipe(Effect.map((resolved) => ({ candidate, resolved }))),
+      { concurrency: 16 },
+    );
+    const livePaths = resolvedCandidates
+      .filter((entry) => entry.resolved !== null && liveRealPaths.has(entry.resolved))
+      .map((entry) => entry.candidate);
+
+    return { livePaths };
+  });
+
   const renameBranch: GitVcsDriver.GitVcsDriver["Service"]["renameBranch"] = Effect.fn(
     "renameBranch",
   )(function* (input) {
@@ -3366,6 +3416,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       withListRefsInvalidation(input.cwd, fetchRemoteTrackingBranch(input)),
     setBranchUpstream: (input) => withListRefsInvalidation(input.cwd, setBranchUpstream(input)),
     removeWorktree: (input) => withListRefsInvalidation(input.cwd, removeWorktree(input)),
+    listWorktrees,
     renameBranch: (input) => withListRefsInvalidation(input.cwd, renameBranch(input)),
     createRef: (input) => withListRefsInvalidation(input.cwd, createRef(input)),
     switchRef: (input) => withListRefsInvalidation(input.cwd, switchRef(input)),

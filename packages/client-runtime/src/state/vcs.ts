@@ -2,6 +2,7 @@ import {
   type EnvironmentId,
   type VcsListRefsInput,
   type VcsListRefsResult,
+  type VcsListWorktreesInput,
   type VcsStatusResult,
   WS_METHODS,
 } from "@t3tools/contracts";
@@ -13,9 +14,14 @@ import * as Result from "effect/Result";
 import * as Schedule from "effect/Schedule";
 import * as Stream from "effect/Stream";
 import * as SubscriptionRef from "effect/SubscriptionRef";
-import { Atom, AtomRegistry } from "effect/unstable/reactivity";
+import { AsyncResult, Atom, AtomRegistry } from "effect/unstable/reactivity";
 
-import { createEnvironmentRpcCommand, createEnvironmentSubscriptionAtomFamily } from "./runtime.ts";
+import {
+  createEnvironmentRpcCommand,
+  createEnvironmentRpcGenerationAtomFamily,
+  createEnvironmentSubscriptionAtomFamily,
+  runInEnvironment,
+} from "./runtime.ts";
 import type { EnvironmentRegistry } from "../connection/registry.ts";
 import { EnvironmentSupervisor } from "../connection/supervisor.ts";
 import { safeErrorLogAttributes } from "../errors/safeLog.ts";
@@ -259,6 +265,32 @@ export function createVcsEnvironmentAtoms<R, E>(
     readonly environmentId: EnvironmentId;
     readonly input: VcsListRefsInput;
   }) => listRefsByEnvironment(target.environmentId)(JSON.stringify(target.input));
+  const rpcGenerationAtom = createEnvironmentRpcGenerationAtomFamily(runtime);
+  const listWorktreesByEnvironment = Atom.family((environmentId: EnvironmentId) =>
+    Atom.family((inputKey: string) => {
+      const input = JSON.parse(inputKey) as VcsListWorktreesInput;
+      return runtime
+        .atom((get) => {
+          const generation = Option.getOrNull(
+            AsyncResult.value(get(rpcGenerationAtom(environmentId))),
+          );
+          if (generation === null) {
+            return Effect.never;
+          }
+          get(vcsRefsCacheStateAtom({ environmentId }));
+          return runInEnvironment(environmentId, request(WS_METHODS.vcsListWorktrees, input));
+        })
+        .pipe(
+          Atom.setIdleTTL(VCS_REFS_IDLE_TTL_MS),
+          Atom.withLabel(`environment-data:vcs:list-worktrees:${environmentId}:${inputKey}`),
+        );
+    }),
+  );
+  const listWorktrees = (target: {
+    readonly environmentId: EnvironmentId;
+    readonly input: VcsListWorktreesInput;
+  }) => listWorktreesByEnvironment(target.environmentId)(JSON.stringify(target.input));
+
   const invalidateRefs = (
     target: { readonly environmentId: EnvironmentId; readonly input: { readonly cwd: string } },
     registry: AtomRegistry.AtomRegistry,
@@ -311,6 +343,7 @@ export function createVcsEnvironmentAtoms<R, E>(
       concurrency: vcsCommandConcurrency,
       onSettled: invalidateRefs,
     }),
+    listWorktrees,
     createRef: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:vcs:create-ref",
       tag: WS_METHODS.vcsCreateRef,

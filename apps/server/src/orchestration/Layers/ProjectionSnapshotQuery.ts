@@ -135,6 +135,9 @@ const ProjectIdLookupInput = Schema.Struct({
 const ThreadIdLookupInput = Schema.Struct({
   threadId: ThreadId,
 });
+const WorktreePathLookupInput = Schema.Struct({
+  worktreePath: Schema.String,
+});
 // Windowed reads order turns by the stable keyset (anchor, turn key), where
 // anchor is requested_at and turn key is
 // COALESCE(turn_id, ''). Both are event-derived, so cursors survive the
@@ -898,6 +901,20 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
           AND archived_at IS NULL
         ORDER BY created_at ASC, thread_id ASC
         LIMIT 1
+      `,
+  });
+
+  const listThreadIdsByWorktreePath = SqlSchema.findAll({
+    Request: WorktreePathLookupInput,
+    Result: ProjectionThreadIdLookupRowSchema,
+    execute: ({ worktreePath }) =>
+      sql`
+        SELECT
+          thread_id AS "threadId"
+        FROM projection_threads
+        WHERE worktree_path = ${worktreePath}
+          AND deleted_at IS NULL
+        ORDER BY created_at ASC, thread_id ASC
       `,
   });
 
@@ -2262,6 +2279,19 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
         Effect.map(Option.map((row) => row.threadId)),
       );
 
+  const getThreadIdsByWorktreePath: ProjectionSnapshotQueryShape["getThreadIdsByWorktreePath"] = (
+    worktreePath,
+  ) =>
+    listThreadIdsByWorktreePath({ worktreePath }).pipe(
+      Effect.mapError(
+        toPersistenceSqlOrDecodeError(
+          "ProjectionSnapshotQuery.getThreadIdsByWorktreePath:query",
+          "ProjectionSnapshotQuery.getThreadIdsByWorktreePath:decodeRows",
+        ),
+      ),
+      Effect.map((rows) => rows.map((row) => row.threadId)),
+    );
+
   const getThreadCheckpointContext: ProjectionSnapshotQueryShape["getThreadCheckpointContext"] = (
     threadId,
   ) =>
@@ -2718,6 +2748,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
     getActiveProjectByWorkspaceRoot,
     getProjectShellById,
     getFirstActiveThreadIdByProjectId,
+    getThreadIdsByWorktreePath,
     getThreadCheckpointContext,
     getFullThreadDiffContext,
     getThreadShellById,

@@ -1364,6 +1364,70 @@ it.layer(TestLayer)("GitVcsDriver core integration", (it) => {
       }),
     );
 
+    it.effect("reports only candidate paths whose worktree directory still exists", () =>
+      Effect.gen(function* () {
+        const cwd = yield* makeTmpDir();
+        const { initialBranch } = yield* initRepoWithCommit(cwd);
+        const pathService = yield* Path.Path;
+        const worktreesRoot = yield* makeTmpDir("git-worktrees-");
+        const livePath = pathService.join(worktreesRoot, "live");
+        const removedPath = pathService.join(worktreesRoot, "removed");
+        const driver = yield* GitVcsDriver.GitVcsDriver;
+        yield* driver.createWorktree({
+          cwd,
+          path: livePath,
+          refName: initialBranch,
+          newRefName: "feature/live",
+        });
+        yield* driver.createWorktree({
+          cwd,
+          path: removedPath,
+          refName: initialBranch,
+          newRefName: "feature/removed",
+        });
+
+        const fileSystem = yield* FileSystem.FileSystem;
+        yield* fileSystem.remove(removedPath, { recursive: true });
+
+        const { livePaths } = yield* driver.listWorktrees({
+          cwd,
+          candidatePaths: [livePath, removedPath],
+        });
+
+        assert.deepStrictEqual(livePaths, [livePath]);
+      }),
+    );
+
+    it.effect("resolves candidate paths through symlinks when reporting live worktrees", () =>
+      Effect.gen(function* () {
+        const cwd = yield* makeTmpDir();
+        const { initialBranch } = yield* initRepoWithCommit(cwd);
+        const pathService = yield* Path.Path;
+        const fileSystem = yield* FileSystem.FileSystem;
+        const worktreesRoot = yield* makeTmpDir("git-worktrees-");
+        const worktreePath = pathService.join(worktreesRoot, "live");
+        const driver = yield* GitVcsDriver.GitVcsDriver;
+        yield* driver.createWorktree({
+          cwd,
+          path: worktreePath,
+          refName: initialBranch,
+          newRefName: "feature/live",
+        });
+
+        const linkRoot = pathService.join(yield* makeTmpDir("git-worktrees-link-"), "link");
+        yield* fileSystem.symlink(worktreesRoot, linkRoot);
+        const symlinkedCandidate = pathService.join(linkRoot, "live");
+        const missingCandidate = pathService.join(worktreesRoot, "gone");
+
+        const { livePaths } = yield* driver.listWorktrees({
+          cwd,
+          candidatePaths: [symlinkedCandidate, missingCandidate],
+        });
+
+        assert.deepStrictEqual(livePaths, [symlinkedCandidate]);
+      }),
+    );
+
     it.effect("refuses to delete a branch checked out in a worktree and names that worktree", () =>
       Effect.gen(function* () {
         const cwd = yield* makeTmpDir();

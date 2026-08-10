@@ -484,6 +484,29 @@ const makeWsRpcLayer = (
       const serverCommandId = (tag: string) =>
         randomUUID.pipe(Effect.map((uuid) => CommandId.make(`server:${tag}:${uuid}`)));
 
+      const clearThreadWorktreePaths = (worktreePath: string) =>
+        projectionSnapshotQuery.getThreadIdsByWorktreePath(worktreePath).pipe(
+          Effect.flatMap((threadIds) =>
+            Effect.forEach(
+              threadIds,
+              (threadId) =>
+                serverCommandId("worktree-removed-meta-update").pipe(
+                  Effect.flatMap((commandId) =>
+                    orchestrationEngine.dispatch({
+                      type: "thread.meta.update",
+                      commandId,
+                      threadId,
+                      worktreePath: null,
+                    }),
+                  ),
+                  Effect.ignoreCause({ log: true }),
+                ),
+              { discard: true },
+            ),
+          ),
+          Effect.ignoreCause({ log: true }),
+        );
+
       const loadAuthAccessSnapshot = () =>
         Effect.all({
           pairingLinks: serverAuth.listPairingLinks(),
@@ -1911,9 +1934,16 @@ const makeWsRpcLayer = (
         [WS_METHODS.vcsRemoveWorktree]: (input) =>
           observeRpcEffect(
             WS_METHODS.vcsRemoveWorktree,
-            gitWorkflow.removeWorktree(input).pipe(Effect.tap(() => refreshGitStatus(input.cwd))),
+            gitWorkflow.removeWorktree(input).pipe(
+              Effect.tap(() => clearThreadWorktreePaths(input.path)),
+              Effect.tap(() => refreshGitStatus(input.cwd)),
+            ),
             { "rpc.aggregate": "vcs" },
           ),
+        [WS_METHODS.vcsListWorktrees]: (input) =>
+          observeRpcEffect(WS_METHODS.vcsListWorktrees, gitWorkflow.listWorktrees(input), {
+            "rpc.aggregate": "vcs",
+          }),
         [WS_METHODS.vcsCreateRef]: (input) =>
           observeRpcEffect(
             WS_METHODS.vcsCreateRef,
@@ -1929,7 +1959,15 @@ const makeWsRpcLayer = (
         [WS_METHODS.vcsDeleteBranch]: (input) =>
           observeRpcEffect(
             WS_METHODS.vcsDeleteBranch,
-            gitWorkflow.deleteBranch(input).pipe(Effect.tap(() => refreshGitStatus(input.cwd))),
+            gitWorkflow.deleteBranch(input).pipe(
+              Effect.tap((result) => {
+                const removedWorktreePath = result.removedWorktreePath ?? null;
+                return removedWorktreePath === null
+                  ? Effect.void
+                  : clearThreadWorktreePaths(removedWorktreePath);
+              }),
+              Effect.tap(() => refreshGitStatus(input.cwd)),
+            ),
             { "rpc.aggregate": "vcs" },
           ),
         [WS_METHODS.vcsFetch]: (input) =>
