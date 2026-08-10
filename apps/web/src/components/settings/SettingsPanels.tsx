@@ -364,6 +364,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       ["Restore default settings?", `This will reset: ${changedSettingLabels.join(", ")}.`].join(
         "\n",
       ),
+      { variant: "destructive" },
     );
     if (!confirmed) return;
 
