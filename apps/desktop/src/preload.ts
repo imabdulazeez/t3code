@@ -47,6 +47,19 @@ contextBridge.exposeInMainWorld("desktopBridge", {
   getClientSettings: () => ipcRenderer.invoke(IpcChannels.GET_CLIENT_SETTINGS_CHANNEL),
   setClientSettings: (settings) =>
     ipcRenderer.invoke(IpcChannels.SET_CLIENT_SETTINGS_CHANNEL, settings),
+  getLocalUpdateState: () => ipcRenderer.invoke(IpcChannels.LOCAL_UPDATE_GET_STATE_CHANNEL),
+  setLocalUpdateFolder: (folderPath) =>
+    ipcRenderer.invoke(IpcChannels.LOCAL_UPDATE_SET_FOLDER_CHANNEL, folderPath),
+  checkForLocalUpdate: () => ipcRenderer.invoke(IpcChannels.LOCAL_UPDATE_CHECK_CHANNEL),
+  installLocalUpdate: () => ipcRenderer.invoke(IpcChannels.LOCAL_UPDATE_INSTALL_CHANNEL),
+  onLocalUpdateState: (listener) => {
+    const wrappedListener = (_event: Electron.IpcRendererEvent, state: unknown) => {
+      listener(state as Parameters<typeof listener>[0]);
+    };
+    ipcRenderer.on(IpcChannels.LOCAL_UPDATE_STATE_CHANNEL, wrappedListener);
+    return () =>
+      ipcRenderer.removeListener(IpcChannels.LOCAL_UPDATE_STATE_CHANNEL, wrappedListener);
+  },
   getConnectionCatalog: () => ipcRenderer.invoke(IpcChannels.GET_CONNECTION_CATALOG_CHANNEL),
   setConnectionCatalog: (catalog) =>
     ipcRenderer.invoke(IpcChannels.SET_CONNECTION_CATALOG_CHANNEL, catalog),

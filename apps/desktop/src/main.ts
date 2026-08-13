@@ -64,6 +64,7 @@ import * as PreviewManager from "./preview/Manager.ts";
 import * as DesktopWindow from "./window/DesktopWindow.ts";
 import * as DesktopWslBackend from "./wsl/DesktopWslBackend.ts";
 import * as DesktopWslEnvironment from "./wsl/DesktopWslEnvironment.ts";
+import * as DesktopLocalUpdates from "./updates/DesktopLocalUpdates.ts";
 
 const desktopEnvironmentLayer = Layer.unwrap(
   Effect.gen(function* () {
@@ -201,6 +202,7 @@ const desktopApplicationLayer = Layer.mergeAll(
   DesktopLinuxUrlHandler.layer,
   DesktopShellEnvironment.layer,
   ElectronPermissions.layer,
+  DesktopLocalUpdates.layer,
   desktopSshLayer,
 ).pipe(
   Layer.provideMerge(desktopWslBackendLayer),

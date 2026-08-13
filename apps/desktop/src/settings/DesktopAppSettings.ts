@@ -22,6 +22,7 @@ import {
 import { isValidDistroName } from "../wsl/wslPathParsing.ts";
 
 export interface DesktopSettings {
+  readonly localUpdateFolderPath?: string | null;
   readonly linuxPasswordStore: LinuxPasswordStorePreference;
   readonly mainWindowBounds: DesktopWindowBounds | null;
   readonly mainWindowMaximized: boolean;
@@ -87,6 +88,7 @@ const DesktopWindowBoundsDocument = Schema.Struct({
 });
 
 const DesktopSettingsDocument = Schema.Struct({
+  localUpdateFolderPath: Schema.optionalKey(Schema.NullOr(Schema.String)),
   linuxPasswordStore: Schema.optionalKey(Schema.Unknown),
   mainWindowBounds: Schema.optionalKey(Schema.NullOr(DesktopWindowBoundsDocument)),
   mainWindowMaximized: Schema.optionalKey(Schema.Boolean),
@@ -143,6 +145,9 @@ export class DesktopAppSettings extends Context.Service<
   {
     readonly load: Effect.Effect<DesktopSettings>;
     readonly get: Effect.Effect<DesktopSettings>;
+    readonly setLocalUpdateFolderPath?: (
+      folderPath: string | null,
+    ) => Effect.Effect<DesktopSettingsChange, DesktopSettingsWriteError>;
     readonly setMainWindowBounds: (
       bounds: DesktopWindowBounds,
       isMaximized: boolean,
@@ -200,6 +205,10 @@ function normalizeDesktopSettingsDocument(parsed: DesktopSettingsDocument): Desk
     (parsed.wslBackendEnabled === undefined && parsed.wslMode === "wsl");
 
   return {
+    ...(typeof parsed.localUpdateFolderPath === "string" &&
+    parsed.localUpdateFolderPath.trim().length > 0
+      ? { localUpdateFolderPath: parsed.localUpdateFolderPath }
+      : {}),
     linuxPasswordStore: normalizeLinuxPasswordStorePreference(parsed.linuxPasswordStore),
     mainWindowBounds,
     mainWindowMaximized: mainWindowBounds !== null && parsed.mainWindowMaximized === true,
@@ -218,6 +227,10 @@ function toDesktopSettingsDocument(
   defaults: DesktopSettings,
 ): DesktopSettingsDocument {
   const document: Mutable<DesktopSettingsDocument> = {};
+
+  if (settings.localUpdateFolderPath != null) {
+    document.localUpdateFolderPath = settings.localUpdateFolderPath;
+  }
 
   if (settings.linuxPasswordStore !== defaults.linuxPasswordStore) {
     document.linuxPasswordStore = settings.linuxPasswordStore;
@@ -260,6 +273,18 @@ function setServerExposureMode(
         ...settings,
         serverExposureMode: requestedMode,
       };
+}
+
+function setLocalUpdateFolderPath(
+  settings: DesktopSettings,
+  folderPath: string | null,
+): DesktopSettings {
+  const normalized = folderPath?.trim() || null;
+  return settings.localUpdateFolderPath === normalized
+    ? settings
+    : normalized === null
+      ? (({ localUpdateFolderPath: _, ...rest }) => rest)(settings)
+      : { ...settings, localUpdateFolderPath: normalized };
 }
 
 function setMainWindowBounds(
@@ -454,6 +479,10 @@ export const make = Effect.gen(function* () {
       const settings = yield* readSettings(fileSystem, environment.desktopSettingsPath);
       return yield* SynchronizedRef.setAndGet(settingsRef, settings);
     }).pipe(Effect.withSpan("desktop.settings.load")),
+    setLocalUpdateFolderPath: (folderPath) =>
+      persist((settings) => setLocalUpdateFolderPath(settings, folderPath)).pipe(
+        Effect.withSpan("desktop.settings.setLocalUpdateFolderPath"),
+      ),
     setMainWindowBounds: (bounds, isMaximized) =>
       persist((settings) => setMainWindowBounds(settings, bounds, isMaximized)).pipe(
         Effect.withSpan("desktop.settings.setMainWindowBounds", {
@@ -519,6 +548,8 @@ export const layerTest = (initialSettings: DesktopSettings = DEFAULT_DESKTOP_SET
       return DesktopAppSettings.of({
         get: SynchronizedRef.get(settingsRef),
         load: SynchronizedRef.get(settingsRef),
+        setLocalUpdateFolderPath: (folderPath) =>
+          update((settings) => setLocalUpdateFolderPath(settings, folderPath)),
         setMainWindowBounds: (bounds, isMaximized) =>
           update((settings) => setMainWindowBounds(settings, bounds, isMaximized)),
         setServerExposureMode: (mode) =>

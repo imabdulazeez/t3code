@@ -177,6 +177,35 @@ export const DesktopRuntimeInfoSchema = Schema.Struct({
   runningUnderArm64Translation: Schema.Boolean,
 });
 
+export const DesktopLocalUpdateStatusSchema = Schema.Literals([
+  "disabled",
+  "idle",
+  "checking",
+  "available",
+  "installing",
+  "error",
+]);
+export type DesktopLocalUpdateStatus = typeof DesktopLocalUpdateStatusSchema.Type;
+
+export const DesktopLocalUpdateBuildSchema = Schema.Struct({
+  version: Schema.String,
+  buildTimestamp: Schema.String,
+  fileName: Schema.String,
+});
+export type DesktopLocalUpdateBuild = typeof DesktopLocalUpdateBuildSchema.Type;
+
+export const DesktopLocalUpdateStateSchema = Schema.Struct({
+  supported: Schema.Boolean,
+  folderPath: Schema.NullOr(Schema.String),
+  currentVersion: Schema.String,
+  currentBuildTimestamp: Schema.String,
+  status: DesktopLocalUpdateStatusSchema,
+  availableBuild: Schema.NullOr(DesktopLocalUpdateBuildSchema),
+  checkedAt: Schema.NullOr(Schema.String),
+  message: Schema.NullOr(Schema.String),
+});
+export type DesktopLocalUpdateState = typeof DesktopLocalUpdateStateSchema.Type;
+
 // Stable id for the Windows-native primary backend. Desktop side wraps
 // this with a brand inside DesktopBackendManager; web side keeps it as
 // a plain string so the env-runtime can compare against it without
@@ -921,6 +950,11 @@ export interface DesktopBridge {
   getLocalEnvironmentBearerToken: () => Promise<string>;
   getClientSettings: () => Promise<ClientSettings | null>;
   setClientSettings: (settings: ClientSettings) => Promise<void>;
+  getLocalUpdateState: () => Promise<DesktopLocalUpdateState>;
+  setLocalUpdateFolder: (folderPath: string | null) => Promise<DesktopLocalUpdateState>;
+  checkForLocalUpdate: () => Promise<DesktopLocalUpdateState>;
+  installLocalUpdate: () => Promise<DesktopLocalUpdateState>;
+  onLocalUpdateState: (listener: (state: DesktopLocalUpdateState) => void) => () => void;
   getConnectionCatalog?: () => Promise<string | null>;
   setConnectionCatalog?: (catalog: string) => Promise<boolean>;
   clearConnectionCatalog?: () => Promise<void>;

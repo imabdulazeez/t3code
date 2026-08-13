@@ -77,6 +77,7 @@ export class DesktopEnvironment extends Context.Service<
     readonly resolveResourcePathCandidates: (fileName: string) => readonly string[];
     readonly developmentDockIconPath: string;
     readonly displayVersion: string;
+    readonly buildTimestamp: string;
   }
 >()("@t3tools/desktop/app/DesktopEnvironment") {}
 
@@ -262,6 +263,7 @@ const make = Effect.fn("desktop.environment.make")(function* (
     ],
     developmentDockIconPath: path.join(rootDir, "assets", "dev", "blueprint-macos-1024.png"),
     displayVersion,
+    buildTimestamp: input.buildTimestamp,
   });
 });
 

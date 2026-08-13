@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAtomValue } from "@effect/atom-react";
 import {
   type BackgroundActivityProfile,
+  type DesktopLocalUpdateState,
   ProviderDriverKind,
   type ScopedThreadRef,
   type SidebarProjectGroupingMode,
@@ -151,6 +152,103 @@ const BACKGROUND_ACTIVITY_PROFILE_LABELS: Record<BackgroundActivityProfile, stri
 };
 
 type BackgroundActivityProfileOption = BackgroundActivityProfile | "advanced";
+
+function DesktopLocalUpdateSettingsRow() {
+  const bridge = typeof window === "undefined" ? undefined : window.desktopBridge;
+  const [state, setState] = useState<DesktopLocalUpdateState | null>(null);
+  const [actionPending, setActionPending] = useState(false);
+
+  useEffect(() => {
+    if (!bridge) return;
+    let active = true;
+    const unsubscribe = bridge.onLocalUpdateState((nextState) => {
+      if (active) setState(nextState);
+    });
+    void bridge.getLocalUpdateState().then((nextState) => {
+      if (active) setState(nextState);
+    });
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [bridge]);
+
+  if (!bridge || !state?.supported) return null;
+
+  const runAction = async (action: () => Promise<DesktopLocalUpdateState>) => {
+    setActionPending(true);
+    try {
+      setState(await action());
+    } finally {
+      setActionPending(false);
+    }
+  };
+
+  const chooseFolder = async () => {
+    const folderPath = await bridge.pickFolder({
+      ...(state.folderPath ? { initialPath: state.folderPath } : {}),
+    });
+    if (folderPath !== null) {
+      await runAction(() => bridge.setLocalUpdateFolder(folderPath));
+    }
+  };
+
+  const busy = actionPending || state.status === "checking" || state.status === "installing";
+  const status = state.availableBuild
+    ? `${state.availableBuild.fileName} is ready to install.`
+    : state.message;
+
+  return (
+    <SettingsRow
+      {...searchableSetting("local-desktop-updates")}
+      description="Periodically scan a local releases folder for a newer compatible macOS ZIP build."
+      status={status}
+      control={
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button variant="outline" size="sm" disabled={busy} onClick={() => void chooseFolder()}>
+            {state.folderPath ? "Change folder" : "Choose folder"}
+          </Button>
+          {state.folderPath ? (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy}
+              onClick={() => void runAction(() => bridge.checkForLocalUpdate())}
+            >
+              {state.status === "checking" ? (
+                <LoaderIcon className="size-3.5 animate-spin" />
+              ) : null}
+              Check now
+            </Button>
+          ) : null}
+          {state.status === "available" ? (
+            <Button
+              size="sm"
+              disabled={busy}
+              onClick={() => void runAction(() => bridge.installLocalUpdate())}
+            >
+              Update and restart
+            </Button>
+          ) : null}
+        </div>
+      }
+    >
+      {state.folderPath ? (
+        <div className="flex items-center gap-2 pt-3">
+          <Input value={state.folderPath} readOnly aria-label="Local releases folder" />
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={busy}
+            onClick={() => void runAction(() => bridge.setLocalUpdateFolder(null))}
+          >
+            Clear
+          </Button>
+        </div>
+      ) : null}
+    </SettingsRow>
+  );
+}
 
 const BACKGROUND_ACTIVITY_PROFILE_OPTION_LABELS: Record<BackgroundActivityProfileOption, string> = {
   ...BACKGROUND_ACTIVITY_PROFILE_LABELS,
@@ -1590,6 +1688,7 @@ export function GeneralSettingsPanel() {
   return (
     <SettingsPageContainer>
       <SettingsSection title="General">
+        <DesktopLocalUpdateSettingsRow />
         <SettingsRow
           {...searchableSetting("project-grouping")}
           description="Combine matching repositories across environments."

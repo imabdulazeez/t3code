@@ -3,6 +3,12 @@ import * as Effect from "effect/Effect";
 import * as DesktopIpc from "./DesktopIpc.ts";
 import { getClientSettings, setClientSettings } from "./methods/clientSettings.ts";
 import {
+  checkForLocalUpdate,
+  getLocalUpdateState,
+  installLocalUpdate,
+  setLocalUpdateFolder,
+} from "./methods/localUpdates.ts";
+import {
   clearConnectionCatalog,
   getConnectionCatalog,
   setConnectionCatalog,
@@ -48,6 +54,10 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
 
   yield* ipc.handle(getClientSettings);
   yield* ipc.handle(setClientSettings);
+  yield* ipc.handle(getLocalUpdateState);
+  yield* ipc.handle(setLocalUpdateFolder);
+  yield* ipc.handle(checkForLocalUpdate);
+  yield* ipc.handle(installLocalUpdate);
   yield* ipc.handle(getConnectionCatalog);
   yield* ipc.handle(setConnectionCatalog);
   yield* ipc.handle(clearConnectionCatalog);
