@@ -159,7 +159,6 @@ export const SidebarChromeFooter = memo(function SidebarChromeFooter() {
 
   return (
     <SidebarFooter className="p-[var(--sidebar-content-inset)]">
-      <SidebarLocalUpdatePill />
       <SidebarProviderUpdatePill />
       <SidebarMenu className="flex-row items-center">
         {currentFooterPage ? (
@@ -219,6 +218,7 @@ export const SidebarChromeFooter = memo(function SidebarChromeFooter() {
             </SidebarMenuItem>
           </>
         )}
+        <SidebarLocalUpdatePill />
       </SidebarMenu>
     </SidebarFooter>
   );

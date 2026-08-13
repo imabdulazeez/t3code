@@ -196,13 +196,16 @@ const desktopLocalEnvironmentAuthLayer = DesktopLocalEnvironmentAuth.layer.pipe(
   Layer.provideMerge(desktopBackendLayer),
 );
 
+const desktopApplicationMenuLayer = DesktopApplicationMenu.layer.pipe(
+  Layer.provideMerge(DesktopLocalUpdates.layer),
+);
+
 const desktopApplicationLayer = Layer.mergeAll(
   DesktopLifecycle.layer,
-  DesktopApplicationMenu.layer,
+  desktopApplicationMenuLayer,
   DesktopLinuxUrlHandler.layer,
   DesktopShellEnvironment.layer,
   ElectronPermissions.layer,
-  DesktopLocalUpdates.layer,
   desktopSshLayer,
 ).pipe(
   Layer.provideMerge(desktopWslBackendLayer),

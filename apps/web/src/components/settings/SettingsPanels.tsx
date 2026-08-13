@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAtomValue } from "@effect/atom-react";
 import {
   type BackgroundActivityProfile,
-  type DesktopLocalUpdateState,
   ProviderDriverKind,
   type ScopedThreadRef,
   type SidebarProjectGroupingMode,
@@ -67,6 +66,7 @@ import {
 import { ensureLocalApi, readLocalApi } from "../../localApi";
 import { isMacPlatform } from "../../lib/utils";
 import { primaryServerObservabilityAtom, primaryServerProvidersAtom } from "../../state/server";
+import { useDesktopLocalUpdateState } from "../../state/desktopLocalUpdate";
 import { useProjects } from "../../state/entities";
 import { useArchivedThreadSnapshots } from "../../lib/archivedThreadsState";
 import { formatRelativeTimeLabel } from "../../timestampFormat";
@@ -155,30 +155,15 @@ type BackgroundActivityProfileOption = BackgroundActivityProfile | "advanced";
 
 function DesktopLocalUpdateSettingsRow() {
   const bridge = typeof window === "undefined" ? undefined : window.desktopBridge;
-  const [state, setState] = useState<DesktopLocalUpdateState | null>(null);
+  const state = useDesktopLocalUpdateState();
   const [actionPending, setActionPending] = useState(false);
-
-  useEffect(() => {
-    if (!bridge) return;
-    let active = true;
-    const unsubscribe = bridge.onLocalUpdateState((nextState) => {
-      if (active) setState(nextState);
-    });
-    void bridge.getLocalUpdateState().then((nextState) => {
-      if (active) setState(nextState);
-    });
-    return () => {
-      active = false;
-      unsubscribe();
-    };
-  }, [bridge]);
 
   if (!bridge || !state?.supported) return null;
 
-  const runAction = async (action: () => Promise<DesktopLocalUpdateState>) => {
+  const runAction = async (action: () => Promise<unknown>) => {
     setActionPending(true);
     try {
-      setState(await action());
+      await action();
     } finally {
       setActionPending(false);
     }
@@ -208,28 +193,6 @@ function DesktopLocalUpdateSettingsRow() {
           <Button variant="outline" size="sm" disabled={busy} onClick={() => void chooseFolder()}>
             {state.folderPath ? "Change folder" : "Choose folder"}
           </Button>
-          {state.folderPath ? (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={busy}
-              onClick={() => void runAction(() => bridge.checkForLocalUpdate())}
-            >
-              {state.status === "checking" ? (
-                <LoaderIcon className="size-3.5 animate-spin" />
-              ) : null}
-              Check now
-            </Button>
-          ) : null}
-          {state.status === "available" ? (
-            <Button
-              size="sm"
-              disabled={busy}
-              onClick={() => void runAction(() => bridge.installLocalUpdate())}
-            >
-              Update and restart
-            </Button>
-          ) : null}
         </div>
       }
     >
@@ -306,8 +269,99 @@ function AboutVersionTitle() {
 }
 
 function AboutVersionSection() {
+  const bridge = typeof window === "undefined" ? undefined : window.desktopBridge;
+  const state = useDesktopLocalUpdateState();
+  const [actionPending, setActionPending] = useState(false);
+  const updateAvailable = state?.status === "available" && state.availableBuild !== null;
+  const upToDate = state?.status === "idle" && state.checkedAt !== null;
+  const busy = actionPending || state?.status === "checking" || state?.status === "installing";
+  const buttonDisabled = !bridge || !state?.supported || state.folderPath === null || busy;
+  const buttonLabel = updateAvailable
+    ? "Update and Restart"
+    : state?.status === "checking"
+      ? "Checking…"
+      : state?.status === "installing"
+        ? "Installing…"
+        : upToDate
+          ? "Up to Date"
+          : "Check for Updates";
+  const buttonTooltip = !state?.supported
+    ? (state?.message ?? "Local desktop updates are unavailable in this build.")
+    : state.folderPath === null
+      ? "Choose a local releases folder below before checking for updates."
+      : updateAvailable
+        ? `Install ${state.availableBuild?.fileName}`
+        : state.message;
+
+  const handleButtonClick = useCallback(async () => {
+    if (!bridge || !state || buttonDisabled) return;
+    setActionPending(true);
+    try {
+      if (updateAvailable) {
+        const confirmed = await ensureLocalApi().dialogs.confirm(
+          `Install ${state.availableBuild?.fileName ?? "the local desktop update"} and restart T3 Code?`,
+        );
+        if (!confirmed) return;
+        const nextState = await bridge.installLocalUpdate();
+        if (nextState.status === "error") {
+          toastManager.add(
+            stackedThreadToast({
+              type: "error",
+              title: "Could not install update",
+              description: nextState.message ?? "The local update could not be installed.",
+            }),
+          );
+        }
+        return;
+      }
+
+      const nextState = await bridge.checkForLocalUpdate();
+      if (nextState.status === "error") {
+        toastManager.add(
+          stackedThreadToast({
+            type: "error",
+            title: "Could not check for updates",
+            description: nextState.message ?? "The local releases folder could not be checked.",
+          }),
+        );
+      }
+    } catch (error) {
+      toastManager.add(
+        stackedThreadToast({
+          type: "error",
+          title: updateAvailable ? "Could not install update" : "Could not check for updates",
+          description: error instanceof Error ? error.message : "An unexpected error occurred.",
+        }),
+      );
+    } finally {
+      setActionPending(false);
+    }
+  }, [bridge, buttonDisabled, state, updateAvailable]);
+
   return (
-    <SettingsRow title={<AboutVersionTitle />} description="Current version of the application." />
+    <SettingsRow
+      title={<AboutVersionTitle />}
+      description={updateAvailable ? "Update available." : "Current version of the application."}
+      control={
+        bridge ? (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  size="xs"
+                  variant={updateAvailable ? "default" : "outline"}
+                  disabled={buttonDisabled}
+                  onClick={() => void handleButtonClick()}
+                >
+                  {buttonLabel}
+                </Button>
+              }
+            />
+            {buttonTooltip ? <TooltipPopup>{buttonTooltip}</TooltipPopup> : null}
+          </Tooltip>
+        ) : null
+      }
+    />
   );
 }
 

@@ -7,8 +7,10 @@ import type * as Electron from "electron";
 
 import { makeComponentLogger } from "../app/DesktopObservability.ts";
 import * as ElectronApp from "../electron/ElectronApp.ts";
+import * as ElectronDialog from "../electron/ElectronDialog.ts";
 import * as ElectronMenu from "../electron/ElectronMenu.ts";
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
+import * as DesktopLocalUpdates from "../updates/DesktopLocalUpdates.ts";
 import * as DesktopWindow from "./DesktopWindow.ts";
 
 export class DesktopApplicationMenuActionError extends Schema.TaggedErrorClass<DesktopApplicationMenuActionError>()(
@@ -30,7 +32,10 @@ export class DesktopApplicationMenu extends Context.Service<
   }
 >()("@t3tools/desktop/window/DesktopApplicationMenu") {}
 
-type DesktopApplicationMenuRuntimeServices = DesktopWindow.DesktopWindow;
+type DesktopApplicationMenuRuntimeServices =
+  | DesktopLocalUpdates.DesktopLocalUpdates
+  | DesktopWindow.DesktopWindow
+  | ElectronDialog.ElectronDialog;
 
 const { logError: logMenuError } = makeComponentLogger("desktop-menu");
 
@@ -47,6 +52,55 @@ const zoomMainWindow = Effect.fn("desktop.menu.zoomMainWindow")(function* (
   const desktopWindow = yield* DesktopWindow.DesktopWindow;
   yield* desktopWindow.zoomMain(direction);
 });
+
+const checkForUpdatesFromMenu = Effect.gen(function* () {
+  const updates = yield* DesktopLocalUpdates.DesktopLocalUpdates;
+  const electronDialog = yield* ElectronDialog.ElectronDialog;
+  const currentState = yield* updates.getState;
+
+  if (!currentState.supported) {
+    yield* electronDialog.showMessageBox({
+      type: "info",
+      title: "Updates unavailable",
+      message: "Local desktop updates are not available right now.",
+      detail: currentState.message ?? "Local updates require a packaged macOS build.",
+      buttons: ["OK"],
+    });
+    return;
+  }
+
+  if (currentState.folderPath === null) {
+    yield* electronDialog.showMessageBox({
+      type: "info",
+      title: "Choose an update folder",
+      message: "A local releases folder is required before checking for updates.",
+      detail: "Choose one in Settings → General → About.",
+      buttons: ["OK"],
+    });
+    return;
+  }
+
+  const desktopWindow = yield* DesktopWindow.DesktopWindow;
+  yield* desktopWindow.ensureMain;
+  const updateState = yield* updates.check;
+
+  if (updateState.status === "idle") {
+    yield* electronDialog.showMessageBox({
+      type: "info",
+      title: "You're up to date!",
+      message: `T3 Code ${updateState.currentVersion} is currently the newest build in the local releases folder.`,
+      buttons: ["OK"],
+    });
+  } else if (updateState.status === "error") {
+    yield* electronDialog.showMessageBox({
+      type: "warning",
+      title: "Update check failed",
+      message: "Could not check for updates.",
+      detail: updateState.message ?? "The local releases folder could not be checked.",
+      buttons: ["OK"],
+    });
+  }
+}).pipe(Effect.withSpan("desktop.menu.checkForUpdates"));
 
 export const make = Effect.gen(function* () {
   const electronApp = yield* ElectronApp.ElectronApp;
@@ -73,6 +127,9 @@ export const make = Effect.gen(function* () {
   };
 
   const configure = Effect.gen(function* () {
+    const checkForUpdatesClick = () => {
+      runMenuEffect("check-for-updates", checkForUpdatesFromMenu);
+    };
     const settingsClick = () => {
       runMenuEffect("open-settings", dispatchMenuAction("open-settings"));
     };
@@ -86,6 +143,11 @@ export const make = Effect.gen(function* () {
         label: appName,
         submenu: [
           { role: "about" },
+          {
+            label: "Check for Updates...",
+            click: checkForUpdatesClick,
+          },
+          { type: "separator" },
           {
             label: "Settings...",
             accelerator: "CmdOrCtrl+,",
@@ -148,6 +210,15 @@ export const make = Effect.gen(function* () {
         ],
       },
       { role: "windowMenu" },
+      {
+        role: "help",
+        submenu: [
+          {
+            label: "Check for Updates...",
+            click: checkForUpdatesClick,
+          },
+        ],
+      },
     );
 
     yield* electronMenu.setApplicationMenu(template);
