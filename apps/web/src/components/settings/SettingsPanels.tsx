@@ -1688,7 +1688,6 @@ export function GeneralSettingsPanel() {
   return (
     <SettingsPageContainer>
       <SettingsSection title="General">
-        <DesktopLocalUpdateSettingsRow />
         <SettingsRow
           {...searchableSetting("project-grouping")}
           description="Combine matching repositories across environments."
@@ -2257,6 +2256,7 @@ export function GeneralSettingsPanel() {
 
       <SettingsSection title="About">
         <AboutVersionSection />
+        <DesktopLocalUpdateSettingsRow />
         <SettingsRow
           {...searchableSetting("diagnostics")}
           description={diagnosticsDescription}
