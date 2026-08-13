@@ -1,10 +1,12 @@
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
 import type * as Electron from "electron";
 
+import * as DesktopAppIdentity from "../app/DesktopAppIdentity.ts";
 import { makeComponentLogger } from "../app/DesktopObservability.ts";
 import * as ElectronApp from "../electron/ElectronApp.ts";
 import * as ElectronDialog from "../electron/ElectronDialog.ts";
@@ -33,7 +35,9 @@ export class DesktopApplicationMenu extends Context.Service<
 >()("@t3tools/desktop/window/DesktopApplicationMenu") {}
 
 type DesktopApplicationMenuRuntimeServices =
+  | DesktopAppIdentity.DesktopAppIdentity
   | DesktopLocalUpdates.DesktopLocalUpdates
+  | DesktopEnvironment.DesktopEnvironment
   | DesktopWindow.DesktopWindow
   | ElectronDialog.ElectronDialog;
 
@@ -55,7 +59,9 @@ const zoomMainWindow = Effect.fn("desktop.menu.zoomMainWindow")(function* (
 
 const checkForUpdatesFromMenu = Effect.gen(function* () {
   const updates = yield* DesktopLocalUpdates.DesktopLocalUpdates;
+  const appIdentity = yield* DesktopAppIdentity.DesktopAppIdentity;
   const electronDialog = yield* ElectronDialog.ElectronDialog;
+  const environment = yield* DesktopEnvironment.DesktopEnvironment;
   const currentState = yield* updates.getState;
 
   if (!currentState.supported) {
@@ -85,10 +91,14 @@ const checkForUpdatesFromMenu = Effect.gen(function* () {
   const updateState = yield* updates.check;
 
   if (updateState.status === "idle") {
+    const commitHash = yield* appIdentity.resolveCommitHash;
+    const commit = Option.getOrElse(commitHash, () => "unknown");
     yield* electronDialog.showMessageBox({
       type: "info",
       title: "You're up to date!",
-      message: `T3 Code ${updateState.currentVersion} is currently the newest build in the local releases folder.`,
+      message:
+        `T3 Code ${updateState.currentVersion} is currently the newest build in the local releases folder ` +
+        `(commit ${commit}, built ${environment.buildTimestamp}).`,
       buttons: ["OK"],
     });
   } else if (updateState.status === "error") {

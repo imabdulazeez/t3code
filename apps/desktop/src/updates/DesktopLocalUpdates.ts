@@ -422,13 +422,14 @@ export const make = Effect.gen(function* () {
                 ),
               );
             }
-            yield* launchInstaller({ ...prepared, currentBundlePath });
-            yield* setState({
+            yield* launchInstaller({ ...prepared, currentBundlePath }).pipe(Effect.asVoid);
+            const installingState = yield* setState({
               ...current,
               status: "installing",
               message: "Installing update…",
             });
             yield* electronApp.quit;
+            return installingState;
           }),
         ),
         Effect.catch((error) => setState({ ...current, status: "error", message: error.message })),
