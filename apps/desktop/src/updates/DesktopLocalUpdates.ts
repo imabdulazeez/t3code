@@ -28,7 +28,7 @@ interface LocalBuildCandidate extends DesktopLocalUpdateBuild {
 export class DesktopLocalUpdateOperationError extends Schema.TaggedErrorClass<DesktopLocalUpdateOperationError>()(
   "DesktopLocalUpdateOperationError",
   {
-    operation: Schema.Literals(["scan", "prepare", "launch", "persist"]),
+    operation: Schema.Literals(["scan", "prepare", "launch", "persist", "cleanup"]),
     cause: Schema.Defect(),
   },
 ) {
@@ -47,6 +47,7 @@ export class DesktopLocalUpdates extends Context.Service<
     readonly getState: Effect.Effect<DesktopLocalUpdateState>;
     readonly configure: Effect.Effect<void, never, Scope.Scope>;
     readonly setFolder: (folderPath: string | null) => Effect.Effect<DesktopLocalUpdateState>;
+    readonly setCleanupEnabled: (enabled: boolean) => Effect.Effect<DesktopLocalUpdateState>;
     readonly check: Effect.Effect<DesktopLocalUpdateState>;
     readonly install: Effect.Effect<DesktopLocalUpdateState>;
   }
@@ -63,6 +64,7 @@ export const make = Effect.gen(function* () {
   const stateRef = yield* Ref.make<DesktopLocalUpdateState>({
     supported,
     folderPath: null,
+    cleanupEnabled: false,
     currentVersion: environment.appVersion,
     currentBuildTimestamp: environment.buildTimestamp,
     status: supported ? "idle" : "disabled",
@@ -72,6 +74,31 @@ export const make = Effect.gen(function* () {
   });
   const candidateRef = yield* Ref.make<LocalBuildCandidate | null>(null);
   const checkingRef = yield* Ref.make(false);
+
+  const readCandidates = Effect.fn("desktop.localUpdates.readCandidates")(function* (
+    folderPath: string,
+  ) {
+    const entries = yield* fileSystem
+      .readDirectory(folderPath)
+      .pipe(
+        Effect.mapError(
+          (cause) => new DesktopLocalUpdateOperationError({ operation: "scan", cause }),
+        ),
+      );
+    return entries.flatMap((fileName): readonly LocalBuildCandidate[] => {
+      const match = BUILD_FILE_PATTERN.exec(fileName);
+      if (!match?.[1] || !match[2] || !match[3]) return [];
+      return [
+        {
+          path: environment.path.join(folderPath, fileName),
+          fileName,
+          version: match[1],
+          arch: match[2] as LocalBuildCandidate["arch"],
+          buildTimestamp: match[3],
+        },
+      ];
+    });
+  });
 
   const setState = (state: DesktopLocalUpdateState) =>
     Ref.set(stateRef, state).pipe(
@@ -190,6 +217,52 @@ export const make = Effect.gen(function* () {
       );
   });
 
+  const cleanupAppliedUpdate = Effect.fn("desktop.localUpdates.cleanupAppliedUpdate")(function* () {
+    const settings = yield* appSettings.get;
+    const pending = settings.localUpdatePendingCleanup ?? null;
+    const clearPending = appSettings.setLocalUpdatePendingCleanup;
+    if (
+      settings.localUpdateCleanupEnabled !== true ||
+      pending === null ||
+      clearPending === undefined ||
+      environment.buildTimestamp < pending.buildTimestamp
+    ) {
+      return;
+    }
+    const candidates = yield* readCandidates(pending.folderPath);
+    const retainedTimestamps = new Map<LocalBuildCandidate["arch"], ReadonlySet<string>>();
+    for (const arch of ["arm64", "x64", "universal"] as const) {
+      retainedTimestamps.set(
+        arch,
+        new Set(
+          candidates
+            .filter(
+              (candidate) =>
+                candidate.arch === arch && candidate.buildTimestamp <= environment.buildTimestamp,
+            )
+            .map((candidate) => candidate.buildTimestamp)
+            .sort((left, right) => right.localeCompare(left))
+            .filter((timestamp, index, timestamps) => timestamps.indexOf(timestamp) === index)
+            .slice(0, 2),
+        ),
+      );
+    }
+    const obsolete = candidates.filter(
+      (candidate) =>
+        candidate.buildTimestamp <= environment.buildTimestamp &&
+        !retainedTimestamps.get(candidate.arch)?.has(candidate.buildTimestamp),
+    );
+    yield* Effect.forEach(obsolete, (candidate) => fileSystem.remove(candidate.path), {
+      concurrency: 1,
+      discard: true,
+    }).pipe(
+      Effect.mapError(
+        (cause) => new DesktopLocalUpdateOperationError({ operation: "cleanup", cause }),
+      ),
+    );
+    yield* clearPending(null);
+  });
+
   const check = Effect.gen(function* () {
     if (yield* Ref.get(checkingRef)) return yield* Ref.get(stateRef);
     const settings = yield* appSettings.get;
@@ -207,20 +280,11 @@ export const make = Effect.gen(function* () {
     }
     yield* Ref.set(checkingRef, true);
     yield* setState({ ...current, folderPath, status: "checking", message: null });
-    return yield* fileSystem.readDirectory(folderPath).pipe(
-      Effect.map((entries) => {
-        const candidates = entries.flatMap((fileName): readonly LocalBuildCandidate[] => {
-          const match = BUILD_FILE_PATTERN.exec(fileName);
-          if (!match?.[1] || !match[2] || !match[3]) return [];
-          const candidate: LocalBuildCandidate = {
-            path: environment.path.join(folderPath, fileName),
-            fileName,
-            version: match[1],
-            arch: match[2] as LocalBuildCandidate["arch"],
-            buildTimestamp: match[3],
-          };
-          return supportsArch(candidate, environment.runtimeInfo.hostArch) ? [candidate] : [];
-        });
+    return yield* readCandidates(folderPath).pipe(
+      Effect.map((allCandidates) => {
+        const candidates = allCandidates.filter((candidate) =>
+          supportsArch(candidate, environment.runtimeInfo.hostArch),
+        );
         return (
           candidates
             .filter((candidate) => candidate.buildTimestamp > environment.buildTimestamp)
@@ -228,9 +292,6 @@ export const make = Effect.gen(function* () {
           null
         );
       }),
-      Effect.mapError(
-        (cause) => new DesktopLocalUpdateOperationError({ operation: "scan", cause }),
-      ),
       Effect.flatMap((candidate) =>
         Effect.gen(function* () {
           const checkedAt = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso));
@@ -271,7 +332,9 @@ export const make = Effect.gen(function* () {
       yield* setState({
         ...(yield* Ref.get(stateRef)),
         folderPath: settings.localUpdateFolderPath ?? null,
+        cleanupEnabled: settings.localUpdateCleanupEnabled === true,
       });
+      yield* cleanupAppliedUpdate().pipe(Effect.catch(() => Effect.void));
       yield* Effect.sleep(STARTUP_DELAY);
       yield* check;
       return yield* Effect.sleep(POLL_INTERVAL).pipe(Effect.andThen(check), Effect.forever);
@@ -303,6 +366,36 @@ export const make = Effect.gen(function* () {
         ),
       );
     },
+    setCleanupEnabled: (enabled) => {
+      const persist = appSettings.setLocalUpdateCleanupEnabled;
+      if (!persist) {
+        return Ref.get(stateRef).pipe(
+          Effect.flatMap((current) =>
+            setState({
+              ...current,
+              status: "error",
+              message: "Local update settings are unavailable.",
+            }),
+          ),
+        );
+      }
+      return persist(enabled).pipe(
+        Effect.flatMap(({ settings }) =>
+          Ref.get(stateRef).pipe(
+            Effect.flatMap((current) =>
+              setState({ ...current, cleanupEnabled: settings.localUpdateCleanupEnabled === true }),
+            ),
+          ),
+        ),
+        Effect.catch((error) =>
+          Ref.get(stateRef).pipe(
+            Effect.flatMap((current) =>
+              setState({ ...current, status: "error", message: error.message }),
+            ),
+          ),
+        ),
+      );
+    },
     check,
     install: Effect.gen(function* () {
       const candidate = yield* Ref.get(candidateRef);
@@ -311,12 +404,32 @@ export const make = Effect.gen(function* () {
       const currentBundlePath = environment.path.resolve(environment.appPath, "../../..");
       return yield* prepareUpdate(candidate.path, currentBundlePath).pipe(
         Effect.flatMap((prepared) =>
-          launchInstaller({ ...prepared, currentBundlePath }).pipe(
-            Effect.andThen(
-              setState({ ...current, status: "installing", message: "Installing update…" }),
-            ),
-            Effect.tap(() => electronApp.quit),
-          ),
+          Effect.gen(function* () {
+            if (current.cleanupEnabled) {
+              const recordPending = appSettings.setLocalUpdatePendingCleanup;
+              if (!recordPending) {
+                return yield* new DesktopLocalUpdateOperationError({
+                  operation: "persist",
+                  cause: "Local update settings are unavailable.",
+                });
+              }
+              yield* recordPending({
+                folderPath: environment.path.dirname(candidate.path),
+                buildTimestamp: candidate.buildTimestamp,
+              }).pipe(
+                Effect.mapError(
+                  (cause) => new DesktopLocalUpdateOperationError({ operation: "persist", cause }),
+                ),
+              );
+            }
+            yield* launchInstaller({ ...prepared, currentBundlePath });
+            yield* setState({
+              ...current,
+              status: "installing",
+              message: "Installing update…",
+            });
+            yield* electronApp.quit;
+          }),
         ),
         Effect.catch((error) => setState({ ...current, status: "error", message: error.message })),
       );

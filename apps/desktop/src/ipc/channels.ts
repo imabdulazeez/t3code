@@ -14,6 +14,7 @@ export const GET_CLIENT_SETTINGS_CHANNEL = "desktop:get-client-settings";
 export const SET_CLIENT_SETTINGS_CHANNEL = "desktop:set-client-settings";
 export const LOCAL_UPDATE_GET_STATE_CHANNEL = "desktop:local-update-get-state";
 export const LOCAL_UPDATE_SET_FOLDER_CHANNEL = "desktop:local-update-set-folder";
+export const LOCAL_UPDATE_SET_CLEANUP_ENABLED_CHANNEL = "desktop:local-update-set-cleanup-enabled";
 export const LOCAL_UPDATE_CHECK_CHANNEL = "desktop:local-update-check";
 export const LOCAL_UPDATE_INSTALL_CHANNEL = "desktop:local-update-install";
 export const LOCAL_UPDATE_STATE_CHANNEL = "desktop:local-update-state";

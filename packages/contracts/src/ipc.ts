@@ -197,6 +197,7 @@ export type DesktopLocalUpdateBuild = typeof DesktopLocalUpdateBuildSchema.Type;
 export const DesktopLocalUpdateStateSchema = Schema.Struct({
   supported: Schema.Boolean,
   folderPath: Schema.NullOr(Schema.String),
+  cleanupEnabled: Schema.Boolean,
   currentVersion: Schema.String,
   currentBuildTimestamp: Schema.String,
   status: DesktopLocalUpdateStatusSchema,
@@ -952,6 +953,7 @@ export interface DesktopBridge {
   setClientSettings: (settings: ClientSettings) => Promise<void>;
   getLocalUpdateState: () => Promise<DesktopLocalUpdateState>;
   setLocalUpdateFolder: (folderPath: string | null) => Promise<DesktopLocalUpdateState>;
+  setLocalUpdateCleanupEnabled: (enabled: boolean) => Promise<DesktopLocalUpdateState>;
   checkForLocalUpdate: () => Promise<DesktopLocalUpdateState>;
   installLocalUpdate: () => Promise<DesktopLocalUpdateState>;
   onLocalUpdateState: (listener: (state: DesktopLocalUpdateState) => void) => () => void;

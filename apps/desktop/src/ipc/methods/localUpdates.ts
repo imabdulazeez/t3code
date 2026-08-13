@@ -24,6 +24,15 @@ export const setLocalUpdateFolder = DesktopIpc.makeIpcMethod({
   }),
 });
 
+export const setLocalUpdateCleanupEnabled = DesktopIpc.makeIpcMethod({
+  channel: IpcChannels.LOCAL_UPDATE_SET_CLEANUP_ENABLED_CHANNEL,
+  payload: Schema.Boolean,
+  result: DesktopLocalUpdateStateSchema,
+  handler: Effect.fn("desktop.ipc.localUpdates.setCleanupEnabled")(function* (enabled) {
+    return yield* (yield* DesktopLocalUpdates.DesktopLocalUpdates).setCleanupEnabled(enabled);
+  }),
+});
+
 export const checkForLocalUpdate = DesktopIpc.makeIpcMethod({
   channel: IpcChannels.LOCAL_UPDATE_CHECK_CHANNEL,
   payload: Schema.Void,

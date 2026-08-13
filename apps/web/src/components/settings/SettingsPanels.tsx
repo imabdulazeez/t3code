@@ -197,16 +197,31 @@ function DesktopLocalUpdateSettingsRow() {
       }
     >
       {state.folderPath ? (
-        <div className="flex items-center gap-2 pt-3">
-          <Input value={state.folderPath} readOnly aria-label="Local releases folder" />
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={busy}
-            onClick={() => void runAction(() => bridge.setLocalUpdateFolder(null))}
-          >
-            Clear
-          </Button>
+        <div className="space-y-3 pt-3">
+          <div className="flex items-center gap-2">
+            <Input value={state.folderPath} readOnly aria-label="Local releases folder" />
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={busy}
+              onClick={() => void runAction(() => bridge.setLocalUpdateFolder(null))}
+            >
+              Clear
+            </Button>
+          </div>
+          <label className="flex items-center justify-between gap-3">
+            <span className="text-sm text-muted-foreground">
+              Remove older builds after an update, keeping the current and previous build
+            </span>
+            <Switch
+              checked={state.cleanupEnabled}
+              disabled={busy}
+              onCheckedChange={(checked) =>
+                void runAction(() => bridge.setLocalUpdateCleanupEnabled(Boolean(checked)))
+              }
+              aria-label="Clean up old local update builds"
+            />
+          </label>
         </div>
       ) : null}
     </SettingsRow>

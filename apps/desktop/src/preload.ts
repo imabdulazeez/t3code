@@ -50,6 +50,8 @@ contextBridge.exposeInMainWorld("desktopBridge", {
   getLocalUpdateState: () => ipcRenderer.invoke(IpcChannels.LOCAL_UPDATE_GET_STATE_CHANNEL),
   setLocalUpdateFolder: (folderPath) =>
     ipcRenderer.invoke(IpcChannels.LOCAL_UPDATE_SET_FOLDER_CHANNEL, folderPath),
+  setLocalUpdateCleanupEnabled: (enabled) =>
+    ipcRenderer.invoke(IpcChannels.LOCAL_UPDATE_SET_CLEANUP_ENABLED_CHANNEL, enabled),
   checkForLocalUpdate: () => ipcRenderer.invoke(IpcChannels.LOCAL_UPDATE_CHECK_CHANNEL),
   installLocalUpdate: () => ipcRenderer.invoke(IpcChannels.LOCAL_UPDATE_INSTALL_CHANNEL),
   onLocalUpdateState: (listener) => {

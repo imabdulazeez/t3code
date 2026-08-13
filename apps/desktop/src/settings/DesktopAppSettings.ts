@@ -22,7 +22,9 @@ import {
 import { isValidDistroName } from "../wsl/wslPathParsing.ts";
 
 export interface DesktopSettings {
+  readonly localUpdateCleanupEnabled?: boolean;
   readonly localUpdateFolderPath?: string | null;
+  readonly localUpdatePendingCleanup?: LocalUpdatePendingCleanup | null;
   readonly linuxPasswordStore: LinuxPasswordStorePreference;
   readonly mainWindowBounds: DesktopWindowBounds | null;
   readonly mainWindowMaximized: boolean;
@@ -44,6 +46,11 @@ export interface DesktopSettings {
   // this requires a desktop restart because the pool's primary spec is
   // chosen once at layer init.
   readonly wslOnly: boolean;
+}
+
+export interface LocalUpdatePendingCleanup {
+  readonly folderPath: string;
+  readonly buildTimestamp: string;
 }
 
 export interface DesktopSettingsChange {
@@ -69,6 +76,8 @@ export const DEFAULT_MAIN_WINDOW_SIZE = {
 } as const;
 
 export const DEFAULT_DESKTOP_SETTINGS: DesktopSettings = {
+  localUpdateCleanupEnabled: false,
+  localUpdatePendingCleanup: null,
   linuxPasswordStore: DEFAULT_LINUX_PASSWORD_STORE,
   mainWindowBounds: null,
   mainWindowMaximized: false,
@@ -88,7 +97,16 @@ const DesktopWindowBoundsDocument = Schema.Struct({
 });
 
 const DesktopSettingsDocument = Schema.Struct({
+  localUpdateCleanupEnabled: Schema.optionalKey(Schema.Boolean),
   localUpdateFolderPath: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  localUpdatePendingCleanup: Schema.optionalKey(
+    Schema.NullOr(
+      Schema.Struct({
+        folderPath: Schema.String,
+        buildTimestamp: Schema.String,
+      }),
+    ),
+  ),
   linuxPasswordStore: Schema.optionalKey(Schema.Unknown),
   mainWindowBounds: Schema.optionalKey(Schema.NullOr(DesktopWindowBoundsDocument)),
   mainWindowMaximized: Schema.optionalKey(Schema.Boolean),
@@ -148,6 +166,12 @@ export class DesktopAppSettings extends Context.Service<
     readonly setLocalUpdateFolderPath?: (
       folderPath: string | null,
     ) => Effect.Effect<DesktopSettingsChange, DesktopSettingsWriteError>;
+    readonly setLocalUpdateCleanupEnabled?: (
+      enabled: boolean,
+    ) => Effect.Effect<DesktopSettingsChange, DesktopSettingsWriteError>;
+    readonly setLocalUpdatePendingCleanup?: (
+      pendingCleanup: LocalUpdatePendingCleanup | null,
+    ) => Effect.Effect<DesktopSettingsChange, DesktopSettingsWriteError>;
     readonly setMainWindowBounds: (
       bounds: DesktopWindowBounds,
       isMaximized: boolean,
@@ -205,10 +229,17 @@ function normalizeDesktopSettingsDocument(parsed: DesktopSettingsDocument): Desk
     (parsed.wslBackendEnabled === undefined && parsed.wslMode === "wsl");
 
   return {
+    localUpdateCleanupEnabled: parsed.localUpdateCleanupEnabled === true,
     ...(typeof parsed.localUpdateFolderPath === "string" &&
     parsed.localUpdateFolderPath.trim().length > 0
       ? { localUpdateFolderPath: parsed.localUpdateFolderPath }
       : {}),
+    localUpdatePendingCleanup:
+      parsed.localUpdatePendingCleanup &&
+      parsed.localUpdatePendingCleanup.folderPath.trim().length > 0 &&
+      /^\d{8}-\d{4}$/.test(parsed.localUpdatePendingCleanup.buildTimestamp)
+        ? parsed.localUpdatePendingCleanup
+        : null,
     linuxPasswordStore: normalizeLinuxPasswordStorePreference(parsed.linuxPasswordStore),
     mainWindowBounds,
     mainWindowMaximized: mainWindowBounds !== null && parsed.mainWindowMaximized === true,
@@ -228,8 +259,14 @@ function toDesktopSettingsDocument(
 ): DesktopSettingsDocument {
   const document: Mutable<DesktopSettingsDocument> = {};
 
+  if (settings.localUpdateCleanupEnabled === true) {
+    document.localUpdateCleanupEnabled = true;
+  }
   if (settings.localUpdateFolderPath != null) {
     document.localUpdateFolderPath = settings.localUpdateFolderPath;
+  }
+  if (settings.localUpdatePendingCleanup != null) {
+    document.localUpdatePendingCleanup = settings.localUpdatePendingCleanup;
   }
 
   if (settings.linuxPasswordStore !== defaults.linuxPasswordStore) {
@@ -285,6 +322,30 @@ function setLocalUpdateFolderPath(
     : normalized === null
       ? (({ localUpdateFolderPath: _, ...rest }) => rest)(settings)
       : { ...settings, localUpdateFolderPath: normalized };
+}
+
+function setLocalUpdateCleanupEnabled(
+  settings: DesktopSettings,
+  enabled: boolean,
+): DesktopSettings {
+  return settings.localUpdateCleanupEnabled === enabled &&
+    (enabled || settings.localUpdatePendingCleanup == null)
+    ? settings
+    : {
+        ...settings,
+        localUpdateCleanupEnabled: enabled,
+        ...(enabled ? {} : { localUpdatePendingCleanup: null }),
+      };
+}
+
+function setLocalUpdatePendingCleanup(
+  settings: DesktopSettings,
+  pendingCleanup: LocalUpdatePendingCleanup | null,
+): DesktopSettings {
+  return (settings.localUpdatePendingCleanup ?? null)?.folderPath === pendingCleanup?.folderPath &&
+    settings.localUpdatePendingCleanup?.buildTimestamp === pendingCleanup?.buildTimestamp
+    ? settings
+    : { ...settings, localUpdatePendingCleanup: pendingCleanup };
 }
 
 function setMainWindowBounds(
@@ -483,6 +544,14 @@ export const make = Effect.gen(function* () {
       persist((settings) => setLocalUpdateFolderPath(settings, folderPath)).pipe(
         Effect.withSpan("desktop.settings.setLocalUpdateFolderPath"),
       ),
+    setLocalUpdateCleanupEnabled: (enabled) =>
+      persist((settings) => setLocalUpdateCleanupEnabled(settings, enabled)).pipe(
+        Effect.withSpan("desktop.settings.setLocalUpdateCleanupEnabled"),
+      ),
+    setLocalUpdatePendingCleanup: (pendingCleanup) =>
+      persist((settings) => setLocalUpdatePendingCleanup(settings, pendingCleanup)).pipe(
+        Effect.withSpan("desktop.settings.setLocalUpdatePendingCleanup"),
+      ),
     setMainWindowBounds: (bounds, isMaximized) =>
       persist((settings) => setMainWindowBounds(settings, bounds, isMaximized)).pipe(
         Effect.withSpan("desktop.settings.setMainWindowBounds", {
@@ -550,6 +619,10 @@ export const layerTest = (initialSettings: DesktopSettings = DEFAULT_DESKTOP_SET
         load: SynchronizedRef.get(settingsRef),
         setLocalUpdateFolderPath: (folderPath) =>
           update((settings) => setLocalUpdateFolderPath(settings, folderPath)),
+        setLocalUpdateCleanupEnabled: (enabled) =>
+          update((settings) => setLocalUpdateCleanupEnabled(settings, enabled)),
+        setLocalUpdatePendingCleanup: (pendingCleanup) =>
+          update((settings) => setLocalUpdatePendingCleanup(settings, pendingCleanup)),
         setMainWindowBounds: (bounds, isMaximized) =>
           update((settings) => setMainWindowBounds(settings, bounds, isMaximized)),
         setServerExposureMode: (mode) =>

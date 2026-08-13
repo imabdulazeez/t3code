@@ -6,6 +6,7 @@ import {
   checkForLocalUpdate,
   getLocalUpdateState,
   installLocalUpdate,
+  setLocalUpdateCleanupEnabled,
   setLocalUpdateFolder,
 } from "./methods/localUpdates.ts";
 import {
@@ -56,6 +57,7 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
   yield* ipc.handle(setClientSettings);
   yield* ipc.handle(getLocalUpdateState);
   yield* ipc.handle(setLocalUpdateFolder);
+  yield* ipc.handle(setLocalUpdateCleanupEnabled);
   yield* ipc.handle(checkForLocalUpdate);
   yield* ipc.handle(installLocalUpdate);
   yield* ipc.handle(getConnectionCatalog);
