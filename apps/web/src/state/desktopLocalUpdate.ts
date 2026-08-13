@@ -34,7 +34,7 @@ function createDesktopLocalUpdateStateAtom(getBridge: () => DesktopLocalUpdateBr
 
       const initialState = yield* Effect.tryPromise(() => bridge.getLocalUpdateState()).pipe(
         Effect.retry({ times: 2 }),
-        Effect.catchAll((error) =>
+        Effect.catch((error) =>
           Effect.logError("Failed to read the initial local desktop update state.", {
             error,
           }).pipe(Effect.as(null)),
