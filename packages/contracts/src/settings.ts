@@ -137,6 +137,9 @@ export const ClientSettingsSchema = Schema.Struct({
   changedFilesExpandedByDefault: Schema.Boolean.pipe(
     Schema.withDecodingDefault(Effect.succeed(false)),
   ),
+  // Desktop-only: require holding the quit shortcut (Cmd/Ctrl+Q) before the
+  // app quits; a quick tap only shows a hint. Browser clients ignore it.
+  confirmQuit: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
   confirmThreadArchive: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   confirmThreadDelete: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
   deleteRemoteBranchOnDelete: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
@@ -823,6 +826,7 @@ export const ClientSettingsPatch = Schema.Struct({
   branchListSortDirection: Schema.optionalKey(BranchListSortDirection),
   branchRemoteSyncMode: Schema.optionalKey(BranchRemoteSyncMode),
   changedFilesExpandedByDefault: Schema.optionalKey(Schema.Boolean),
+  confirmQuit: Schema.optionalKey(Schema.Boolean),
   confirmThreadArchive: Schema.optionalKey(Schema.Boolean),
   confirmThreadDelete: Schema.optionalKey(Schema.Boolean),
   deleteRemoteBranchOnDelete: Schema.optionalKey(Schema.Boolean),

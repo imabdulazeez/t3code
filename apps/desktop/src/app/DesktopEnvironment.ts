@@ -82,7 +82,6 @@ export class DesktopEnvironment extends Context.Service<
     readonly runtimeInfo: DesktopRuntimeInfo;
     readonly resolvePickFolderDefaultPath: (rawOptions: unknown) => Option.Option<string>;
     readonly resolveResourcePathCandidates: (fileName: string) => readonly string[];
-    readonly developmentDockIconPath: string;
     readonly displayVersion: string;
     readonly buildTimestamp: string;
   }
@@ -273,7 +272,6 @@ const make = Effect.fn("desktop.environment.make")(function* (
       path.join(resourcesPath, "resources", fileName),
       path.join(resourcesPath, fileName),
     ],
-    developmentDockIconPath: path.join(rootDir, "assets", "dev", "blueprint-macos-1024.png"),
     displayVersion,
     buildTimestamp: input.buildTimestamp,
   });

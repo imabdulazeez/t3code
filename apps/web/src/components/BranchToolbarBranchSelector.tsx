@@ -55,6 +55,7 @@ import {
   resolveBranchToolbarValue,
   resolveDraftEnvModeAfterBranchChange,
   resolveEffectiveEnvMode,
+  sanitizeNewRefName,
   shouldIncludeBranchPickerItem,
 } from "./BranchToolbar.logic";
 import {
@@ -282,13 +283,18 @@ export function BranchToolbarBranchSelector({
   );
   const trimmedBranchQuery = branchQuery.trim();
   const deferredTrimmedBranchQuery = deferredBranchQuery.trim();
+  // The server filters refs by substring, so it has to be given the sanitized
+  // name as well: querying the raw "new branch" drops an existing new-branch
+  // from the response entirely, which would defeat the collision check below.
+  // Ref names cannot contain an ASCII space, so sanitizing loses no matches.
+  const branchRefQuery = sanitizeNewRefName(deferredTrimmedBranchQuery);
   const branchRefTarget = useMemo(
     () => ({
       environmentId,
       cwd: branchCwd,
-      query: deferredTrimmedBranchQuery,
+      query: branchRefQuery,
     }),
-    [branchCwd, deferredTrimmedBranchQuery, environmentId],
+    [branchCwd, branchRefQuery, environmentId],
   );
   const branchRefState = usePaginatedBranches(branchRefTarget);
   const refs = branchRefState.refs;
@@ -339,8 +345,13 @@ export function BranchToolbarBranchSelector({
   const checkoutPullRequestItemValue =
     prReference && onCheckoutPullRequestRequest ? `__checkout_pull_request__:${prReference}` : null;
   const canCreateBranch = !isSelectingWorktreeBase && trimmedBranchQuery.length > 0;
-  const createBranchNameError = canCreateBranch ? validateGitBranchName(trimmedBranchQuery) : null;
-  const hasExactBranchMatch = branchByName.has(trimmedBranchQuery);
+  // The branch is created under its sanitized name, so both the collision check
+  // and the validation have to use that name. Matching on the raw query would
+  // offer to create a branch that already exists, and validating it would
+  // reject a name sanitizing has already made legal.
+  const newRefName = sanitizeNewRefName(trimmedBranchQuery);
+  const createBranchNameError = canCreateBranch ? validateGitBranchName(newRefName) : null;
+  const hasExactBranchMatch = branchByName.has(newRefName);
   const createBranchItemValue = canCreateBranch
     ? `__create_new_branch__:${trimmedBranchQuery}`
     : null;
@@ -523,7 +534,7 @@ export function BranchToolbarBranchSelector({
   };
 
   const createRef = (rawName: string) => {
-    const name = rawName.trim();
+    const name = sanitizeNewRefName(rawName);
     if (!branchCwd || !name || isBranchActionPending) return;
 
     const validationError = validateGitBranchName(name);
@@ -872,7 +883,7 @@ export function BranchToolbarBranchSelector({
           onClick={() => createRef(trimmedBranchQuery)}
         >
           <span className="flex min-w-0 flex-col items-start">
-            <span className="truncate">Create new branch &quot;{trimmedBranchQuery}&quot;</span>
+            <span className="truncate">Create new branch &quot;{newRefName}&quot;</span>
             {createBranchNameError ? (
               <span className="truncate text-destructive text-xs">{createBranchNameError}</span>
             ) : null}

@@ -18,6 +18,7 @@ const clientSettings: ClientSettings = {
   branchListSortDirection: "desc",
   branchRemoteSyncMode: "fetch",
   changedFilesExpandedByDefault: false,
+  confirmQuit: true,
   confirmThreadArchive: true,
   confirmThreadDelete: false,
   deleteRemoteBranchOnDelete: true,
