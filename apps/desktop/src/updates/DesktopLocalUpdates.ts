@@ -13,6 +13,7 @@ import * as Scope from "effect/Scope";
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
 import * as DesktopAppSettings from "../settings/DesktopAppSettings.ts";
 import * as ElectronApp from "../electron/ElectronApp.ts";
+import * as ElectronShell from "../electron/ElectronShell.ts";
 import * as ElectronWindow from "../electron/ElectronWindow.ts";
 import * as IpcChannels from "../ipc/channels.ts";
 
@@ -50,6 +51,8 @@ export class DesktopLocalUpdates extends Context.Service<
     readonly setCleanupEnabled: (enabled: boolean) => Effect.Effect<DesktopLocalUpdateState>;
     readonly check: Effect.Effect<DesktopLocalUpdateState>;
     readonly install: Effect.Effect<DesktopLocalUpdateState>;
+    readonly rollback: Effect.Effect<DesktopLocalUpdateState>;
+    readonly revealFolder: Effect.Effect<boolean>;
   }
 >()("@t3tools/desktop/updates/DesktopLocalUpdates") {}
 
@@ -69,10 +72,12 @@ export const make = Effect.gen(function* () {
     currentBuildTimestamp: environment.buildTimestamp,
     status: supported ? "idle" : "disabled",
     availableBuild: null,
+    rollbackBuild: null,
     checkedAt: null,
     message: supported ? null : "Local desktop updates require a packaged macOS build.",
   });
   const candidateRef = yield* Ref.make<LocalBuildCandidate | null>(null);
+  const rollbackCandidateRef = yield* Ref.make<LocalBuildCandidate | null>(null);
   const checkingRef = yield* Ref.make(false);
 
   const readCandidates = Effect.fn("desktop.localUpdates.readCandidates")(function* (
@@ -270,11 +275,13 @@ export const make = Effect.gen(function* () {
     const current = yield* Ref.get(stateRef);
     if (!supported || folderPath === null) {
       yield* Ref.set(candidateRef, null);
+      yield* Ref.set(rollbackCandidateRef, null);
       return yield* setState({
         ...current,
         folderPath,
         status: supported ? "idle" : "disabled",
         availableBuild: null,
+        rollbackBuild: null,
         message: supported ? null : current.message,
       });
     }
@@ -285,24 +292,32 @@ export const make = Effect.gen(function* () {
         const candidates = allCandidates.filter((candidate) =>
           supportsArch(candidate, environment.runtimeInfo.hostArch),
         );
-        return (
-          candidates
-            .filter((candidate) => candidate.buildTimestamp > environment.buildTimestamp)
-            .sort((left, right) => right.buildTimestamp.localeCompare(left.buildTimestamp))[0] ??
-          null
-        );
+        return {
+          available:
+            candidates
+              .filter((candidate) => candidate.buildTimestamp > environment.buildTimestamp)
+              .sort((left, right) => right.buildTimestamp.localeCompare(left.buildTimestamp))[0] ??
+            null,
+          rollback:
+            candidates
+              .filter((candidate) => candidate.buildTimestamp < environment.buildTimestamp)
+              .sort((left, right) => right.buildTimestamp.localeCompare(left.buildTimestamp))[0] ??
+            null,
+        };
       }),
-      Effect.flatMap((candidate) =>
+      Effect.flatMap(({ available, rollback }) =>
         Effect.gen(function* () {
           const checkedAt = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso));
-          yield* Ref.set(candidateRef, candidate);
+          yield* Ref.set(candidateRef, available);
+          yield* Ref.set(rollbackCandidateRef, rollback);
           return yield* setState({
             ...current,
             folderPath,
-            status: candidate ? "available" : "idle",
-            availableBuild: candidate,
+            status: available ? "available" : "idle",
+            availableBuild: available,
+            rollbackBuild: rollback,
             checkedAt,
-            message: candidate ? null : "No newer compatible build was found.",
+            message: available ? null : "No newer compatible build was found.",
           });
         }),
       ),
@@ -315,6 +330,7 @@ export const make = Effect.gen(function* () {
               folderPath,
               status: "error",
               availableBuild: null,
+              rollbackBuild: null,
               checkedAt,
               message: error.message,
             }),
@@ -324,6 +340,46 @@ export const make = Effect.gen(function* () {
       Effect.ensuring(Ref.set(checkingRef, false)),
     );
   }).pipe(Effect.withSpan("desktop.localUpdates.check"));
+
+  const installCandidate = Effect.fn("desktop.localUpdates.installCandidate")(function* (
+    candidate: LocalBuildCandidate,
+    direction: "update" | "rollback",
+  ) {
+    const current = yield* Ref.get(stateRef);
+    const currentBundlePath = environment.path.resolve(environment.appPath, "../../..");
+    return yield* prepareUpdate(candidate.path, currentBundlePath).pipe(
+      Effect.flatMap((prepared) =>
+        Effect.gen(function* () {
+          if (direction === "update" && current.cleanupEnabled) {
+            const recordPending = appSettings.setLocalUpdatePendingCleanup;
+            if (!recordPending) {
+              return yield* new DesktopLocalUpdateOperationError({
+                operation: "persist",
+                cause: "Local update settings are unavailable.",
+              });
+            }
+            yield* recordPending({
+              folderPath: environment.path.dirname(candidate.path),
+              buildTimestamp: candidate.buildTimestamp,
+            }).pipe(
+              Effect.mapError(
+                (cause) => new DesktopLocalUpdateOperationError({ operation: "persist", cause }),
+              ),
+            );
+          }
+          yield* launchInstaller({ ...prepared, currentBundlePath }).pipe(Effect.asVoid);
+          const installingState = yield* setState({
+            ...current,
+            status: "installing",
+            message: direction === "update" ? "Installing update…" : "Rolling back…",
+          });
+          yield* electronApp.quit;
+          return installingState;
+        }),
+      ),
+      Effect.catch((error) => setState({ ...current, status: "error", message: error.message })),
+    );
+  });
 
   return DesktopLocalUpdates.of({
     getState: Ref.get(stateRef),
@@ -401,40 +457,19 @@ export const make = Effect.gen(function* () {
       const candidate = yield* Ref.get(candidateRef);
       const current = yield* Ref.get(stateRef);
       if (!supported || candidate === null || current.status !== "available") return current;
-      const currentBundlePath = environment.path.resolve(environment.appPath, "../../..");
-      return yield* prepareUpdate(candidate.path, currentBundlePath).pipe(
-        Effect.flatMap((prepared) =>
-          Effect.gen(function* () {
-            if (current.cleanupEnabled) {
-              const recordPending = appSettings.setLocalUpdatePendingCleanup;
-              if (!recordPending) {
-                return yield* new DesktopLocalUpdateOperationError({
-                  operation: "persist",
-                  cause: "Local update settings are unavailable.",
-                });
-              }
-              yield* recordPending({
-                folderPath: environment.path.dirname(candidate.path),
-                buildTimestamp: candidate.buildTimestamp,
-              }).pipe(
-                Effect.mapError(
-                  (cause) => new DesktopLocalUpdateOperationError({ operation: "persist", cause }),
-                ),
-              );
-            }
-            yield* launchInstaller({ ...prepared, currentBundlePath }).pipe(Effect.asVoid);
-            const installingState = yield* setState({
-              ...current,
-              status: "installing",
-              message: "Installing update…",
-            });
-            yield* electronApp.quit;
-            return installingState;
-          }),
-        ),
-        Effect.catch((error) => setState({ ...current, status: "error", message: error.message })),
-      );
+      return yield* installCandidate(candidate, "update");
     }).pipe(Effect.withSpan("desktop.localUpdates.install")),
+    rollback: Effect.gen(function* () {
+      const candidate = yield* Ref.get(rollbackCandidateRef);
+      const current = yield* Ref.get(stateRef);
+      if (!supported || candidate === null || current.status === "installing") return current;
+      return yield* installCandidate(candidate, "rollback");
+    }).pipe(Effect.withSpan("desktop.localUpdates.rollback")),
+    revealFolder: Effect.gen(function* () {
+      const folderPath = (yield* Ref.get(stateRef)).folderPath;
+      if (!supported || folderPath === null) return false;
+      return yield* ElectronShell.openPath(folderPath);
+    }),
   });
 });
 

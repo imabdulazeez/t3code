@@ -50,3 +50,21 @@ export const installLocalUpdate = DesktopIpc.makeIpcMethod({
     return yield* (yield* DesktopLocalUpdates.DesktopLocalUpdates).install;
   }),
 });
+
+export const rollbackLocalUpdate = DesktopIpc.makeIpcMethod({
+  channel: IpcChannels.LOCAL_UPDATE_ROLLBACK_CHANNEL,
+  payload: Schema.Void,
+  result: DesktopLocalUpdateStateSchema,
+  handler: Effect.fn("desktop.ipc.localUpdates.rollback")(function* () {
+    return yield* (yield* DesktopLocalUpdates.DesktopLocalUpdates).rollback;
+  }),
+});
+
+export const revealLocalUpdateFolder = DesktopIpc.makeIpcMethod({
+  channel: IpcChannels.LOCAL_UPDATE_REVEAL_FOLDER_CHANNEL,
+  payload: Schema.Void,
+  result: Schema.Boolean,
+  handler: Effect.fn("desktop.ipc.localUpdates.revealFolder")(function* () {
+    return yield* (yield* DesktopLocalUpdates.DesktopLocalUpdates).revealFolder;
+  }),
+});

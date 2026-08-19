@@ -58,6 +58,8 @@ contextBridge.exposeInMainWorld("desktopBridge", {
     ipcRenderer.invoke(IpcChannels.LOCAL_UPDATE_SET_CLEANUP_ENABLED_CHANNEL, enabled),
   checkForLocalUpdate: () => ipcRenderer.invoke(IpcChannels.LOCAL_UPDATE_CHECK_CHANNEL),
   installLocalUpdate: () => ipcRenderer.invoke(IpcChannels.LOCAL_UPDATE_INSTALL_CHANNEL),
+  rollbackLocalUpdate: () => ipcRenderer.invoke(IpcChannels.LOCAL_UPDATE_ROLLBACK_CHANNEL),
+  revealLocalUpdateFolder: () => ipcRenderer.invoke(IpcChannels.LOCAL_UPDATE_REVEAL_FOLDER_CHANNEL),
   onLocalUpdateState: (listener) => {
     const wrappedListener = (_event: Electron.IpcRendererEvent, state: unknown) => {
       listener(state as Parameters<typeof listener>[0]);

@@ -1,4 +1,12 @@
-import { ArchiveIcon, ArchiveX, ChevronRightIcon, LoaderIcon, SettingsIcon } from "lucide-react";
+import {
+  ArchiveIcon,
+  ArchiveX,
+  ChevronRightIcon,
+  FolderOpenIcon,
+  LoaderIcon,
+  RotateCcwIcon,
+  SettingsIcon,
+} from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import type { CSSProperties, ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -180,6 +188,36 @@ function DesktopLocalUpdateSettingsRow() {
     }
   };
 
+  const revealFolder = async () => {
+    const opened = await bridge.revealLocalUpdateFolder();
+    if (!opened) {
+      toastManager.add(
+        stackedThreadToast({
+          type: "error",
+          title: "Could not open releases folder",
+        }),
+      );
+    }
+  };
+
+  const rollback = async () => {
+    if (!state.rollbackBuild) return;
+    const confirmed = await ensureLocalApi().dialogs.confirm(
+      `Roll back to ${state.rollbackBuild.fileName} and restart T3 Code?`,
+    );
+    if (!confirmed) return;
+    const nextState = await bridge.rollbackLocalUpdate();
+    if (nextState.status === "error") {
+      toastManager.add(
+        stackedThreadToast({
+          type: "error",
+          title: "Could not roll back",
+          description: nextState.message ?? "The previous local build could not be installed.",
+        }),
+      );
+    }
+  };
+
   const busy = actionPending || state.status === "checking" || state.status === "installing";
   const status = state.availableBuild
     ? `${state.availableBuild.fileName} is ready to install.`
@@ -192,6 +230,18 @@ function DesktopLocalUpdateSettingsRow() {
       status={status}
       control={
         <div className="flex flex-wrap justify-end gap-2">
+          {state.rollbackBuild ? (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy}
+              aria-label={`Roll back to ${state.rollbackBuild.fileName}`}
+              onClick={() => void runAction(rollback)}
+            >
+              <RotateCcwIcon />
+              Rollback
+            </Button>
+          ) : null}
           <Button variant="outline" size="sm" disabled={busy} onClick={() => void chooseFolder()}>
             {state.folderPath ? "Change folder" : "Choose folder"}
           </Button>
@@ -202,6 +252,22 @@ function DesktopLocalUpdateSettingsRow() {
         <div className="space-y-3 pt-3">
           <div className="flex items-center gap-2">
             <Input value={state.folderPath} readOnly aria-label="Local releases folder" />
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={busy}
+                    aria-label="Open releases folder"
+                    onClick={() => void runAction(revealFolder)}
+                  />
+                }
+              >
+                <FolderOpenIcon />
+              </TooltipTrigger>
+              <TooltipPopup>Open releases folder</TooltipPopup>
+            </Tooltip>
             <Button
               variant="ghost"
               size="sm"

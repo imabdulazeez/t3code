@@ -203,6 +203,7 @@ export const DesktopLocalUpdateStateSchema = Schema.Struct({
   currentBuildTimestamp: Schema.String,
   status: DesktopLocalUpdateStatusSchema,
   availableBuild: Schema.NullOr(DesktopLocalUpdateBuildSchema),
+  rollbackBuild: Schema.NullOr(DesktopLocalUpdateBuildSchema),
   checkedAt: Schema.NullOr(Schema.String),
   message: Schema.NullOr(Schema.String),
 });
@@ -1026,6 +1027,8 @@ export interface DesktopBridge {
   setLocalUpdateCleanupEnabled: (enabled: boolean) => Promise<DesktopLocalUpdateState>;
   checkForLocalUpdate: () => Promise<DesktopLocalUpdateState>;
   installLocalUpdate: () => Promise<DesktopLocalUpdateState>;
+  rollbackLocalUpdate: () => Promise<DesktopLocalUpdateState>;
+  revealLocalUpdateFolder: () => Promise<boolean>;
   onLocalUpdateState: (listener: (state: DesktopLocalUpdateState) => void) => () => void;
   getConnectionCatalog?: () => Promise<string | null>;
   setConnectionCatalog?: (catalog: string) => Promise<boolean>;

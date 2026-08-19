@@ -57,3 +57,8 @@ export const make = ElectronShell.of({
 });
 
 export const layer = Layer.succeed(ElectronShell, make);
+
+export const openPath = (path: string) =>
+  Effect.promise(() => Electron.shell.openPath(path).then((error) => error.length === 0)).pipe(
+    Effect.catchCause(() => Effect.succeed(false)),
+  );
