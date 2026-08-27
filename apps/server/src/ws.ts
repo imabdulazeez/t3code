@@ -93,6 +93,7 @@ import * as ServerSelfUpdate from "./cloud/selfUpdate.ts";
 import * as ServerLifecycleEvents from "./serverLifecycleEvents.ts";
 import * as ServerRuntimeStartup from "./serverRuntimeStartup.ts";
 import * as ServerSettings from "./serverSettings.ts";
+import { pullSettingsGist, pushSettingsGist } from "./settingsGistSync.ts";
 import * as TerminalManager from "./terminal/Manager.ts";
 import * as PreviewAutomationBroker from "./mcp/PreviewAutomationBroker.ts";
 import * as PreviewManager from "./preview/Manager.ts";
@@ -501,6 +502,7 @@ const makeWsRpcLayer = (
       );
       const serverAuth = yield* EnvironmentAuth.EnvironmentAuth;
       const sourceControlDiscovery = yield* SourceControlDiscovery.SourceControlDiscovery;
+      const github = yield* GitHubCli.GitHubCli;
       const automaticGitFetchInterval = serverSettings.getSettings.pipe(
         Effect.map(
           (settings) => resolveServerBackgroundActivitySettings(settings).automaticGitFetchInterval,
@@ -1703,6 +1705,18 @@ const makeWsRpcLayer = (
               "rpc.aggregate": "server",
             },
           ),
+        [WS_METHODS.serverPullSettingsGist]: ({ gistId }) =>
+          observeRpcEffect(
+            WS_METHODS.serverPullSettingsGist,
+            pullSettingsGist({ github, cwd: config.cwd, gistId }),
+            { "rpc.aggregate": "server" },
+          ),
+        [WS_METHODS.serverPushSettingsGist]: ({ gistId, settings, serverSettings }) =>
+          observeRpcEffect(
+            WS_METHODS.serverPushSettingsGist,
+            pushSettingsGist({ github, cwd: config.cwd, gistId, settings, serverSettings }),
+            { "rpc.aggregate": "server" },
+          ),
         [WS_METHODS.serverDiscoverSourceControl]: (_input) =>
           observeRpcEffect(
             WS_METHODS.serverDiscoverSourceControl,
@@ -2566,6 +2580,7 @@ export const websocketRpcRouteLayer = Layer.unwrap(
                   Layer.provide(VcsProcess.layer),
                 ),
               ),
+              Layer.provideMerge(GitHubCli.layer.pipe(Layer.provide(VcsProcess.layer))),
             ),
           ),
         );

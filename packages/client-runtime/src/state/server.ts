@@ -770,6 +770,22 @@ export function createServerEnvironmentAtoms<R, E>(
       scheduler: configScheduler,
       concurrency: configConcurrency,
     }),
+    pullSettingsGist: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:pull-settings-gist",
+      tag: WS_METHODS.serverPullSettingsGist,
+      concurrency: {
+        mode: "singleFlight",
+        key: ({ environmentId }) => environmentId,
+      },
+    }),
+    pushSettingsGist: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:push-settings-gist",
+      tag: WS_METHODS.serverPushSettingsGist,
+      concurrency: {
+        mode: "latest",
+        key: ({ environmentId }) => environmentId,
+      },
+    }),
     signalProcess: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:server:signal-process",
       tag: WS_METHODS.serverSignalProcess,

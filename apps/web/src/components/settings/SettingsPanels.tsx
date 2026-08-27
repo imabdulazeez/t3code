@@ -2,6 +2,7 @@ import {
   ArchiveIcon,
   ArchiveX,
   ChevronRightIcon,
+  ExternalLinkIcon,
   FolderOpenIcon,
   LoaderIcon,
   RotateCcwIcon,
@@ -64,6 +65,10 @@ import {
 import { isElectron } from "../../env";
 import { useLocalStorage } from "../../hooks/useLocalStorage";
 import { usePrimarySettings, useUpdatePrimarySettings } from "../../hooks/useSettings";
+import {
+  type SettingsGistSyncOutcome,
+  useSettingsGistSyncActions,
+} from "../../hooks/useSettingsGistSync";
 import { useThreadActions } from "../../hooks/useThreadActions";
 import {
   getCustomModelOptionsByInstance,
@@ -1938,10 +1943,193 @@ export function GeneralSettingsPanel() {
     settings.backgroundActivity,
     DEFAULT_UNIFIED_SETTINGS.backgroundActivity,
   );
+  const { create: createSettingsGist, reconcile: reconcileSettingsGist } =
+    useSettingsGistSyncActions();
+  const [settingsGistSyncPending, setSettingsGistSyncPending] = useState(false);
+  const [settingsGistConflict, setSettingsGistConflict] = useState<{
+    readonly gistId: string;
+    readonly conflicts: ReadonlyArray<string>;
+    readonly firstSync: boolean;
+  } | null>(null);
+  const reportSettingsGistSyncResult = useCallback(
+    (result: SettingsGistSyncOutcome | null, created = false) => {
+      if (!result) return;
+      if (result.status === "conflict") {
+        setSettingsGistConflict(result);
+        return;
+      }
+      if (result.status === "synced") {
+        const description = created
+          ? `Save Gist ID ${result.gistId} for your other devices.`
+          : result.changedLocal && result.changedRemote
+            ? "Local and Gist changes were merged."
+            : result.changedLocal
+              ? "Gist changes were applied to this device."
+              : result.changedRemote
+                ? "Local settings were uploaded to the Gist."
+                : "This device and the Gist are already up to date.";
+        toastManager.add({
+          type: "success",
+          title: created ? "Settings Gist created" : "Settings synced",
+          description,
+        });
+        return;
+      }
+      const error = squashAtomCommandFailure(result.failure as never);
+      toastManager.add(
+        stackedThreadToast({
+          type: "error",
+          title: "Settings sync failed",
+          description: error instanceof Error ? error.message : "Could not sync the settings Gist.",
+        }),
+      );
+    },
+    [],
+  );
+  const runSettingsGistSync = useCallback(async () => {
+    setSettingsGistSyncPending(true);
+    const creating = !settings.gistSettingsSync.gistId;
+    const result = creating
+      ? await createSettingsGist()
+      : await reconcileSettingsGist(settings.gistSettingsSync.gistId, "prompt");
+    setSettingsGistSyncPending(false);
+    reportSettingsGistSyncResult(result, creating);
+  }, [
+    createSettingsGist,
+    reconcileSettingsGist,
+    reportSettingsGistSyncResult,
+    settings.gistSettingsSync.gistId,
+  ]);
+  const resolveSettingsGistConflict = useCallback(
+    async (policy: "local" | "remote") => {
+      if (!settingsGistConflict) return;
+      setSettingsGistSyncPending(true);
+      const result = await reconcileSettingsGist(settingsGistConflict.gistId, policy);
+      setSettingsGistSyncPending(false);
+      if (result?.status === "synced") setSettingsGistConflict(null);
+      reportSettingsGistSyncResult(result);
+    },
+    [reconcileSettingsGist, reportSettingsGistSyncResult, settingsGistConflict],
+  );
 
   return (
     <SettingsPageContainer>
+      <Dialog
+        open={settingsGistConflict !== null}
+        onOpenChange={(open) => {
+          if (!open && !settingsGistSyncPending) setSettingsGistConflict(null);
+        }}
+      >
+        <DialogPopup className="max-w-lg" showCloseButton={!settingsGistSyncPending}>
+          <DialogHeader>
+            <DialogTitle>Choose settings to keep</DialogTitle>
+            <DialogDescription>
+              {settingsGistConflict?.firstSync
+                ? "This device already has settings that differ from this Gist. Choose which values to use for the first sync."
+                : `This device and the Gist changed the same ${settingsGistConflict?.conflicts.length === 1 ? "setting" : "settings"}. Unrelated changes will still be merged.`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogPanel>
+            <div className="flex flex-wrap gap-2">
+              {settingsGistConflict?.conflicts.map((key) => (
+                <span key={key} className="rounded-md bg-muted px-2 py-1 text-xs">
+                  {key.replaceAll(/([a-z])([A-Z])/g, "$1 $2").toLowerCase()}
+                </span>
+              ))}
+            </div>
+          </DialogPanel>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={settingsGistSyncPending}
+              onClick={() => void resolveSettingsGistConflict("remote")}
+            >
+              Use Gist
+            </Button>
+            <Button
+              disabled={settingsGistSyncPending}
+              onClick={() => void resolveSettingsGistConflict("local")}
+            >
+              Keep this device
+            </Button>
+          </DialogFooter>
+        </DialogPopup>
+      </Dialog>
       <SettingsSection title="General">
+        <SettingsRow
+          {...searchableSetting("gist-settings-sync")}
+          description={
+            settings.gistSettingsSync.gistId
+              ? "Uses the host's GitHub CLI authentication."
+              : "Uses the host's GitHub CLI authentication. Enter an existing Gist ID or create a new secret Gist."
+          }
+          status={
+            settings.gistSettingsSync.lastSyncedAt
+              ? `Last synced ${formatRelativeTimeLabel(settings.gistSettingsSync.lastSyncedAt)}.`
+              : settings.gistSettingsSync.gistId
+                ? "Not synced yet."
+                : undefined
+          }
+          control={
+            <div className="flex w-full flex-col items-stretch gap-2 sm:w-[28rem]">
+              <div className="flex items-center gap-2">
+                <DraftInput
+                  className="min-w-0 flex-1"
+                  value={settings.gistSettingsSync.gistId}
+                  onCommit={(gistId) =>
+                    updateSettings({
+                      gistSettingsSync: { gistId: gistId.trim(), lastSyncedAt: null },
+                    })
+                  }
+                  placeholder="Gist ID"
+                  spellCheck={false}
+                  aria-label="Settings Gist ID"
+                />
+                {settings.gistSettingsSync.gistId ? (
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <Button
+                          variant="ghost-muted"
+                          size="icon-sm"
+                          aria-label="Open settings Gist on GitHub"
+                          onClick={() =>
+                            void readLocalApi()?.shell.openExternal(
+                              `https://gist.github.com/${encodeURIComponent(settings.gistSettingsSync.gistId)}`,
+                            )
+                          }
+                        />
+                      }
+                    >
+                      <ExternalLinkIcon />
+                    </TooltipTrigger>
+                    <TooltipPopup>Open Gist on GitHub</TooltipPopup>
+                  </Tooltip>
+                ) : null}
+                <Button
+                  variant="outline"
+                  disabled={settingsGistSyncPending}
+                  onClick={() => void runSettingsGistSync()}
+                >
+                  {settingsGistSyncPending ? <LoaderIcon className="animate-spin" /> : null}
+                  {settings.gistSettingsSync.gistId ? "Sync now" : "Create Gist"}
+                </Button>
+                <Switch
+                  checked={settings.gistSettingsSync.enabled}
+                  onCheckedChange={(enabled) =>
+                    updateSettings({ gistSettingsSync: { enabled: Boolean(enabled) } })
+                  }
+                  aria-label="Automatically sync settings to Gist"
+                />
+              </div>
+              <span className="text-right text-xs text-muted-foreground">
+                {settings.gistSettingsSync.enabled
+                  ? "Changes merge automatically after one second."
+                  : "Automatic sync is off."}
+              </span>
+            </div>
+          }
+        />
         <SettingsRow
           {...searchableSetting("project-grouping")}
           description="Combine matching repositories across environments."

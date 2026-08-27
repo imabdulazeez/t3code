@@ -31,7 +31,8 @@ import {
 import { resolveAndPersistPreferredEditor } from "../editorPreferences";
 import { applyAppearanceFontVariables } from "~/appearanceFonts";
 import { applyAppearanceContrast } from "~/appearanceContrast";
-import { useClientSettings } from "../hooks/useSettings";
+import { useClientSettings, usePrimarySettings } from "../hooks/useSettings";
+import { SettingsGistSyncController } from "../hooks/useSettingsGistSync";
 import { PlanAgentSelectionHeal } from "../planAgentSelectionHeal";
 import {
   deriveLogicalProjectKeyFromSettings,
@@ -144,6 +145,7 @@ function RootRouteView() {
         <HostedStaticEnvironmentBootstrap />
         {primaryEnvironmentAuthenticated ? <EventRouter /> : null}
         {primaryEnvironmentAuthenticated ? <PlanAgentSelectionHeal /> : null}
+        {primaryEnvironmentAuthenticated ? <SettingsGistSyncBootstrap /> : null}
         {primaryEnvironmentAuthenticated ? <ProviderUpdateLaunchNotification /> : null}
         {appShell}
         {/* Above the router: a theme draft is judged by walking the app, so the
@@ -152,6 +154,11 @@ function RootRouteView() {
       </AnchoredToastProvider>
     </ToastProvider>
   );
+}
+
+function SettingsGistSyncBootstrap() {
+  const sync = usePrimarySettings((settings) => settings.gistSettingsSync);
+  return <SettingsGistSyncController enabled={sync.enabled} gistId={sync.gistId} />;
 }
 
 function ContrastAppearanceSync() {

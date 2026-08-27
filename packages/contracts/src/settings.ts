@@ -286,6 +286,75 @@ export type ClientSettings = typeof ClientSettingsSchema.Type;
 
 export const DEFAULT_CLIENT_SETTINGS: ClientSettings = Schema.decodeSync(ClientSettingsSchema)({});
 
+export const GistSyncedClientSettings = Schema.Struct({
+  appearanceContrast: ClientSettingsSchema.fields.appearanceContrast,
+  autoCreatePrOnPush: ClientSettingsSchema.fields.autoCreatePrOnPush,
+  branchListSortKey: ClientSettingsSchema.fields.branchListSortKey,
+  branchListSortDirection: ClientSettingsSchema.fields.branchListSortDirection,
+  branchRemoteSyncMode: ClientSettingsSchema.fields.branchRemoteSyncMode,
+  changedFilesExpandedByDefault: ClientSettingsSchema.fields.changedFilesExpandedByDefault,
+  confirmThreadArchive: ClientSettingsSchema.fields.confirmThreadArchive,
+  confirmThreadDelete: ClientSettingsSchema.fields.confirmThreadDelete,
+  deleteRemoteBranchOnDelete: ClientSettingsSchema.fields.deleteRemoteBranchOnDelete,
+  diffIgnoreWhitespace: ClientSettingsSchema.fields.diffIgnoreWhitespace,
+  environmentIdentificationMode: ClientSettingsSchema.fields.environmentIdentificationMode,
+  fontSizeInterface: ClientSettingsSchema.fields.fontSizeInterface,
+  fontSizePrompt: ClientSettingsSchema.fields.fontSizePrompt,
+  fontSizeCode: ClientSettingsSchema.fields.fontSizeCode,
+  fontSizeTerminal: ClientSettingsSchema.fields.fontSizeTerminal,
+  fontSmoothing: ClientSettingsSchema.fields.fontSmoothing,
+  favorites: ClientSettingsSchema.fields.favorites,
+  providerModelPreferences: ClientSettingsSchema.fields.providerModelPreferences,
+  planModeEnabled: ClientSettingsSchema.fields.planModeEnabled,
+  showSkillsInSlashMenu: ClientSettingsSchema.fields.showSkillsInSlashMenu,
+  legacySidebarEnabled: ClientSettingsSchema.fields.legacySidebarEnabled,
+  sidebarAutoSettleAfterDays: ClientSettingsSchema.fields.sidebarAutoSettleAfterDays,
+  sidebarAutoSettleOnMerge: ClientSettingsSchema.fields.sidebarAutoSettleOnMerge,
+  sidebarProjectGroupingMode: ClientSettingsSchema.fields.sidebarProjectGroupingMode,
+  sidebarProjectGroupingOverrides: ClientSettingsSchema.fields.sidebarProjectGroupingOverrides,
+  sidebarProjectSortOrder: ClientSettingsSchema.fields.sidebarProjectSortOrder,
+  sidebarThreadSortOrder: ClientSettingsSchema.fields.sidebarThreadSortOrder,
+  sidebarThreadPreviewCount: ClientSettingsSchema.fields.sidebarThreadPreviewCount,
+  timestampFormat: ClientSettingsSchema.fields.timestampFormat,
+  wordWrap: ClientSettingsSchema.fields.wordWrap,
+});
+export type GistSyncedClientSettings = typeof GistSyncedClientSettings.Type;
+
+export function selectGistSyncedClientSettings(settings: ClientSettings): GistSyncedClientSettings {
+  return {
+    appearanceContrast: settings.appearanceContrast,
+    autoCreatePrOnPush: settings.autoCreatePrOnPush,
+    branchListSortKey: settings.branchListSortKey,
+    branchListSortDirection: settings.branchListSortDirection,
+    branchRemoteSyncMode: settings.branchRemoteSyncMode,
+    changedFilesExpandedByDefault: settings.changedFilesExpandedByDefault,
+    confirmThreadArchive: settings.confirmThreadArchive,
+    confirmThreadDelete: settings.confirmThreadDelete,
+    deleteRemoteBranchOnDelete: settings.deleteRemoteBranchOnDelete,
+    diffIgnoreWhitespace: settings.diffIgnoreWhitespace,
+    environmentIdentificationMode: settings.environmentIdentificationMode,
+    fontSizeInterface: settings.fontSizeInterface,
+    fontSizePrompt: settings.fontSizePrompt,
+    fontSizeCode: settings.fontSizeCode,
+    fontSizeTerminal: settings.fontSizeTerminal,
+    fontSmoothing: settings.fontSmoothing,
+    favorites: settings.favorites,
+    providerModelPreferences: settings.providerModelPreferences,
+    planModeEnabled: settings.planModeEnabled,
+    showSkillsInSlashMenu: settings.showSkillsInSlashMenu,
+    legacySidebarEnabled: settings.legacySidebarEnabled,
+    sidebarAutoSettleAfterDays: settings.sidebarAutoSettleAfterDays,
+    sidebarAutoSettleOnMerge: settings.sidebarAutoSettleOnMerge,
+    sidebarProjectGroupingMode: settings.sidebarProjectGroupingMode,
+    sidebarProjectGroupingOverrides: settings.sidebarProjectGroupingOverrides,
+    sidebarProjectSortOrder: settings.sidebarProjectSortOrder,
+    sidebarThreadSortOrder: settings.sidebarThreadSortOrder,
+    sidebarThreadPreviewCount: settings.sidebarThreadPreviewCount,
+    timestampFormat: settings.timestampFormat,
+    wordWrap: settings.wordWrap,
+  };
+}
+
 // ── Server Settings (server-authoritative) ────────────────────
 
 // Moved to environment.ts so orchestration contracts can use it without an
@@ -670,6 +739,15 @@ export const BackgroundActivitySettings = Schema.Struct({
 }).pipe(Schema.withDecodingDefault(Effect.succeed({})));
 export type BackgroundActivitySettings = typeof BackgroundActivitySettings.Type;
 
+export const GistSettingsSync = Schema.Struct({
+  enabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
+  gistId: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
+  lastSyncedAt: Schema.NullOr(TrimmedNonEmptyString).pipe(
+    Schema.withDecodingDefault(Effect.succeed(null)),
+  ),
+}).pipe(Schema.withDecodingDefault(Effect.succeed({})));
+export type GistSettingsSync = typeof GistSettingsSync.Type;
+
 export const ServerSettings = Schema.Struct({
   // Legacy token-by-token assistant output. Deliberately a fresh key (was
   // `enableAssistantStreaming`): decoding drops the old key, so everyone,
@@ -678,6 +756,7 @@ export const ServerSettings = Schema.Struct({
     Schema.withDecodingDefault(Effect.succeed(false)),
   ),
   enableProviderUpdateChecks: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
+  gistSettingsSync: GistSettingsSync,
   /**
    * Whether agents may drive the in-app preview browser. Turning this off
    * withholds the MCP credential, so the `t3-code` server (and with it every
@@ -765,6 +844,23 @@ export const ServerSettings = Schema.Struct({
 export type ServerSettings = typeof ServerSettings.Type;
 
 export const DEFAULT_SERVER_SETTINGS: ServerSettings = Schema.decodeSync(ServerSettings)({});
+
+export const GistSyncedServerSettings = Schema.Struct({
+  branchNamePromptInstructions: ServerSettings.fields.branchNamePromptInstructions,
+  commitMessagePromptInstructions: ServerSettings.fields.commitMessagePromptInstructions,
+  prContentPromptInstructions: ServerSettings.fields.prContentPromptInstructions,
+  sourceControlWritingStyle: ServerSettings.fields.sourceControlWritingStyle,
+}).pipe(Schema.withDecodingDefault(Effect.succeed({})));
+export type GistSyncedServerSettings = typeof GistSyncedServerSettings.Type;
+
+export function selectGistSyncedServerSettings(settings: ServerSettings): GistSyncedServerSettings {
+  return {
+    branchNamePromptInstructions: settings.branchNamePromptInstructions,
+    commitMessagePromptInstructions: settings.commitMessagePromptInstructions,
+    prContentPromptInstructions: settings.prContentPromptInstructions,
+    sourceControlWritingStyle: settings.sourceControlWritingStyle,
+  };
+}
 
 /**
  * Read the legacy `enabled` flag embedded in a provider instance config
@@ -909,6 +1005,13 @@ export const ServerSettingsPatch = Schema.Struct({
   enableLegacyTokenStreaming: Schema.optionalKey(Schema.Boolean),
   enableProviderUpdateChecks: Schema.optionalKey(Schema.Boolean),
   enableAgentBrowserAccess: Schema.optionalKey(Schema.Boolean),
+  gistSettingsSync: Schema.optionalKey(
+    Schema.Struct({
+      enabled: Schema.optionalKey(Schema.Boolean),
+      gistId: Schema.optionalKey(TrimmedString),
+      lastSyncedAt: Schema.optionalKey(Schema.NullOr(TrimmedNonEmptyString)),
+    }),
+  ),
   backgroundActivity: Schema.optionalKey(
     Schema.Struct({
       schemaVersion: Schema.optionalKey(Schema.Literal(1)),
