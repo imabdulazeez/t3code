@@ -8,10 +8,13 @@ import * as Option from "effect/Option";
 import type * as Electron from "electron";
 
 import * as ElectronApp from "../electron/ElectronApp.ts";
+import * as ElectronDialog from "../electron/ElectronDialog.ts";
 import * as ElectronMenu from "../electron/ElectronMenu.ts";
 import * as DesktopApplicationMenu from "./DesktopApplicationMenu.ts";
+import * as DesktopAppIdentity from "../app/DesktopAppIdentity.ts";
 import * as DesktopConfig from "../app/DesktopConfig.ts";
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
+import * as DesktopLocalUpdates from "../updates/DesktopLocalUpdates.ts";
 import * as DesktopWindow from "./DesktopWindow.ts";
 
 const environmentInput = {
@@ -76,6 +79,30 @@ const makeElectronMenuLayer = (
     showContextMenu: () => Effect.succeed(Option.none()),
   } satisfies ElectronMenu.ElectronMenu["Service"]);
 
+const desktopAppIdentityLayer = Layer.succeed(DesktopAppIdentity.DesktopAppIdentity, {
+  resolveUserDataPath: Effect.die("unexpected user data path resolution"),
+  resolveCommitHash: Effect.die("unexpected commit hash resolution"),
+  configure: Effect.die("unexpected app identity configuration"),
+} satisfies DesktopAppIdentity.DesktopAppIdentity["Service"]);
+
+const desktopLocalUpdatesLayer = Layer.succeed(DesktopLocalUpdates.DesktopLocalUpdates, {
+  getState: Effect.die("unexpected local update state read"),
+  configure: Effect.die("unexpected local update configuration"),
+  setFolder: () => Effect.die("unexpected local update folder change"),
+  setCleanupEnabled: () => Effect.die("unexpected local update cleanup change"),
+  check: Effect.die("unexpected local update check"),
+  install: Effect.die("unexpected local update install"),
+  rollback: Effect.die("unexpected local update rollback"),
+  revealFolder: Effect.die("unexpected local update folder reveal"),
+} satisfies DesktopLocalUpdates.DesktopLocalUpdates["Service"]);
+
+const electronDialogLayer = Layer.succeed(ElectronDialog.ElectronDialog, {
+  pickFolder: () => Effect.die("unexpected folder picker"),
+  pickFiles: () => Effect.die("unexpected file picker"),
+  showMessageBox: () => Effect.die("unexpected message box"),
+  showErrorBox: () => Effect.die("unexpected error box"),
+} satisfies ElectronDialog.ElectronDialog["Service"]);
+
 const configureMenu = (
   selectedAction: Deferred.Deferred<string>,
   applicationMenuTemplate: Deferred.Deferred<readonly Electron.MenuItemConstructorOptions[]>,
@@ -89,6 +116,9 @@ const configureMenu = (
         Layer.provideMerge(makeElectronMenuLayer(applicationMenuTemplate)),
         Layer.provideMerge(makeDesktopWindowLayer(selectedAction)),
         Layer.provideMerge(electronAppLayer),
+        Layer.provideMerge(desktopAppIdentityLayer),
+        Layer.provideMerge(desktopLocalUpdatesLayer),
+        Layer.provideMerge(electronDialogLayer),
         Layer.provideMerge(
           DesktopEnvironment.layer(environmentInput).pipe(
             Layer.provide(Layer.mergeAll(NodeServices.layer, DesktopConfig.layerTest({}))),

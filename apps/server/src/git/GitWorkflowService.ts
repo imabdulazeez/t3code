@@ -90,6 +90,9 @@ export class GitWorkflowService extends Context.Service<
     readonly removeWorktree: (
       input: VcsRemoveWorktreeInput,
     ) => Effect.Effect<void, GitCommandError>;
+    readonly pruneWorktrees: (input: {
+      readonly cwd: string;
+    }) => Effect.Effect<void, GitCommandError>;
     readonly listWorktrees: (
       input: VcsListWorktreesInput,
     ) => Effect.Effect<VcsListWorktreesResult, GitCommandError>;
@@ -331,6 +334,10 @@ export const make = Effect.gen(function* () {
     removeWorktree: (input) =>
       ensureGitCommand("GitWorkflowService.removeWorktree", input.cwd).pipe(
         Effect.andThen(git.removeWorktree(input)),
+      ),
+    pruneWorktrees: (input) =>
+      ensureGitCommand("GitWorkflowService.pruneWorktrees", input.cwd).pipe(
+        Effect.andThen(git.pruneWorktrees(input)),
       ),
     listWorktrees: (input) =>
       ensureGitCommand("GitWorkflowService.listWorktrees", input.cwd).pipe(

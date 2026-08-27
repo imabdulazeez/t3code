@@ -7,7 +7,6 @@ for (const stream of [process.stdout, process.stderr]) {
 import * as NodeHttpClient from "@effect/platform-node/NodeHttpClient";
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import * as NodeFS from "node:fs";
 import * as NodeOS from "node:os";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -84,7 +83,9 @@ const desktopEnvironmentLayer = Layer.unwrap(
       // @effect-diagnostics-next-line tryCatchInEffectGen:off
       try {
         // @effect-diagnostics-next-line preferSchemaOverJson:off
-        const packageJson = JSON.parse(NodeFS.readFileSync(packagePath, "utf8"));
+        const packageJson = JSON.parse(
+          process.getBuiltinModule("fs").readFileSync(packagePath, "utf8"),
+        );
         if (typeof packageJson?.t3codeBuildTimestamp === "string") {
           buildTimestamp = packageJson.t3codeBuildTimestamp;
         }

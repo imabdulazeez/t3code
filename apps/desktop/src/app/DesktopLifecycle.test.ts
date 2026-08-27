@@ -49,7 +49,6 @@ function makeElectronAppLayer(
     setDockIcon: () => Effect.void,
     appendCommandLineSwitch: () => Effect.void,
     removeCommandLineSwitch: () => Effect.void,
-    onBeforeQuitForUpdate: (listener) => registerListener("before-quit-for-update", listener),
     on: (eventName, listener) =>
       registerListener(eventName, listener as unknown as (...args: readonly unknown[]) => void),
   } satisfies ElectronApp.ElectronApp["Service"]);
