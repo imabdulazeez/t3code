@@ -11,9 +11,10 @@ import * as Equal from "effect/Equal";
 import * as Schema from "effect/Schema";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { stackedThreadToast, toastManager } from "../components/ui/toast";
-import { usePrimaryEnvironmentId } from "../state/environments";
+import { usePrimaryEnvironment, usePrimaryEnvironmentId } from "../state/environments";
 import { primaryServerSettingsAtom, serverEnvironment } from "../state/server";
 import { useAtomCommand } from "../state/use-atom-command";
+import { isTransportConnectionErrorMessage } from "../rpc/transportError";
 import { useLocalStorage } from "./useLocalStorage";
 import {
   getClientSettings,
@@ -119,6 +120,10 @@ function reconcileSettings(
     settings: { client: client.settings, server: server.settings },
     conflicts: [...client.conflicts, ...server.conflicts],
   };
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : typeof error === "string" ? error : null;
 }
 
 export function useSettingsGistSyncActions() {
@@ -289,6 +294,8 @@ export function SettingsGistSyncController(props: {
   const clientSettings = useClientSettings();
   const serverSettings = useAtomValue(primaryServerSettingsAtom);
   const environmentId = usePrimaryEnvironmentId();
+  const environment = usePrimaryEnvironment();
+  const connected = environment?.connection.phase === "connected";
   const { reconcile } = useSettingsGistSyncActions();
   const portableSettings = useMemo<PortableSettings>(
     () => ({
@@ -305,7 +312,7 @@ export function SettingsGistSyncController(props: {
   useEffect(() => {
     const key = `${environmentId ?? ""}:${props.enabled}:${props.gistId}`;
     const observed = observedRef.current;
-    if (!hydrated || !environmentId || !props.enabled || !props.gistId.trim()) {
+    if (!hydrated || !environmentId || !connected || !props.enabled || !props.gistId.trim()) {
       observedRef.current = null;
       return;
     }
@@ -318,6 +325,7 @@ export function SettingsGistSyncController(props: {
           if (!result || (result.status === "synced" && result.conflicts.length === 0)) return;
           if (result.status === "failure") {
             const error = squashAtomCommandFailure(result.failure as never);
+            if (isTransportConnectionErrorMessage(errorMessage(error))) return;
             toastManager.add(
               stackedThreadToast({
                 type: "error",
@@ -343,7 +351,15 @@ export function SettingsGistSyncController(props: {
       initialSync ? 0 : SETTINGS_GIST_SYNC_DEBOUNCE_MS,
     );
     return () => window.clearTimeout(timeout);
-  }, [environmentId, hydrated, portableSettings, props.enabled, props.gistId, reconcile]);
+  }, [
+    connected,
+    environmentId,
+    hydrated,
+    portableSettings,
+    props.enabled,
+    props.gistId,
+    reconcile,
+  ]);
 
   return null;
 }
