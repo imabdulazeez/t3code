@@ -128,6 +128,14 @@ export function resourceMonitorExecutableName(platform: typeof BuildPlatform.Typ
   return platform === "win" ? "t3-resource-monitor.exe" : "t3-resource-monitor";
 }
 
+export function shouldCopyDesktopArtifact(
+  platform: typeof BuildPlatform.Type,
+  fileName: string,
+): boolean {
+  if (platform !== "mac") return true;
+  return fileName.endsWith(".zip");
+}
+
 const PLATFORM_CONFIG: Record<typeof BuildPlatform.Type, PlatformConfig> = {
   mac: {
     cliFlag: "--mac",
@@ -3010,6 +3018,8 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
 
   const copiedArtifacts: string[] = [];
   for (const entry of stageEntries) {
+    if (!shouldCopyDesktopArtifact(options.platform, entry)) continue;
+
     const from = path.join(stageDistDir, entry);
     const stat = yield* fs.stat(from).pipe(Effect.orElseSucceed(() => null));
     if (!stat || stat.type !== "File") continue;
