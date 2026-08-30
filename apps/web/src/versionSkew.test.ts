@@ -3,12 +3,16 @@ import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 // Pinned so the direction cases below read as fixed versions instead of
 // arithmetic on whatever version this checkout happens to be at.
-const branding = vi.hoisted(() => ({ APP_VERSION: "0.0.34" }));
+const branding = vi.hoisted(() => ({
+  APP_VERSION: "0.0.34",
+  get APP_PKG_VERSION() {
+    return this.APP_VERSION;
+  },
+}));
 vi.mock("./branding", () => branding);
 
 import { APP_VERSION } from "./branding";
 import {
-  appendVersionMismatchHint,
   buildVersionMismatchDismissalKey,
   dismissVersionMismatch,
   isVersionMismatchDismissed,
@@ -137,14 +141,6 @@ describe("versionSkew", () => {
         }),
       ),
     ).toBe(false);
-  });
-
-  it("appends a hint to connection errors when the server is behind", () => {
-    const mismatch = resolveVersionMismatch("0.0.33");
-
-    expect(appendVersionMismatchHint("Socket closed.", mismatch)).toBe(
-      `Socket closed. Hint: ${MISMATCH_HINT}`,
-    );
   });
 
   it("reads desktop-managed update capabilities from config descriptors", () => {
