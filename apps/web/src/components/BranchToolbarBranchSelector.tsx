@@ -936,6 +936,7 @@ export function BranchToolbarBranchSelector({
                 onClick={(event) => {
                   event.stopPropagation();
                   event.preventDefault();
+                  setIsBranchMenuOpen(false);
                   setForceDeleteTarget(null);
                   setPendingDelete(refName);
                 }}
