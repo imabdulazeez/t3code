@@ -138,6 +138,7 @@ import {
   resolveSidebarThreadStatus,
   searchSidebarThreadsByTitle,
   shouldCreateNewThreadInCurrentProject,
+  isActiveThreadInProjectGroup,
   resolveWorkingStartedAt,
   sortLogicalProjectsForSidebar,
   sortPinnedThreadsForSidebar,
@@ -3557,7 +3558,20 @@ export default function Sidebar() {
                   value={selectedProjectScopeItem}
                   onValueChange={(item) => {
                     if (!item) return;
-                    setProjectScopeKey(item.value === "all" ? null : item.value);
+                    const nextScopeKey = item.value === "all" ? null : item.value;
+                    setProjectScopeKey(nextScopeKey);
+                    if (nextScopeKey === null) return;
+                    const project = projectGroupByScopeKey.get(nextScopeKey);
+                    if (!project) return;
+                    const activeProject =
+                      newThreadContext.activeThread ?? newThreadContext.activeDraftThread ?? null;
+                    if (isActiveThreadInProjectGroup(activeProject, project.memberProjectRefs)) {
+                      return;
+                    }
+                    if (isMobile) setOpenMobile(false);
+                    void handleNewThreadRef.current(
+                      scopeProjectRef(project.environmentId, project.id),
+                    );
                   }}
                 >
                   <ComboboxTrigger

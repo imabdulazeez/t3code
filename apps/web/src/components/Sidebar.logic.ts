@@ -354,6 +354,18 @@ export function shouldCreateNewThreadInCurrentProject(
   return shiftKey || projectGroupCount <= 1;
 }
 
+export function isActiveThreadInProjectGroup(
+  activeProject: { environmentId: string; projectId: string } | null,
+  memberProjectRefs: readonly { environmentId: string; projectId: string }[],
+): boolean {
+  if (!activeProject) return false;
+  return memberProjectRefs.some(
+    (projectRef) =>
+      projectRef.environmentId === activeProject.environmentId &&
+      projectRef.projectId === activeProject.projectId,
+  );
+}
+
 export function orderItemsByPreferredIds<TItem, TId>(input: {
   items: readonly TItem[];
   preferredIds: readonly TId[];
