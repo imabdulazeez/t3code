@@ -251,7 +251,8 @@ export function useSettingsGistSyncActions() {
       const changedClient = !Equal.equals(local.client, merged.settings.client);
       const changedServer = !Equal.equals(local.server, merged.settings.server);
       const changedLocal = changedClient || changedServer;
-      const changedRemote = !Equal.equals(remote, merged.settings);
+      const changedRemote =
+        pulled.value.migrated === true || !Equal.equals(remote, merged.settings);
       if (changedClient) updateClientSettings(merged.settings.client);
       const applyServerSettings = changedServer ? merged.settings.server : undefined;
       if (changedRemote) {

@@ -1,8 +1,10 @@
 import {
+  LegacySettingsGistDocument,
   SETTINGS_GIST_FILENAME,
   SettingsGistId,
   SettingsGistDocument,
   SettingsGistSyncError,
+  upgradeSettingsGistDocument,
   type GistSyncedClientSettings,
   type GistSyncedServerSettings,
 } from "@t3tools/contracts";
@@ -37,6 +39,9 @@ const decodeGistResponse = Schema.decodeUnknownEffect(Schema.fromJsonString(Gist
 const decodeSettingsDocument = Schema.decodeUnknownEffect(
   Schema.fromJsonString(SettingsGistDocument),
 );
+const decodeLegacySettingsDocument = Schema.decodeUnknownEffect(
+  Schema.fromJsonString(LegacySettingsGistDocument),
+);
 const encodeSettingsDocument = Schema.encodeEffect(Schema.fromJsonString(SettingsGistDocument));
 const encodeGistWritePayload = Schema.encodeEffect(Schema.fromJsonString(GistWritePayload));
 
@@ -66,13 +71,18 @@ export const pullSettingsGist = Effect.fn("settingsGistSync.pull")(function* (in
   const document = yield* decodeSettingsDocument(file.content).pipe(
     Effect.mapError(() => invalidGistError(`${SETTINGS_GIST_FILENAME} is invalid or unsupported.`)),
   );
+  const legacy = yield* decodeLegacySettingsDocument(file.content).pipe(
+    Effect.orElseSucceed((): LegacySettingsGistDocument => ({ settings: {} })),
+  );
+  const upgraded = upgradeSettingsGistDocument(document, legacy);
   const lastSyncedAt = DateTime.formatIso(yield* DateTime.now);
   return {
     gistId: response.id,
     lastSyncedAt,
     revision: response.history?.[0]?.version || document.updatedAt,
-    settings: document.settings,
-    serverSettings: document.serverSettings,
+    settings: upgraded.document.settings,
+    serverSettings: upgraded.document.serverSettings,
+    migrated: upgraded.migrated,
   };
 });
 
