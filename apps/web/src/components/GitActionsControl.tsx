@@ -33,6 +33,7 @@ import {
   ChevronDownIcon,
   CloudDownloadIcon,
   CloudUploadIcon,
+  ExternalLinkIcon,
   GitBranchPlusIcon,
   GitCommitIcon,
   InfoIcon,
@@ -1277,8 +1278,7 @@ export default function GitActionsControl({
   }, [gitStatusForActions, onOpenPullRequest, openLink, threadToastData]);
 
   const openRepository = useCallback(() => {
-    const api = readLocalApi();
-    if (!api || !repositoryWebUrl) {
+    if (!repositoryWebUrl) {
       toastManager.add({
         type: "error",
         title: "Repository opening is unavailable.",
@@ -1286,8 +1286,18 @@ export default function GitActionsControl({
       });
       return;
     }
-    void api.shell.openExternal(repositoryWebUrl);
-  }, [repositoryWebUrl, threadToastData]);
+    void openLink(repositoryWebUrl).catch((err: unknown) => {
+      console.error(err);
+      toastManager.add(
+        stackedThreadToast({
+          type: "error",
+          title: "Unable to open repository link",
+          description: err instanceof Error ? err.message : "An error occurred.",
+          ...(threadToastData !== undefined ? { data: threadToastData } : {}),
+        }),
+      );
+    });
+  }, [openLink, repositoryWebUrl, threadToastData]);
 
   runGitActionWithToast = useEffectEvent(
     async ({
