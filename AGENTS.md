@@ -8,7 +8,7 @@
 >
 > Only record a change when it is itself a _fork change_: the fork intentionally introduces, removes, or significantly reworks behavior in a way that is a permanent, lasting deviation from upstream — significant enough to stand on its own as a fork change. Do NOT record routine upstream syncs/merges, the re-application of already-documented fork intent, conflict resolutions, migration renumbers, or verification that fork intent survived a merge — these are bookkeeping, not fork changes, and must be left out. An incoming upstream change is only worth a row if the fork had to modify it to preserve fork behavior AND that modification is itself a significant, lasting deviation; a simple or unmodified upstream change is never recorded.
 
-T3 Code is a minimal GUI for coding agents. A Node WebSocket server wraps provider CLIs (Codex, Claude Code, Cursor, Grok, OpenCode) and serves web, desktop, and mobile clients.
+T3 Code is a minimal GUI for coding agents. A Node WebSocket server wraps provider CLIs and agents (Codex, Claude Code, Cursor, Grok, OpenCode, Antigravity) and serves web, desktop, and mobile clients.
 
 You can think of T3 Code as an open source "bring-your-own-subscription" alternative to apps like Claude Desktop, Codex App, Cursor Glass and Conductor.
 
@@ -76,7 +76,7 @@ The most common defect in this repo is a change that works on the path you teste
 
 - **Entry points.** A behavior reachable from the chat view is usually also reachable from Settings, the command palette, and a keybinding. Fixing one is not fixing the feature.
 - **Clients.** Web, desktop (wraps web, adds Electron shell/IPC), and mobile (React Native, separate navigation). Shared logic lives in `packages/client-runtime`
-- **Providers.** Codex, Claude, Cursor, Grok, and OpenCode each have an adapter. Provider-shaped features need a decision per adapter, even if the decision is "not supported here".
+- **Providers.** Codex, Claude, Cursor, Grok, OpenCode, and Antigravity each have an adapter. Provider-shaped features need a decision per adapter, even if the decision is "not supported here".
 - **Contracts.** Anything crossing the wire is typed in `packages/contracts`. Change the schema and the server, web, mobile, and desktop all follow.
 - **Reverse states.** If you added a way in, add the way out and the way to see it. Snooze needs unsnooze. Close needs reopen. A one-way door is a bug.
 - **Connection modes.** Local, remote/relay, and tunnel behave differently. Multi-device and multi-environment cases are real.
@@ -152,7 +152,7 @@ Full glossary with file links: `docs/internals/glossary.md`
 
 ## Provider Architecture
 
-T3 Code supports multiple coding-agent providers behind a uniform abstraction: **Codex, Claude, Cursor, and OpenCode**. Each has a driver (`apps/server/src/provider/Drivers/`), a provider layer (`apps/server/src/provider/Layers/*Provider.ts`), and a text-generation adapter (`apps/server/src/textGeneration/*TextGeneration.ts`). Providers that speak the Agent Client Protocol run through the shared ACP runtime in `apps/server/src/provider/acp/`.
+T3 Code supports multiple coding-agent providers behind a uniform abstraction: **Codex, Claude, Cursor, Grok, OpenCode, and Antigravity**. Each has a driver (`apps/server/src/provider/Drivers/`), a provider layer (`apps/server/src/provider/Layers/*Provider.ts`), and a text-generation adapter (`apps/server/src/textGeneration/*TextGeneration.ts`). Providers that speak the Agent Client Protocol run through the shared ACP runtime in `apps/server/src/provider/acp/`.
 
 The runtime pipeline is provider-agnostic:
 
