@@ -33,6 +33,8 @@ const clientSettings: ClientSettings = {
   confirmThreadUnpin: false,
   continueThreadsAfterServerUpdate: true,
   contextWindowMeterEnabled: false,
+  composerCollapseOnBlur: false,
+  composerCollapseOnScroll: true,
   deleteRemoteBranchOnDelete: true,
   dismissedProviderUpdateNotificationKeys: [],
   diffIgnoreWhitespace: true,
