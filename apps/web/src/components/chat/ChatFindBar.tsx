@@ -18,7 +18,8 @@ import { isCommandPaletteOpen } from "../../commandPaletteBus";
 import { resolveShortcutCommand } from "../../keybindings";
 import { isTerminalFocused } from "../../lib/terminalFocus";
 import { Button } from "../ui/button";
-import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "../ui/input-group";
+import { Input } from "../ui/input";
+import { Separator } from "../ui/separator";
 import { Toggle } from "../ui/toggle";
 import { primaryServerKeybindingsAtom } from "~/state/server";
 import { cn } from "~/lib/utils";
@@ -344,91 +345,88 @@ export const ChatFindBar = memo(function ChatFindBar({
       aria-label="Find in chat"
       data-chat-find-bar="true"
       className={cn(
-        "absolute right-4 z-30 rounded-[var(--control-radius)] border border-border bg-popover p-0.5 shadow-md",
+        "absolute right-4 z-30 flex h-8 w-[24rem] max-w-[calc(100%-2rem)] items-center gap-0.5 rounded-lg border border-border/70 bg-popover/95 p-0.5 shadow-md/10 backdrop-blur",
         topFadeEnabled ? "top-[var(--workspace-titlebar-scroll-fade-height)]" : "top-2",
       )}
     >
-      <InputGroup variant="ghost" className="h-7 w-[23rem]">
-        <InputGroupAddon>
-          <SearchIcon aria-hidden className="size-3.5" />
-        </InputGroupAddon>
-        <InputGroupInput
-          ref={inputRef}
-          type="search"
-          size="sm"
-          value={query}
-          onChange={(event) => restartFromQuery(event.currentTarget.value)}
-          onKeyDown={onInputKeyDown}
-          placeholder="Find in chat"
-          aria-label="Find in chat"
-          autoComplete="off"
-          autoCorrect="off"
-          autoCapitalize="off"
-          spellCheck={false}
-        />
-        <InputGroupAddon align="inline-end" className="gap-0.5">
-          <Toggle
-            variant="ghost"
-            size="xs"
-            aria-label="Match case"
-            title="Match case"
-            pressed={options.caseSensitive}
-            onPressedChange={() => toggleOption("caseSensitive")}
-            className="font-mono text-xs text-muted-foreground data-pressed:text-foreground"
-          >
-            Aa
-          </Toggle>
-          <Toggle
-            variant="ghost"
-            size="xs"
-            aria-label="Match whole word"
-            title="Match whole word"
-            pressed={options.wholeWord}
-            onPressedChange={() => toggleOption("wholeWord")}
-            className="font-mono text-xs text-muted-foreground data-pressed:text-foreground"
-          >
-            <span className="underline decoration-2 underline-offset-2">ab</span>
-          </Toggle>
-          <InputGroupText
-            className={cn(
-              "min-w-14 justify-end text-xs tabular-nums",
-              hasQuery && matches.length === 0 && "text-destructive-foreground",
-            )}
-            aria-live="polite"
-          >
-            {countLabel}
-          </InputGroupText>
-          <Button
-            variant="ghost-muted"
-            size="icon-xs"
-            aria-label="Previous match"
-            title="Previous match (Shift+Enter)"
-            disabled={matches.length === 0}
-            onClick={() => step(-1)}
-          >
-            <ChevronUpIcon />
-          </Button>
-          <Button
-            variant="ghost-muted"
-            size="icon-xs"
-            aria-label="Next match"
-            title="Next match (Enter)"
-            disabled={matches.length === 0}
-            onClick={() => step(1)}
-          >
-            <ChevronDownIcon />
-          </Button>
-          <Button
-            variant="ghost-muted"
-            size="icon-xs"
-            aria-label="Close find"
-            title="Close (Esc)"
-            onClick={close}
-          >
-            <XIcon />
-          </Button>
-        </InputGroupAddon>
-      </InputGroup>
+      <SearchIcon aria-hidden className="ms-1.5 size-3.5 shrink-0 text-muted-foreground" />
+      <Input
+        ref={inputRef}
+        unstyled
+        type="search"
+        size="sm"
+        value={query}
+        onChange={(event) => restartFromQuery(event.currentTarget.value)}
+        onKeyDown={onInputKeyDown}
+        placeholder="Find in chat"
+        aria-label="Find in chat"
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
+        spellCheck={false}
+        className="min-w-0 flex-1 text-sm [&_input]:px-1.5"
+      />
+      <span
+        className={cn(
+          "min-w-[4.75rem] shrink-0 whitespace-nowrap px-1.5 text-end text-xs tabular-nums text-muted-foreground",
+          hasQuery && matches.length === 0 && "text-destructive-foreground",
+        )}
+        aria-live="polite"
+      >
+        {countLabel}
+      </span>
+      <Separator orientation="vertical" className="mx-0.5 h-4 bg-border/70" />
+      <Toggle
+        variant="ghost"
+        size="xs"
+        aria-label="Match case"
+        title="Match case"
+        pressed={options.caseSensitive}
+        onPressedChange={() => toggleOption("caseSensitive")}
+        className="size-7 min-w-0 px-0 font-mono text-xs text-muted-foreground data-pressed:text-foreground sm:size-6"
+      >
+        Aa
+      </Toggle>
+      <Toggle
+        variant="ghost"
+        size="xs"
+        aria-label="Match whole word"
+        title="Match whole word"
+        pressed={options.wholeWord}
+        onPressedChange={() => toggleOption("wholeWord")}
+        className="size-7 min-w-0 px-0 font-mono text-xs text-muted-foreground data-pressed:text-foreground sm:size-6"
+      >
+        <span className="underline decoration-2 underline-offset-2">ab</span>
+      </Toggle>
+      <Button
+        variant="ghost-muted"
+        size="icon-xs"
+        aria-label="Previous match"
+        title="Previous match (Shift+Enter)"
+        disabled={matches.length === 0}
+        onClick={() => step(-1)}
+      >
+        <ChevronUpIcon />
+      </Button>
+      <Button
+        variant="ghost-muted"
+        size="icon-xs"
+        aria-label="Next match"
+        title="Next match (Enter)"
+        disabled={matches.length === 0}
+        onClick={() => step(1)}
+      >
+        <ChevronDownIcon />
+      </Button>
+      <Button
+        variant="ghost-muted"
+        size="icon-xs"
+        aria-label="Close find"
+        title="Close (Esc)"
+        onClick={close}
+      >
+        <XIcon />
+      </Button>
     </div>
   );
 });
