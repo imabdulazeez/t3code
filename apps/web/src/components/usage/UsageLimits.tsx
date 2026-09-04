@@ -26,7 +26,12 @@ import { Fragment, useState } from "react";
 
 import { isElectron } from "../../env";
 import { usePrimarySessionState } from "../../environments/primary";
-import { usePrimarySettings, useUpdateEnvironmentSettings } from "../../hooks/useSettings";
+import {
+  useClientSettings,
+  usePrimarySettings,
+  useUpdateClientSettings,
+  useUpdateEnvironmentSettings,
+} from "../../hooks/useSettings";
 import {
   type EnvironmentPresentation,
   useEnvironments,
@@ -55,6 +60,7 @@ import {
 } from "../ui/alert-dialog";
 import { Button } from "../ui/button";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
+import { Switch } from "../ui/switch";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { AddUsageLimitSourceDialog } from "./AddUsageLimitSourceDialog";
 import { PROVIDER_PRESENTATION } from "./usageProviders";
@@ -540,6 +546,22 @@ function SourceLimitsRow({ source, now }: { readonly source: LimitsSource; reado
   return <SourceLimits source={source} now={now} onRemove={canOperate ? remove : null} />;
 }
 
+function SidebarLimitsToggle() {
+  const checked = useClientSettings((settings) => settings.sidebarUsageLimitsEnabled);
+  const updateSettings = useUpdateClientSettings();
+  return (
+    <label className="flex h-7 shrink-0 cursor-pointer items-center gap-2 rounded-md px-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground">
+      <span>Show in sidebar</span>
+      <Switch
+        checked={checked}
+        onCheckedChange={(next) => updateSettings({ sidebarUsageLimitsEnabled: Boolean(next) })}
+        aria-label="Show limits in sidebar"
+        size="sm"
+      />
+    </label>
+  );
+}
+
 /**
  * Subscription quota windows from every connected environment's providers.
  * Countdowns anchor to render time rather than ticking: a live clock would
@@ -588,33 +610,34 @@ export function UsageLimitsSection() {
         {/* The picker stays whenever several environments are connected, so
             a read-only default target does not hide the way to an operable
             one; only the button follows the picked target's access. */}
-        {targetEnvironment ? (
-          <div className="flex items-center gap-2">
-            {connected.length > 1 ? (
-              <Select
-                value={targetEnvironment.environmentId}
-                onValueChange={(value) => {
-                  if (value !== null) setPickedEnvironmentId(EnvironmentId.make(value));
-                }}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {targetEnvironment && connected.length > 1 ? (
+            <Select
+              value={targetEnvironment.environmentId}
+              onValueChange={(value) => {
+                if (value !== null) setPickedEnvironmentId(EnvironmentId.make(value));
+              }}
+            >
+              <SelectTrigger
+                aria-label="Environment to add the hub to"
+                size="compact"
+                variant="ghost"
+                className="w-auto min-w-0"
               >
-                <SelectTrigger
-                  aria-label="Environment to add the hub to"
-                  size="compact"
-                  variant="ghost"
-                  className="w-auto min-w-0"
-                >
-                  <SelectValue>{targetEnvironment.label}</SelectValue>
-                </SelectTrigger>
-                <SelectPopup align="end" alignItemWithTrigger={false}>
-                  {connected.map((environment) => (
-                    <SelectItem key={environment.environmentId} value={environment.environmentId}>
-                      {environment.label}
-                    </SelectItem>
-                  ))}
-                </SelectPopup>
-              </Select>
-            ) : null}
-            {canOperateTarget ? (
+                <SelectValue>{targetEnvironment.label}</SelectValue>
+              </SelectTrigger>
+              <SelectPopup align="end" alignItemWithTrigger={false}>
+                {connected.map((environment) => (
+                  <SelectItem key={environment.environmentId} value={environment.environmentId}>
+                    {environment.label}
+                  </SelectItem>
+                ))}
+              </SelectPopup>
+            </Select>
+          ) : null}
+          <SidebarLimitsToggle />
+          {targetEnvironment ? (
+            canOperateTarget ? (
               <Button size="xs" variant="outline" onClick={() => setAdding(true)}>
                 <PlusIcon className="size-3" aria-hidden />
                 Add hub
@@ -640,9 +663,9 @@ export function UsageLimitsSection() {
                   Your session cannot change settings on {targetEnvironment.label}.
                 </TooltipPopup>
               </Tooltip>
-            )}
-          </div>
-        ) : null}
+            )
+          ) : null}
+        </div>
       </div>
       {groups.length === 0 && sources.length === 0 ? (
         <p className="text-sm text-muted-foreground">

@@ -18,6 +18,11 @@ provider health-check interval and update live while a turn runs. API-key accoun
 subscription windows and say so; that includes a Claude Code that reaches Anthropic through a proxy
 via `ANTHROPIC_AUTH_TOKEN`, since the CLI then treats itself as an API-key client.
 
+When an open chat's provider reports subscription limits, the bottom of the sidebar shows the
+remaining quota for its shortest window, such as the five-hour session. Hover or focus the indicator
+to see every window for that provider without leaving the chat. Turn **Show in sidebar** off beside
+**Add hub** to hide the indicator; the Usage button remains in the sidebar.
+
 If you pool accounts behind a CLIProxyAPI hub, **Add hub** on the Limits view shows the accounts
 the hub manages. Each row shows its provider and instance name, or a small _CLI Proxy_ label for
 hub accounts. When a connected provider reports limits for the same provider and email, its row
