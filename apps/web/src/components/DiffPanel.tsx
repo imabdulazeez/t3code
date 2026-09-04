@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import * as Schema from "effect/Schema";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCodeViewFileReveal } from "./diffs/useCodeViewFileReveal";
 import { useOpenInPreferredEditor } from "../editorPreferences";
 import { type DraftId } from "../composerDraftStore";
 import { openDiffFilePrimaryAction } from "../diffFileActions";
@@ -133,7 +134,7 @@ export default function DiffPanel({
     fileKeys: EMPTY_COLLAPSED_DIFF_FILE_KEYS,
   }));
   const [codeViewRevision, setCodeViewRevision] = useState(0);
-  const codeViewRef = useRef<AnnotatableCodeViewHandle>(null);
+  const [codeView, setCodeView] = useState<AnnotatableCodeViewHandle | null>(null);
 
   const routeThreadRef = useParams({
     strict: false,
@@ -452,17 +453,15 @@ export default function DiffPanel({
     : null;
 
   useEffect(() => {
-    if (!selectedDiffFileKey) return;
-    codeViewRef.current?.scrollTo({ type: "item", id: selectedDiffFileKey, align: "start" });
-  }, [codeViewMountKey, selectedDiffFileKey, selectedFileRevealRequestId]);
+    if (!selectedDiffFileKey || !codeView?.getInstance()) return;
+    codeView.scrollTo({ type: "item", id: selectedDiffFileKey, align: "start" });
+  }, [codeView, codeViewMountKey, selectedDiffFileKey, selectedFileRevealRequestId]);
 
-  // Held as state so the scroll runs after a collapsed file has been drawn open again; scrolling
-  // in the same tick would land on the folded header's position.
-  const [treeReveal, setTreeReveal] = useState<{ fileKey: string; id: number } | null>(null);
-  useEffect(() => {
-    if (treeReveal === null) return;
-    codeViewRef.current?.scrollTo({ type: "item", id: treeReveal.fileKey, align: "start" });
-  }, [treeReveal]);
+  const treeRevealScope = useMemo(
+    () => ({ collapseScopeKey, diffSelection }),
+    [collapseScopeKey, diffSelection],
+  );
+  const requestTreeReveal = useCodeViewFileReveal(codeView, treeRevealScope);
   const revealDiffFile = useCallback(
     (filePath: string) => {
       const file = codeViewFiles.find((candidate) => candidate.filePath === filePath);
@@ -474,9 +473,9 @@ export default function DiffPanel({
           return { scopeKey: collapseScopeKey, fileKeys: next };
         });
       }
-      setTreeReveal((current) => ({ fileKey: file.fileKey, id: (current?.id ?? 0) + 1 }));
+      requestTreeReveal(file.fileKey);
     },
-    [codeViewFiles, collapseScopeKey],
+    [codeViewFiles, collapseScopeKey, requestTreeReveal],
   );
 
   useEffect(() => {
@@ -488,10 +487,10 @@ export default function DiffPanel({
   const scrollToFile = useCallback(
     (path: string) => {
       const file = codeViewFiles.find((candidate) => candidate.filePath === path);
-      if (!file) return;
-      codeViewRef.current?.scrollTo({ type: "item", id: file.fileKey, align: "start" });
+      if (!file || !codeView?.getInstance()) return;
+      codeView.scrollTo({ type: "item", id: file.fileKey, align: "start" });
     },
-    [codeViewFiles],
+    [codeView, codeViewFiles],
   );
 
   const fileSearchMatchPaths = useMemo(() => {
@@ -1024,7 +1023,7 @@ export default function DiffPanel({
                 >
                   <AnnotatableCodeView
                     key={collapseScopeKey ?? reviewSectionId}
-                    viewerRef={codeViewRef}
+                    viewerRef={setCodeView}
                     codeViewKey={codeViewMountKey}
                     className="h-full min-h-0 overflow-auto"
                     files={codeViewFiles}
