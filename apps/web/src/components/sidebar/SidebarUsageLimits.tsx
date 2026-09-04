@@ -2,13 +2,14 @@ import type {
   ProviderDriverKind,
   ServerConfig,
   ServerProvider,
+  ServerProviderUsageLimits,
   ServerProviderUsageWindow,
   UsageLimitSourceAccount,
   UsageProviderKind,
 } from "@t3tools/contracts";
 import { formatResetsIn, providerLimitsLabel } from "@t3tools/shared/usageLimits";
 import { useParams } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 
 import { useComposerDraftStore } from "../../composerDraftStore";
 import { useClientSettings } from "../../hooks/useSettings";
@@ -63,25 +64,25 @@ function sourceAccountForProvider(
   return sameDriver.length === 1 ? (sameDriver[0] ?? null) : null;
 }
 
-function windowsForProvider(
+function limitsForProvider(
   config: ServerConfig,
   provider: ServerProvider,
-): ReadonlyArray<ServerProviderUsageWindow> {
+): ServerProviderUsageLimits | null {
   if (
     provider.usageLimits !== undefined &&
     provider.usageLimits.unavailable === undefined &&
     provider.usageLimits.windows.length > 0
   ) {
-    return provider.usageLimits.windows;
+    return provider.usageLimits;
   }
   const sourceAccount = sourceAccountForProvider(config, provider);
   if (
     sourceAccount?.usageLimits.unavailable === undefined &&
     sourceAccount?.usageLimits.windows.length
   ) {
-    return sourceAccount.usageLimits.windows;
+    return sourceAccount.usageLimits;
   }
-  return [];
+  return null;
 }
 
 function windowLabel(window: ServerProviderUsageWindow): string {
@@ -145,7 +146,6 @@ export function SidebarUsageLimits() {
     return null;
   });
   const serverConfigs = useServerConfigs();
-  const [now] = useState(() => Date.now());
   const environmentId =
     routeTarget?.kind === "server"
       ? routeTarget.threadRef.environmentId
@@ -155,12 +155,12 @@ export function SidebarUsageLimits() {
     activeThread?.session?.providerInstanceId ??
     activeThread?.modelSelection.instanceId ??
     null;
-  if (!enabled) return null;
-  if (environmentId === null || instanceId === null) return null;
-  const config = serverConfigs.get(environmentId);
+  const config = environmentId === null ? undefined : serverConfigs.get(environmentId);
   const provider = config?.providers.find((candidate) => candidate.instanceId === instanceId);
-  if (!config || !provider) return null;
-  const windows = windowsForProvider(config, provider).toSorted(compareWindowDuration);
+  const limits = enabled && config && provider ? limitsForProvider(config, provider) : null;
+  if (!limits || !provider) return null;
+  const now = Date.parse(limits.checkedAt);
+  const windows = limits.windows.toSorted(compareWindowDuration);
   const shortestWindow = windows[0];
   if (!shortestWindow) return null;
   const color = providerColor(provider.driver);
