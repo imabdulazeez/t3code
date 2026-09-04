@@ -16,14 +16,8 @@ export function clearChatFindHighlights(): void {
   CSS.highlights.delete(FIND_ACTIVE_HIGHLIGHT_NAME);
 }
 
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-export function findChatRowTextRanges(root: HTMLElement, query: string): Range[] {
-  if (query.length === 0) return [];
+export function findChatRowTextRanges(root: HTMLElement, pattern: RegExp): Range[] {
   const stream = readAssistantText(root);
-  const pattern = new RegExp(escapeRegExp(query), "gi");
   const ranges: Range[] = [];
   for (const match of stream.text.matchAll(pattern)) {
     const start = match.index;
@@ -46,12 +40,12 @@ export function findMountedChatRow(scrollNode: HTMLElement, rowId: string): HTML
 
 export function applyChatFindHighlights({
   scrollNode,
-  query,
+  pattern,
   matchRowIds,
   active,
 }: {
   scrollNode: HTMLElement;
-  query: string;
+  pattern: RegExp;
   matchRowIds: ReadonlySet<string>;
   active: ChatFindMatch | null;
 }): Range | null {
@@ -61,7 +55,7 @@ export function applyChatFindHighlights({
   for (const element of scrollNode.querySelectorAll<HTMLElement>("[data-timeline-row-id]")) {
     const rowId = element.dataset.timelineRowId;
     if (!rowId || !matchRowIds.has(rowId)) continue;
-    const rowRanges = findChatRowTextRanges(element, query);
+    const rowRanges = findChatRowTextRanges(element, pattern);
     if (active !== null && rowId === active.rowId && rowRanges.length > 0) {
       activeRange = rowRanges[Math.min(active.occurrence, rowRanges.length - 1)] ?? null;
     }

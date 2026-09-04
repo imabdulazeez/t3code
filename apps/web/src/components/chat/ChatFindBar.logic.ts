@@ -16,34 +16,53 @@ export function chatFindSearchableText(row: MessagesTimelineRow): string | null 
   return typeof text === "string" && text.length > 0 ? text : null;
 }
 
-export function countChatFindOccurrences(text: string, query: string): number {
-  if (query.length === 0) return 0;
-  const haystack = text.toLowerCase();
-  const needle = query.toLowerCase();
+export interface ChatFindOptions {
+  readonly caseSensitive: boolean;
+  readonly wholeWord: boolean;
+}
+
+export const DEFAULT_CHAT_FIND_OPTIONS: ChatFindOptions = {
+  caseSensitive: false,
+  wholeWord: false,
+};
+
+const WORD_CHARACTER = String.raw`[\p{L}\p{N}_]`;
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export function buildChatFindPattern(
+  query: string,
+  options: ChatFindOptions = DEFAULT_CHAT_FIND_OPTIONS,
+): RegExp | null {
+  const trimmed = query.trim();
+  if (trimmed.length === 0) return null;
+  const escaped = escapeRegExp(trimmed);
+  const source = options.wholeWord
+    ? `(?<!${WORD_CHARACTER})${escaped}(?!${WORD_CHARACTER})`
+    : escaped;
+  return new RegExp(source, options.caseSensitive ? "gu" : "giu");
+}
+
+export function countChatFindOccurrences(text: string, pattern: RegExp): number {
   let count = 0;
-  for (
-    let index = haystack.indexOf(needle);
-    index !== -1;
-    index = haystack.indexOf(needle, index + needle.length)
-  ) {
-    count += 1;
-  }
+  for (const _ of text.matchAll(pattern)) count += 1;
   return count;
 }
 
 export function deriveChatFindMatches(
   rows: ReadonlyArray<MessagesTimelineRow>,
-  query: string,
+  pattern: RegExp | null,
 ): ChatFindMatch[] {
-  const trimmed = query.trim();
-  if (trimmed.length === 0) return [];
+  if (pattern === null) return [];
   const matches: ChatFindMatch[] = [];
   for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
     const row = rows[rowIndex];
     if (!row) continue;
     const text = chatFindSearchableText(row);
     if (text === null) continue;
-    const count = countChatFindOccurrences(text, trimmed);
+    const count = countChatFindOccurrences(text, pattern);
     for (let occurrence = 0; occurrence < count; occurrence += 1) {
       matches.push({ rowId: row.id, rowIndex, occurrence });
     }
