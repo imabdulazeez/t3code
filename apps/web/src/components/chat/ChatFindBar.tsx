@@ -18,11 +18,16 @@ import { isCommandPaletteOpen } from "../../commandPaletteBus";
 import { resolveShortcutCommand } from "../../keybindings";
 import { isTerminalFocused } from "../../lib/terminalFocus";
 import { Button } from "../ui/button";
+import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "../ui/input-group";
+import { Toggle } from "../ui/toggle";
 import { primaryServerKeybindingsAtom } from "~/state/server";
 import { cn } from "~/lib/utils";
 import {
   type ChatFindMatch,
+  type ChatFindOptions,
+  buildChatFindPattern,
   chatFindMatchKey,
+  DEFAULT_CHAT_FIND_OPTIONS,
   deriveChatFindMatches,
   resolveChatFindActiveIndex,
   resolveChatFindStartIndex,
@@ -40,6 +45,14 @@ const EMPTY_MATCHES: ReadonlyArray<ChatFindMatch> = [];
 const REVEAL_VIEW_OFFSET = 96;
 const REVEAL_TOP_MARGIN = 24;
 const REVEAL_BOTTOM_FRACTION = 0.6;
+const MAX_PREFILL_LENGTH = 200;
+
+function readSelectionPrefill(): string | null {
+  const selection = window.getSelection()?.toString() ?? "";
+  const line = selection.split(/\r?\n/, 1)[0]?.trim() ?? "";
+  if (line.length === 0 || line.length > MAX_PREFILL_LENGTH) return null;
+  return line;
+}
 
 interface ChatFindBarProps {
   rows: ReadonlyArray<MessagesTimelineRow>;
@@ -50,7 +63,7 @@ interface ChatFindBarProps {
 
 interface ChatFindHighlightState {
   open: boolean;
-  query: string;
+  pattern: RegExp | null;
   matchRowIds: ReadonlySet<string>;
   activeMatch: ChatFindMatch | null;
 }
@@ -64,6 +77,7 @@ export const ChatFindBar = memo(function ChatFindBar({
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [options, setOptions] = useState<ChatFindOptions>(DEFAULT_CHAT_FIND_OPTIONS);
   const [activeIndex, setActiveIndex] = useState(0);
   const [focusToken, setFocusToken] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -76,15 +90,19 @@ export const ChatFindBar = memo(function ChatFindBar({
   const frameRef = useRef<number | null>(null);
   const highlightStateRef = useRef<ChatFindHighlightState>({
     open: false,
-    query: "",
+    pattern: null,
     matchRowIds: new Set(),
     activeMatch: null,
   });
 
   const trimmedQuery = query.trim();
+  const pattern = useMemo(
+    () => buildChatFindPattern(trimmedQuery, options),
+    [options, trimmedQuery],
+  );
   const matches = useMemo(
-    () => (open ? deriveChatFindMatches(rows, trimmedQuery) : EMPTY_MATCHES),
-    [open, rows, trimmedQuery],
+    () => (open && pattern !== null ? deriveChatFindMatches(rows, pattern) : EMPTY_MATCHES),
+    [open, pattern, rows],
   );
   const matchRowIds = useMemo(() => new Set(matches.map((match) => match.rowId)), [matches]);
   const activeMatch = matches[activeIndex] ?? null;
@@ -95,13 +113,13 @@ export const ChatFindBar = memo(function ChatFindBar({
     const scrollNode = list?.getScrollableNode();
     if (!list || !(scrollNode instanceof HTMLElement)) return;
     const state = highlightStateRef.current;
-    if (!state.open || state.query.length === 0) {
+    if (!state.open || state.pattern === null) {
       clearChatFindHighlights();
       return;
     }
     const activeRange = applyChatFindHighlights({
       scrollNode,
-      query: state.query,
+      pattern: state.pattern,
       matchRowIds: state.matchRowIds,
       active: state.activeMatch,
     });
@@ -139,7 +157,7 @@ export const ChatFindBar = memo(function ChatFindBar({
   }, [runHighlight]);
 
   useLayoutEffect(() => {
-    highlightStateRef.current = { open, query: trimmedQuery, matchRowIds, activeMatch };
+    highlightStateRef.current = { open, pattern, matchRowIds, activeMatch };
     activeMatchRef.current = activeMatch;
     openRef.current = open;
     queryRef.current = trimmedQuery;
@@ -225,14 +243,24 @@ export const ChatFindBar = memo(function ChatFindBar({
     };
   }, [listRef, open, scheduleHighlight]);
 
+  const restartFromQuery = useCallback((value: string) => {
+    setQuery(value);
+    setActiveIndex(0);
+    activeMatchRef.current = null;
+    revealFirstMatchRef.current = value.trim().length > 0;
+  }, []);
+
   const openBar = useCallback(() => {
-    if (!openRef.current && queryRef.current.length > 0) {
+    const prefill = readSelectionPrefill();
+    if (prefill !== null) {
+      restartFromQuery(prefill);
+    } else if (!openRef.current && queryRef.current.length > 0) {
       activeMatchRef.current = null;
       revealFirstMatchRef.current = true;
     }
     setOpen(true);
     setFocusToken((token) => token + 1);
-  }, []);
+  }, [restartFromQuery]);
 
   useEffect(() => {
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
@@ -276,11 +304,11 @@ export const ChatFindBar = memo(function ChatFindBar({
     [activeIndex, matches, reveal],
   );
 
-  const onQueryChange = useCallback((value: string) => {
-    setQuery(value);
+  const toggleOption = useCallback((key: keyof ChatFindOptions) => {
+    setOptions((current) => ({ ...current, [key]: !current[key] }));
     setActiveIndex(0);
     activeMatchRef.current = null;
-    revealFirstMatchRef.current = value.trim().length > 0;
+    revealFirstMatchRef.current = queryRef.current.length > 0;
   }, []);
 
   const onInputKeyDown = useCallback(
@@ -316,65 +344,91 @@ export const ChatFindBar = memo(function ChatFindBar({
       aria-label="Find in chat"
       data-chat-find-bar="true"
       className={cn(
-        "absolute right-4 z-30 flex items-center gap-0.5 rounded-[var(--control-radius)] border border-border bg-popover p-1 text-foreground shadow-md",
+        "absolute right-4 z-30 rounded-[var(--control-radius)] border border-border bg-popover p-0.5 shadow-md",
         topFadeEnabled ? "top-[var(--workspace-titlebar-scroll-fade-height)]" : "top-2",
       )}
     >
-      <SearchIcon className="ml-1.5 size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-      <input
-        ref={inputRef}
-        type="text"
-        value={query}
-        onChange={(event) => onQueryChange(event.target.value)}
-        onKeyDown={onInputKeyDown}
-        placeholder="Find in chat"
-        aria-label="Find in chat"
-        autoComplete="off"
-        autoCorrect="off"
-        autoCapitalize="off"
-        spellCheck={false}
-        className="h-6 w-44 min-w-0 bg-transparent px-1.5 text-xs text-foreground outline-none placeholder:text-placeholder"
-      />
-      <span
-        className={cn(
-          "min-w-14 shrink-0 pr-1 text-right text-xs tabular-nums",
-          hasQuery && matches.length === 0
-            ? "text-destructive-foreground"
-            : "text-muted-foreground",
-        )}
-        aria-live="polite"
-      >
-        {countLabel}
-      </span>
-      <Button
-        variant="ghost-muted"
-        size="icon-xs"
-        aria-label="Previous match"
-        title="Previous match (Shift+Enter)"
-        disabled={matches.length === 0}
-        onClick={() => step(-1)}
-      >
-        <ChevronUpIcon />
-      </Button>
-      <Button
-        variant="ghost-muted"
-        size="icon-xs"
-        aria-label="Next match"
-        title="Next match (Enter)"
-        disabled={matches.length === 0}
-        onClick={() => step(1)}
-      >
-        <ChevronDownIcon />
-      </Button>
-      <Button
-        variant="ghost-muted"
-        size="icon-xs"
-        aria-label="Close find"
-        title="Close (Esc)"
-        onClick={close}
-      >
-        <XIcon />
-      </Button>
+      <InputGroup variant="ghost" className="h-7 w-[23rem]">
+        <InputGroupAddon>
+          <SearchIcon aria-hidden className="size-3.5" />
+        </InputGroupAddon>
+        <InputGroupInput
+          ref={inputRef}
+          type="search"
+          size="sm"
+          value={query}
+          onChange={(event) => restartFromQuery(event.currentTarget.value)}
+          onKeyDown={onInputKeyDown}
+          placeholder="Find in chat"
+          aria-label="Find in chat"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
+        />
+        <InputGroupAddon align="inline-end" className="gap-0.5">
+          <Toggle
+            variant="ghost"
+            size="xs"
+            aria-label="Match case"
+            title="Match case"
+            pressed={options.caseSensitive}
+            onPressedChange={() => toggleOption("caseSensitive")}
+            className="font-mono text-xs text-muted-foreground data-pressed:text-foreground"
+          >
+            Aa
+          </Toggle>
+          <Toggle
+            variant="ghost"
+            size="xs"
+            aria-label="Match whole word"
+            title="Match whole word"
+            pressed={options.wholeWord}
+            onPressedChange={() => toggleOption("wholeWord")}
+            className="font-mono text-xs text-muted-foreground data-pressed:text-foreground"
+          >
+            <span className="underline decoration-2 underline-offset-2">ab</span>
+          </Toggle>
+          <InputGroupText
+            className={cn(
+              "min-w-14 justify-end text-xs tabular-nums",
+              hasQuery && matches.length === 0 && "text-destructive-foreground",
+            )}
+            aria-live="polite"
+          >
+            {countLabel}
+          </InputGroupText>
+          <Button
+            variant="ghost-muted"
+            size="icon-xs"
+            aria-label="Previous match"
+            title="Previous match (Shift+Enter)"
+            disabled={matches.length === 0}
+            onClick={() => step(-1)}
+          >
+            <ChevronUpIcon />
+          </Button>
+          <Button
+            variant="ghost-muted"
+            size="icon-xs"
+            aria-label="Next match"
+            title="Next match (Enter)"
+            disabled={matches.length === 0}
+            onClick={() => step(1)}
+          >
+            <ChevronDownIcon />
+          </Button>
+          <Button
+            variant="ghost-muted"
+            size="icon-xs"
+            aria-label="Close find"
+            title="Close (Esc)"
+            onClick={close}
+          >
+            <XIcon />
+          </Button>
+        </InputGroupAddon>
+      </InputGroup>
     </div>
   );
 });
