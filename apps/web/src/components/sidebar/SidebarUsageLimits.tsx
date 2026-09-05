@@ -186,7 +186,7 @@ export function SidebarUsageLimits() {
         role="img"
         aria-label={summary}
         tabIndex={0}
-        className="flex cursor-default flex-col gap-1.5 rounded-md px-2 py-1.5 outline-none hover:bg-sidebar-row-hover focus-visible:bg-sidebar-row-hover focus-visible:ring-1 focus-visible:ring-sidebar-border"
+        className="flex cursor-default flex-col gap-1.5 rounded-md px-2 py-1.5 outline-none hover:bg-sidebar-row-hover/50 focus-visible:bg-sidebar-row-hover/50 focus-visible:ring-1 focus-visible:ring-sidebar-border"
       >
         <div className="flex min-w-0 items-center gap-1.5 text-[11px] leading-none">
           <ProviderInstanceIcon
@@ -214,32 +214,36 @@ export function SidebarUsageLimits() {
         </div>
       </div>
       <div className="pointer-events-none invisible absolute inset-x-0 bottom-full z-50 pb-1 opacity-0 transition-opacity group-focus-within/sidebar-usage:pointer-events-auto group-focus-within/sidebar-usage:visible group-focus-within/sidebar-usage:opacity-100 group-hover/sidebar-usage:pointer-events-auto group-hover/sidebar-usage:visible group-hover/sidebar-usage:opacity-100">
-        <button
-          type="button"
-          onClick={openLimits}
-          aria-label={`Open ${providerLabel} limits in Usage`}
-          className="flex w-full cursor-pointer flex-col gap-3 rounded-lg border border-sidebar-border bg-sidebar p-3 text-start text-sidebar-foreground shadow-lg outline-none hover:bg-sidebar-row-hover focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <div className="flex min-w-0 items-center gap-2">
-            <ProviderInstanceIcon
-              driverKind={provider.driver}
-              displayName={providerLabel}
-              accentColor={provider.accentColor}
-              showBadge={Boolean(provider.accentColor)}
-              indicatorBackground="var(--sidebar)"
-              className="size-4 shrink-0"
-              iconClassName="size-3.5 text-sidebar-foreground/80"
-            />
-            <span className="min-w-0 flex-1 truncate text-xs font-medium">
-              {providerLabel} limits
-            </span>
-          </div>
-          <div className="flex flex-col gap-3">
-            {windows.map((window) => (
-              <UsageWindowBar key={window.id} window={window} color={color} now={now} />
-            ))}
-          </div>
-        </button>
+        {/* The card floats over the thread list, so the opaque wrapper keeps rows from
+            bleeding through: sidebar and popover tokens can carry alpha in custom themes. */}
+        <div className="overflow-hidden rounded-lg bg-background shadow-lg">
+          <button
+            type="button"
+            onClick={openLimits}
+            aria-label={`Open ${providerLabel} limits in Usage`}
+            className="flex w-full cursor-pointer flex-col gap-3 rounded-lg border border-sidebar-border bg-sidebar p-3 text-start text-sidebar-foreground outline-none hover:bg-sidebar-row-hover/50 focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <div className="flex min-w-0 items-center gap-2">
+              <ProviderInstanceIcon
+                driverKind={provider.driver}
+                displayName={providerLabel}
+                accentColor={provider.accentColor}
+                showBadge={Boolean(provider.accentColor)}
+                indicatorBackground="var(--sidebar)"
+                className="size-4 shrink-0"
+                iconClassName="size-3.5 text-sidebar-foreground/80"
+              />
+              <span className="min-w-0 flex-1 truncate text-xs font-medium">
+                {providerLabel} limits
+              </span>
+            </div>
+            <div className="flex flex-col gap-3">
+              {windows.map((window) => (
+                <UsageWindowBar key={window.id} window={window} color={color} now={now} />
+              ))}
+            </div>
+          </button>
+        </div>
       </div>
     </div>
   );
