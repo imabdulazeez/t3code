@@ -7,7 +7,7 @@ import {
 import type { ComponentProps } from "react";
 
 import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
-import { useClientSettings } from "~/hooks/useSettings";
+import { useEnvironmentSettings } from "~/hooks/useSettings";
 import { serverEnvironment } from "~/state/server";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { manualServerUpdateCommand } from "~/versionSkew";
@@ -93,7 +93,8 @@ export function ServerUpdateAction({
   readonly variant?: ComponentProps<typeof Button>["variant"];
   readonly size?: ComponentProps<typeof Button>["size"];
 }) {
-  const continueThreadsAfterServerUpdate = useClientSettings(
+  const continueThreadsAfterServerUpdate = useEnvironmentSettings(
+    environmentId,
     (settings) => settings.continueThreadsAfterServerUpdate,
   );
   const updateServer = useAtomCommand(serverEnvironment.updateServer, {

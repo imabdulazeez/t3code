@@ -70,7 +70,6 @@ afterEach(() => {
 });
 
 describe("LocalApi", () => {
-  // Backend VCS forwarding tests moved with the connection rewrite to client-runtime state atoms.
   it("keeps backend operations out of the local host facade", async () => {
     const { createLocalApi } = await import("./localApi");
     const api = createLocalApi();
@@ -112,6 +111,14 @@ describe("LocalApi", () => {
     const { createLocalApi } = await import("./localApi");
 
     await expect(createLocalApi().dialogs.confirm("Delete this thread?")).resolves.toBe(false);
+  });
+
+  it("rejects opening System Settings when the desktop bridge is unavailable", async () => {
+    const { createLocalApi } = await import("./localApi");
+
+    await expect(createLocalApi().shell.openSystemSettings("full-disk-access")).rejects.toThrow(
+      "Unable to open System Settings.",
+    );
   });
 
   it("delegates host capabilities and persistence to the desktop bridge", async () => {
