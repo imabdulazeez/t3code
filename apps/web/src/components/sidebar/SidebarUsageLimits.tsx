@@ -9,7 +9,6 @@ import type {
 } from "@t3tools/contracts";
 import { formatResetsIn, providerLimitsLabel } from "@t3tools/shared/usageLimits";
 import { useNavigate, useParams } from "@tanstack/react-router";
-import { ChevronRightIcon } from "lucide-react";
 import { useCallback, useMemo } from "react";
 
 import { useComposerDraftStore } from "../../composerDraftStore";
@@ -181,11 +180,13 @@ export function SidebarUsageLimits() {
 
   return (
     <div className="group/sidebar-usage relative">
+      {/* The row is a summary, not a control: clicking it only reveals the card above, so its
+          focus treatment stays as quiet as the hover state instead of a full accent ring. */}
       <div
         role="img"
         aria-label={summary}
         tabIndex={0}
-        className="flex cursor-default flex-col gap-1.5 rounded-md px-2 py-1.5 outline-none hover:bg-sidebar-row-hover focus-visible:ring-2 focus-visible:ring-ring"
+        className="flex cursor-default flex-col gap-1.5 rounded-md px-2 py-1.5 outline-none hover:bg-sidebar-row-hover focus-visible:bg-sidebar-row-hover focus-visible:ring-1 focus-visible:ring-sidebar-border"
       >
         <div className="flex min-w-0 items-center gap-1.5 text-[11px] leading-none">
           <ProviderInstanceIcon
@@ -238,10 +239,6 @@ export function SidebarUsageLimits() {
               <UsageWindowBar key={window.id} window={window} color={color} now={now} />
             ))}
           </div>
-          <span className="flex items-center gap-0.5 text-[10px] leading-none text-sidebar-muted-foreground">
-            Open Limits
-            <ChevronRightIcon className="size-3" />
-          </span>
         </button>
       </div>
     </div>
