@@ -8,8 +8,9 @@ import type {
   UsageProviderKind,
 } from "@t3tools/contracts";
 import { formatResetsIn, providerLimitsLabel } from "@t3tools/shared/usageLimits";
-import { useParams } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useNavigate, useParams } from "@tanstack/react-router";
+import { ChevronRightIcon } from "lucide-react";
+import { useCallback, useMemo } from "react";
 
 import { useComposerDraftStore } from "../../composerDraftStore";
 import { useClientSettings } from "../../hooks/useSettings";
@@ -17,6 +18,7 @@ import { useServerConfigs, useThread } from "../../state/entities";
 import { resolveActiveThreadRouteRef, resolveThreadRouteTarget } from "../../threadRoutes";
 import { ProviderInstanceIcon } from "../chat/ProviderInstanceIcon";
 import { getDriverOption } from "../settings/providerDriverMeta";
+import { useSidebar } from "../ui/sidebar";
 import { PROVIDER_PRESENTATION } from "../usage/usageProviders";
 
 function compactDuration(minutes: number | undefined): string | null {
@@ -26,8 +28,10 @@ function compactDuration(minutes: number | undefined): string | null {
   return `${minutes}m`;
 }
 
-function remainingPercent(window: ServerProviderUsageWindow): number {
-  return Math.max(0, Math.min(100, 100 - window.usedPercent));
+// Bars fill with what has been used so they read the same way as the Usage page and the
+// context window meter.
+function usedPercent(window: ServerProviderUsageWindow): number {
+  return Math.max(0, Math.min(100, window.usedPercent));
 }
 
 function compareWindowDuration(
@@ -99,7 +103,7 @@ function UsageWindowBar({
   readonly color: string;
   readonly now: number;
 }) {
-  const remaining = remainingPercent(window);
+  const used = usedPercent(window);
   const reset = formatResetsIn(window, now);
   return (
     <div className="flex flex-col gap-1.5">
@@ -108,13 +112,13 @@ function UsageWindowBar({
           {windowLabel(window)}
         </span>
         <span className="shrink-0 font-medium text-sidebar-foreground tabular-nums">
-          {Math.round(remaining)}% left
+          {Math.round(used)}% used
         </span>
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-sidebar-control-surface">
         <div
           className="h-full rounded-full"
-          style={{ width: `${remaining}%`, backgroundColor: color }}
+          style={{ width: `${used}%`, backgroundColor: color }}
         />
       </div>
       {reset ? (
@@ -128,6 +132,12 @@ function UsageWindowBar({
 
 export function SidebarUsageLimits() {
   const enabled = useClientSettings((settings) => settings.sidebarUsageLimitsEnabled);
+  const navigate = useNavigate();
+  const { isMobile, setOpenMobile } = useSidebar();
+  const openLimits = useCallback(() => {
+    if (isMobile) setOpenMobile(false);
+    void navigate({ to: "/usage", search: { metric: "limits" } });
+  }, [isMobile, navigate, setOpenMobile]);
   const routeTarget = useParams({
     strict: false,
     select: (params) => resolveThreadRouteTarget(params),
@@ -165,9 +175,9 @@ export function SidebarUsageLimits() {
   if (!shortestWindow) return null;
   const color = providerColor(provider.driver);
   const providerLabel = providerLimitsLabel(provider, (driver) => getDriverOption(driver)?.label);
-  const shortestRemaining = remainingPercent(shortestWindow);
+  const shortestUsed = usedPercent(shortestWindow);
   const shortestDuration = compactDuration(shortestWindow.windowDurationMins);
-  const summary = `${providerLabel} ${shortestWindow.label}: ${Math.round(shortestRemaining)}% left`;
+  const summary = `${providerLabel} ${shortestWindow.label}: ${Math.round(shortestUsed)}% used`;
 
   return (
     <div className="group/sidebar-usage relative">
@@ -192,18 +202,23 @@ export function SidebarUsageLimits() {
             {shortestDuration ? ` · ${shortestDuration}` : ""}
           </span>
           <span className="shrink-0 font-medium text-sidebar-foreground tabular-nums">
-            {Math.round(shortestRemaining)}% left
+            {Math.round(shortestUsed)}% used
           </span>
         </div>
         <div className="h-1 overflow-hidden rounded-full bg-sidebar-control-surface">
           <div
             className="h-full rounded-full"
-            style={{ width: `${shortestRemaining}%`, backgroundColor: color }}
+            style={{ width: `${shortestUsed}%`, backgroundColor: color }}
           />
         </div>
       </div>
       <div className="pointer-events-none invisible absolute inset-x-0 bottom-full z-50 pb-1 opacity-0 transition-opacity group-focus-within/sidebar-usage:pointer-events-auto group-focus-within/sidebar-usage:visible group-focus-within/sidebar-usage:opacity-100 group-hover/sidebar-usage:pointer-events-auto group-hover/sidebar-usage:visible group-hover/sidebar-usage:opacity-100">
-        <div className="flex flex-col gap-3 rounded-lg border border-sidebar-border bg-sidebar p-3 text-sidebar-foreground shadow-lg">
+        <button
+          type="button"
+          onClick={openLimits}
+          aria-label={`Open ${providerLabel} limits in Usage`}
+          className="flex w-full cursor-pointer flex-col gap-3 rounded-lg border border-sidebar-border bg-sidebar p-3 text-start text-sidebar-foreground shadow-lg outline-none hover:bg-sidebar-row-hover focus-visible:ring-2 focus-visible:ring-ring"
+        >
           <div className="flex min-w-0 items-center gap-2">
             <ProviderInstanceIcon
               driverKind={provider.driver}
@@ -223,7 +238,11 @@ export function SidebarUsageLimits() {
               <UsageWindowBar key={window.id} window={window} color={color} now={now} />
             ))}
           </div>
-        </div>
+          <span className="flex items-center gap-0.5 text-[10px] leading-none text-sidebar-muted-foreground">
+            Open Limits
+            <ChevronRightIcon className="size-3" />
+          </span>
+        </button>
       </div>
     </div>
   );

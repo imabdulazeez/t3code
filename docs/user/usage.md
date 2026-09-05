@@ -45,10 +45,11 @@ next reset.
 
 If a window looks stale, refresh Limits to re-check every provider and hub.
 
-When an open chat's provider reports subscription limits, the bottom of the sidebar can show the
-remaining quota for its shortest window, such as the five-hour session. Hover or focus the indicator
-to see every window for that provider without leaving the chat. The indicator is hidden by default;
-turn **Show in sidebar** on at the top of the Limits view to display it.
+When an open chat's provider reports subscription limits, the bottom of the sidebar can show how
+much of its shortest window is used, such as the five-hour session. Hover or focus the indicator to
+see every window for that provider without leaving the chat, and click the panel to open
+**Usage → Limits**. The indicator is hidden by default; turn **Show in sidebar** on at the top of
+the Limits view to display it.
 
 API-key accounts may not report subscription limits. This also applies to Claude connections
 using a proxy through `ANTHROPIC_AUTH_TOKEN`.

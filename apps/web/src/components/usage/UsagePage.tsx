@@ -63,14 +63,14 @@ import { UsagePriceOverrides } from "./UsagePriceOverrides";
 import { UsageProviderChart, type UsageChartMetric } from "./UsageProviderChart";
 import { PROVIDER_ORDER, PROVIDER_PRESENTATION, providersWithUsage } from "./usageProviders";
 
-type UsageMetric = UsageChartMetric | "limits";
+export type UsageMetric = UsageChartMetric | "limits";
 const METRIC_OPTIONS = [
   { value: "cost", label: "Cost" },
   { value: "tokens", label: "Tokens" },
   { value: "limits", label: "Limits" },
 ] as const satisfies readonly { value: UsageMetric; label: string }[];
 
-function isUsageMetric(value: string | null | undefined): value is UsageMetric {
+export function isUsageMetric(value: unknown): value is UsageMetric {
   return METRIC_OPTIONS.some((option) => option.value === value);
 }
 
@@ -81,12 +81,16 @@ const WINDOW_OPTIONS = [
   { days: 90, label: "90 days" },
 ] as const;
 
-export function UsagePage() {
+export function UsagePage({
+  initialMetric = "cost",
+}: {
+  readonly initialMetric?: UsageMetric | undefined;
+}) {
   const [windowSelection, setWindowSelection] = useState(() => ({
     days: 30,
     window: makeWindow(30),
   }));
-  const [metric, setMetric] = useState<UsageMetric>("cost");
+  const [metric, setMetric] = useState<UsageMetric>(initialMetric);
   const showingLimits = metric === "limits";
   const [breakdown, setBreakdown] = useState<"model" | "time">("model");
   const [selectedEnvironmentIds, setSelectedEnvironmentIds] =
