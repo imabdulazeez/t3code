@@ -7,7 +7,7 @@ import type {
   UsageLimitSourceAccount,
   UsageProviderKind,
 } from "@t3tools/contracts";
-import { formatResetsIn, providerLimitsLabel } from "@t3tools/shared/usageLimits";
+import { formatResetsIn } from "@t3tools/shared/usageLimits";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { useCallback, useMemo } from "react";
 
@@ -173,7 +173,10 @@ export function SidebarUsageLimits() {
   const shortestWindow = windows[0];
   if (!shortestWindow) return null;
   const color = providerColor(provider.driver);
-  const providerLabel = providerLimitsLabel(provider, (driver) => getDriverOption(driver)?.label);
+  const providerLabel =
+    provider.displayName?.trim() ||
+    getDriverOption(provider.driver)?.label ||
+    String(provider.driver);
   const shortestUsed = usedPercent(shortestWindow);
   const shortestDuration = compactDuration(shortestWindow.windowDurationMins);
   const summary = `${providerLabel} ${shortestWindow.label}: ${Math.round(shortestUsed)}% used`;

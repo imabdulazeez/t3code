@@ -11,10 +11,10 @@ import * as Equal from "effect/Equal";
 import * as Schema from "effect/Schema";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { stackedThreadToast, toastManager } from "../components/ui/toast";
+import { isTransportConnectionErrorMessage } from "@t3tools/client-runtime/errors";
 import { usePrimaryEnvironment, usePrimaryEnvironmentId } from "../state/environments";
 import { primaryServerSettingsAtom, serverEnvironment } from "../state/server";
 import { useAtomCommand } from "../state/use-atom-command";
-import { isTransportConnectionErrorMessage } from "../rpc/transportError";
 import { useLocalStorage } from "./useLocalStorage";
 import {
   getClientSettings,
