@@ -363,9 +363,8 @@ export const ClientSettingsSchema = Schema.Struct({
   // Legacy context window meter. The composer hides it by default; users who
   // still want the old usage indicator can restore it from Settings.
   contextWindowMeterEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
-  // Desktop resting composer. Each trigger that settles an existing thread's
-  // composer into its single-line layout can be turned off on its own.
-  composerCollapseOnBlur: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
+  // Desktop resting composer: scrolling an existing thread's conversation
+  // settles the composer into its single-line layout. Losing focus never does.
   composerCollapseOnScroll: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
   proactivePanelsEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   showSkillsInSlashMenu: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
@@ -407,7 +406,6 @@ export const GistSyncedClientSettings = Schema.Struct({
   branchListSortDirection: ClientSettingsSchema.fields.branchListSortDirection,
   branchRemoteSyncMode: ClientSettingsSchema.fields.branchRemoteSyncMode,
   changedFilesExpandedByDefault: ClientSettingsSchema.fields.changedFilesExpandedByDefault,
-  composerCollapseOnBlur: ClientSettingsSchema.fields.composerCollapseOnBlur,
   composerCollapseOnScroll: ClientSettingsSchema.fields.composerCollapseOnScroll,
   confirmThreadArchive: ClientSettingsSchema.fields.confirmThreadArchive,
   confirmThreadDelete: ClientSettingsSchema.fields.confirmThreadDelete,
@@ -443,7 +441,6 @@ export function selectGistSyncedClientSettings(settings: ClientSettings): GistSy
     branchListSortDirection: settings.branchListSortDirection,
     branchRemoteSyncMode: settings.branchRemoteSyncMode,
     changedFilesExpandedByDefault: settings.changedFilesExpandedByDefault,
-    composerCollapseOnBlur: settings.composerCollapseOnBlur,
     composerCollapseOnScroll: settings.composerCollapseOnScroll,
     confirmThreadArchive: settings.confirmThreadArchive,
     confirmThreadDelete: settings.confirmThreadDelete,
@@ -1448,7 +1445,6 @@ export const ClientSettingsPatch = Schema.Struct({
   ),
   planModeEnabled: Schema.optionalKey(Schema.Boolean),
   contextWindowMeterEnabled: Schema.optionalKey(Schema.Boolean),
-  composerCollapseOnBlur: Schema.optionalKey(Schema.Boolean),
   composerCollapseOnScroll: Schema.optionalKey(Schema.Boolean),
   proactivePanelsEnabled: Schema.optionalKey(Schema.Boolean),
   showSkillsInSlashMenu: Schema.optionalKey(Schema.Boolean),

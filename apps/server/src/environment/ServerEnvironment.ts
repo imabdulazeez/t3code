@@ -220,6 +220,7 @@ export const make = Effect.gen(function* () {
       usagePriceOverrides: true,
       threadPinning: true,
       threadPinReorder: true,
+      threadActiveReorder: true,
       threadTitleRegeneration: true,
       threadPullRequestLinking: true,
       environmentIcon: true,
