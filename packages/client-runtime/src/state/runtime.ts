@@ -507,7 +507,12 @@ export function createEnvironmentRpcGenerationAtomFamily<R, ER>(
 
 export function createEnvironmentQueryAtomFamily<R, ER, Input, A, E>(
   runtime: Atom.AtomRuntime<EnvironmentRegistry | R, ER>,
-  options: EnvironmentQueryAtomOptions<Input, A, E, EnvironmentSupervisor | R>,
+  options: EnvironmentQueryAtomOptions<
+    Input,
+    A,
+    E,
+    EnvironmentSupervisor | EnvironmentRegistry | AtomRegistry.AtomRegistry | R
+  >,
 ): (target: {
   readonly environmentId: EnvironmentIdType;
   readonly input: Input;

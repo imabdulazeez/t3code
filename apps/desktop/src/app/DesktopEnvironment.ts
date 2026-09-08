@@ -13,6 +13,7 @@ import * as Path from "effect/Path";
 
 import * as DesktopAppSettings from "../settings/DesktopAppSettings.ts";
 import * as DesktopConfig from "./DesktopConfig.ts";
+import { resolveLinuxDesktopEntryName } from "./DesktopEarlyElectronStartup.ts";
 import { resolveDesktopBaseDir, resolveDesktopStateDir } from "./DesktopStatePaths.ts";
 import { FORK_STAGE_LABEL, formatForkDisplayVersion } from "./forkBranding.ts";
 
@@ -99,7 +100,13 @@ function resolveDesktopAppStageLabel(input: {
   return FORK_STAGE_LABEL;
 }
 
-function resolveDesktopAppBranding(input: {
+/** The fork's stage label never depends on the version, so callers that only
+    need the window/entry title can resolve it before the app version is known. */
+export function resolveDesktopAppDisplayName(input: { readonly isDevelopment: boolean }): string {
+  return `${APP_BASE_NAME} (${resolveDesktopAppStageLabel(input)})`;
+}
+
+export function resolveDesktopAppBranding(input: {
   readonly isDevelopment: boolean;
   readonly appVersion: string;
   readonly displayVersion: string;
@@ -229,7 +236,7 @@ const make = Effect.fn("desktop.environment.make")(function* (
     appUserModelId: Option.getOrElse(config.appUserModelIdOverride, () =>
       isDevelopment ? "com.t3tools.t3code.dev" : "com.t3tools.t3code",
     ),
-    linuxDesktopEntryName: isDevelopment ? "t3code-dev.desktop" : "t3code.desktop",
+    linuxDesktopEntryName: resolveLinuxDesktopEntryName(isDevelopment),
     linuxWmClass: isDevelopment ? "t3code-dev" : "t3code",
     linuxApplicationsDir,
     appImagePath: config.appImagePath,

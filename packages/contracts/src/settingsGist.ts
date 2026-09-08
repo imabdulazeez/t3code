@@ -72,7 +72,7 @@ export const SettingsGistSyncResult = Schema.Struct({
 });
 export type SettingsGistSyncResult = typeof SettingsGistSyncResult.Type;
 
-export class SettingsGistSyncError extends Schema.TaggedErrorClass<SettingsGistSyncError>()(
+export class SettingsGistSyncError extends Schema.TaggedError<SettingsGistSyncError>()(
   "SettingsGistSyncError",
   {
     operation: Schema.Literals(["pull", "create", "update"]),

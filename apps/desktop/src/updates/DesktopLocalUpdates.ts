@@ -26,7 +26,7 @@ interface LocalBuildCandidate extends DesktopLocalUpdateBuild {
   readonly arch: "arm64" | "x64" | "universal";
 }
 
-export class DesktopLocalUpdateOperationError extends Schema.TaggedErrorClass<DesktopLocalUpdateOperationError>()(
+export class DesktopLocalUpdateOperationError extends Schema.TaggedError<DesktopLocalUpdateOperationError>()(
   "DesktopLocalUpdateOperationError",
   {
     operation: Schema.Literals(["scan", "prepare", "launch", "persist", "cleanup"]),
