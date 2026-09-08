@@ -8,6 +8,7 @@ import * as Stream from "effect/Stream";
 import * as SubscriptionRef from "effect/SubscriptionRef";
 import { AsyncResult, Atom, AtomRegistry } from "effect/unstable/reactivity";
 
+import type { ConnectionAttemptError } from "../connection/model.ts";
 import { EnvironmentNotRegisteredError, EnvironmentRegistry } from "../connection/registry.ts";
 import {
   type EnvironmentRpcInput,
@@ -15,6 +16,7 @@ import {
   type EnvironmentRpcStreamValue,
   type EnvironmentSubscriptionRpcTag,
   type EnvironmentUnaryRpcTag,
+  EnvironmentRpcUnavailableError,
   request,
   subscribe,
 } from "../rpc/client.ts";
@@ -517,19 +519,61 @@ export function createEnvironmentQueryAtomFamily<R, ER, Input, A, E>(
   readonly environmentId: EnvironmentIdType;
   readonly input: Input;
 }) => Atom.Atom<AsyncResult.AsyncResult<A, E | ER | Error>> {
-  const rpcGenerationAtom = createEnvironmentRpcGenerationAtomFamily(runtime);
+  const connectionAtom = Atom.family((environmentId: EnvironmentIdType) =>
+    runtime.atom(
+      followStreamInEnvironment(
+        environmentId,
+        Stream.unwrap(
+          EnvironmentSupervisor.pipe(
+            Effect.map((supervisor) =>
+              SubscriptionRef.changes(supervisor.state).pipe(
+                Stream.zipLatest(SubscriptionRef.changes(supervisor.session)),
+              ),
+            ),
+          ),
+        ),
+      ),
+      { initialValue: null },
+    ),
+  );
   const family = Atom.family((key: string) => {
     const target = parseEnvironmentRpcKey<Input>(key);
     const idleTtlMs = options.idleTtlMs ?? 5 * 60_000;
     const queryAtom = runtime
-      .atom((get) => {
-        const generation = Option.getOrNull(
-          AsyncResult.value(get(rpcGenerationAtom(target.environmentId))),
+      .atom<
+        A,
+        E | ConnectionAttemptError | EnvironmentNotRegisteredError | EnvironmentRpcUnavailableError
+      >((get) => {
+        const connection = Option.getOrNull(
+          AsyncResult.value(get(connectionAtom(target.environmentId))),
         );
-        if (generation === null) {
+        if (connection === null) {
           return Effect.never;
         }
-        return runInEnvironment(target.environmentId, options.execute(target.input));
+        const [connectionState, session] = connection;
+        switch (connectionState.phase) {
+          case "connected":
+            return Option.isSome(session)
+              ? runInEnvironment(target.environmentId, options.execute(target.input))
+              : Effect.never;
+          case "connecting":
+          case "backoff":
+            return Effect.never;
+          case "available":
+          case "offline":
+          case "blocked":
+            if (connectionState.lastFailure !== null) {
+              return Effect.fail(connectionState.lastFailure);
+            }
+            return Effect.fail(
+              new EnvironmentRpcUnavailableError({
+                environmentId: target.environmentId,
+                message: `Environment ${target.environmentId} is ${
+                  connectionState.phase === "available" ? "not connected" : connectionState.phase
+                }.`,
+              }),
+            );
+        }
       })
       .pipe(
         Atom.swr({
