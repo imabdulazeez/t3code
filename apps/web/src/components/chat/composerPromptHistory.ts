@@ -158,6 +158,14 @@ export function recallableComposerPrompt(messageText: string): string {
   return trimmed;
 }
 
+export function resendableComposerPrompt(messageText: string): string {
+  let prompt = messageText.trim();
+  if (prompt.startsWith(CLAUDE_ULTRATHINK_PREFIX)) {
+    prompt = prompt.slice(CLAUDE_ULTRATHINK_PREFIX.length).trim();
+  }
+  return prompt === ATTACHMENT_ONLY_BOOTSTRAP_PROMPT ? "" : prompt;
+}
+
 /**
  * Oldest first. Consecutive identical prompts collapse into the newest one,
  * matching shell `HISTCONTROL=ignoredups`. Image-only sends have no text and

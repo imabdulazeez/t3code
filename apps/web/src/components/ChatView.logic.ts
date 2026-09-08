@@ -3,6 +3,7 @@ import {
   type AssetCreateUrlInput,
   type AssetCreateUrlResult,
   type ChatFileAttachment,
+  type ChatImageAttachment,
   type EnvironmentId,
   isProviderDriverKind,
   ProjectId,
@@ -31,13 +32,18 @@ import {
 } from "@t3tools/client-runtime/codex-artifact-templates";
 import {
   type ChatMessage,
+  isFileAttachment,
   isImageAttachment,
   type SessionPhase,
   type Thread,
   type ThreadShell,
   type TurnDiffSummary,
 } from "../types";
-import { type ComposerImageAttachment, type DraftThreadState } from "../composerDraftStore";
+import {
+  type ComposerFileAttachment,
+  type ComposerImageAttachment,
+  type DraftThreadState,
+} from "../composerDraftStore";
 import * as Schema from "effect/Schema";
 import { appAtomRegistry } from "../rpc/atomRegistry";
 import { environmentThreadDetails } from "../state/threads";
@@ -572,14 +578,16 @@ export function revokeBlobPreviewUrl(previewUrl: string | undefined): void {
 }
 
 /** Signs an attachment URL without reading its bytes, so video playback can request byte ranges. */
+type CreateAttachmentAssetUrl = (input: {
+  environmentId: EnvironmentId;
+  input: AssetCreateUrlInput;
+}) => Promise<AtomCommandResult<AssetCreateUrlResult, unknown>>;
+
 export async function resolveFileAttachmentUrl(input: {
-  attachment: ChatFileAttachment;
+  attachment: ChatFileAttachment | ChatImageAttachment;
   environmentId: EnvironmentId;
   httpBaseUrl: string;
-  createAssetUrl: (input: {
-    environmentId: EnvironmentId;
-    input: AssetCreateUrlInput;
-  }) => Promise<AtomCommandResult<AssetCreateUrlResult, unknown>>;
+  createAssetUrl: CreateAttachmentAssetUrl;
 }): Promise<string> {
   const { attachment } = input;
   const result = await input.createAssetUrl({
@@ -589,7 +597,10 @@ export async function resolveFileAttachmentUrl(input: {
         _tag: "attachment",
         attachmentId: attachment.id,
         fileName: attachment.name,
-        mimeType: videoMimeType(attachment) ?? attachment.mimeType,
+        mimeType:
+          attachment.type === "file"
+            ? (videoMimeType(attachment) ?? attachment.mimeType)
+            : attachment.mimeType,
       },
     },
   });
@@ -597,6 +608,88 @@ export async function resolveFileAttachmentUrl(input: {
   const url = resolveAssetUrl(input.httpBaseUrl, result.value.relativeUrl);
   if (url === null) throw new Error("The environment returned an invalid attachment URL.");
   return url;
+}
+
+export interface MessageComposerAttachments {
+  images: ComposerImageAttachment[];
+  files: ComposerFileAttachment[];
+  failed: string[];
+}
+
+/**
+ * Rebuilds a sent message's attachments as composer drafts so the message can
+ * be re-staged in another thread. Bytes are fetched from the environment and
+ * wrapped in fresh `File`s; the new draft uploads them again on send, so the
+ * original message's attachment ids are never shared across threads.
+ */
+export async function buildComposerAttachmentsFromMessage(input: {
+  attachments: ChatMessage["attachments"];
+  environmentId: EnvironmentId;
+  httpBaseUrl: string;
+  createAssetUrl: CreateAttachmentAssetUrl;
+  createId: () => string;
+  fetchBlob?: (url: string) => Promise<Blob>;
+  createPreviewUrl?: (file: File) => string;
+}): Promise<MessageComposerAttachments> {
+  const fetchBlob =
+    input.fetchBlob ??
+    (async (url: string) => {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Attachment download failed (${response.status}).`);
+      return response.blob();
+    });
+  const createPreviewUrl = input.createPreviewUrl ?? ((file: File) => URL.createObjectURL(file));
+  const result: MessageComposerAttachments = { images: [], files: [], failed: [] };
+  const settled = await Promise.allSettled(
+    (input.attachments ?? []).flatMap((attachment) => {
+      if (!isImageAttachment(attachment) && !isFileAttachment(attachment)) return [];
+      return [
+        (async () => {
+          const url = await resolveFileAttachmentUrl({
+            attachment,
+            environmentId: input.environmentId,
+            httpBaseUrl: input.httpBaseUrl,
+            createAssetUrl: input.createAssetUrl,
+          });
+          const blob = await fetchBlob(url);
+          const file = new File([blob], attachment.name, { type: attachment.mimeType });
+          return { attachment, file };
+        })(),
+      ];
+    }),
+  );
+  for (const outcome of settled) {
+    if (outcome.status === "rejected") continue;
+    const { attachment, file } = outcome.value;
+    if (attachment.type === "image") {
+      result.images.push({
+        type: "image",
+        id: input.createId(),
+        name: attachment.name,
+        mimeType: attachment.mimeType,
+        sizeBytes: file.size,
+        ...(attachment.source ? { source: attachment.source } : {}),
+        previewUrl: createPreviewUrl(file),
+        file,
+      });
+    } else {
+      result.files.push({
+        type: "file",
+        id: input.createId(),
+        name: attachment.name,
+        mimeType: attachment.mimeType,
+        sizeBytes: file.size,
+        file,
+      });
+    }
+  }
+  const candidates = (input.attachments ?? []).filter(
+    (attachment) => isImageAttachment(attachment) || isFileAttachment(attachment),
+  );
+  settled.forEach((outcome, index) => {
+    if (outcome.status === "rejected") result.failed.push(candidates[index]!.name);
+  });
+  return result;
 }
 
 export function revokeUserMessagePreviewUrls(message: ChatMessage): void {

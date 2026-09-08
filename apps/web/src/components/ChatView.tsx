@@ -218,7 +218,7 @@ import {
   nextProjectScriptId,
   projectScriptIdFromCommand,
 } from "~/projectScripts";
-import { newDraftId, newMessageId, newThreadId } from "~/lib/utils";
+import { newDraftId, newMessageId, newThreadId, randomUUID } from "~/lib/utils";
 import { useBrowserHistoryStore } from "~/browserHistoryStore";
 import { registerFaviconProjectForThread } from "~/browserFaviconStore";
 import { getProviderModelCapabilities } from "../providerModels";
@@ -390,6 +390,7 @@ import {
   cloneComposerImageForRetry,
   deriveLockedProvider,
   readFileAsDataUrl,
+  buildComposerAttachmentsFromMessage,
   resolveFileAttachmentUrl,
   reconcileMountedTerminalThreadIds,
   resolveBackgroundDraftWorkspaceOptions,
@@ -457,7 +458,10 @@ import {
   supportsServerUpdateThreadContinuation,
 } from "../versionSkew";
 import { useAssetUrls } from "../assets/assetUrls";
-import { ATTACHMENT_ONLY_BOOTSTRAP_PROMPT } from "./chat/composerPromptHistory";
+import {
+  ATTACHMENT_ONLY_BOOTSTRAP_PROMPT,
+  resendableComposerPrompt,
+} from "./chat/composerPromptHistory";
 
 const EMPTY_ACTIVITIES: OrchestrationThreadActivity[] = [];
 const EMPTY_PROVIDERS: ServerProvider[] = [];
@@ -2920,6 +2924,49 @@ export default function ChatView(props: ChatViewProps) {
       }
     },
     [createAttachmentAssetUrl, environmentId],
+  );
+  const moveMessageToNewThread = useCallback(
+    async (message: ChatMessage) => {
+      if (!activeProjectRef) return;
+      const connection = readPreparedConnection(environmentId);
+      if (!connection) {
+        toastManager.add({ type: "error", title: "The environment is not connected." });
+        return;
+      }
+      const attachments = await buildComposerAttachmentsFromMessage({
+        attachments: message.attachments,
+        environmentId,
+        httpBaseUrl: connection.httpBaseUrl,
+        createAssetUrl: createAttachmentAssetUrl,
+        createId: randomUUID,
+      });
+      const nextDraft = await handleNewThread(activeProjectRef);
+      if (!nextDraft) {
+        for (const image of attachments.images) {
+          revokeBlobPreviewUrl(image.previewUrl);
+        }
+        return;
+      }
+      const draftStore = useComposerDraftStore.getState();
+      const prompt = resendableComposerPrompt(message.text);
+      if (prompt.length > 0) {
+        draftStore.setPrompt(nextDraft.draftId, prompt);
+      }
+      if (attachments.images.length > 0) {
+        draftStore.addImages(nextDraft.draftId, attachments.images);
+      }
+      if (attachments.files.length > 0) {
+        draftStore.addFiles(nextDraft.draftId, attachments.files);
+      }
+      if (attachments.failed.length > 0) {
+        toastManager.add({
+          type: "error",
+          title: "Some attachments could not be moved",
+          description: attachments.failed.join(", "),
+        });
+      }
+    },
+    [activeProjectRef, createAttachmentAssetUrl, environmentId, handleNewThread],
   );
   const openFileAttachment = useCallback(
     (attachment: ChatFileAttachment) => {
@@ -7695,6 +7742,11 @@ export default function ChatView(props: ChatViewProps) {
   const onRevertTimelineTurn = useCallback((targetTurnCount: number) => {
     void onRevertToTurnCountRef.current(targetTurnCount);
   }, []);
+  const moveMessageToNewThreadRef = useRef(moveMessageToNewThread);
+  moveMessageToNewThreadRef.current = moveMessageToNewThread;
+  const onMoveTimelineMessageToNewThread = useCallback((message: ChatMessage) => {
+    void moveMessageToNewThreadRef.current(message);
+  }, []);
 
   // Empty state: no active thread
   if (!activeThread) {
@@ -8011,6 +8063,7 @@ export default function ChatView(props: ChatViewProps) {
                 onOpenTurnDiff={onOpenTurnDiff}
                 supportsConversationRollback={supportsConversationRollback}
                 onRevertToTurnCount={onRevertTimelineTurn}
+                onMoveMessageToNewThread={onMoveTimelineMessageToNewThread}
                 onUseArtifactTemplate={useArtifactTemplate}
                 isRevertingCheckpoint={isRevertingCheckpoint}
                 onImageExpand={onExpandTimelineImage}

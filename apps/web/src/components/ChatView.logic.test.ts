@@ -31,6 +31,7 @@ import {
   agentControlledBrowserCloseConfirmation,
   branchMismatchKey,
   buildExpiredTerminalContextToastCopy,
+  buildComposerAttachmentsFromMessage,
   buildLoadingThreadFromShell,
   buildRunningThreadTurnInterruptInput,
   buildThreadTurnInterruptInput,
@@ -1956,5 +1957,113 @@ describe("shouldRefocusComposerOnWindowFocus", () => {
   it("leaves focus inside a dialog or popup alone", () => {
     expect(shouldRefocusComposerOnWindowFocus(element("BUTTON", { within: "dialog" }))).toBe(false);
     expect(shouldRefocusComposerOnWindowFocus(element("BUTTON", { within: "-popup" }))).toBe(false);
+  });
+});
+
+describe("buildComposerAttachmentsFromMessage", () => {
+  const environmentId = EnvironmentId.make("env-1");
+  const source = {
+    kind: "snap-shot" as const,
+    capturedAt: "2026-09-08T00:00:00.000Z",
+    appName: "Finder",
+    windowTitle: "Desktop",
+  };
+
+  it("rebuilds images and files from fetched bytes with fresh composer ids", async () => {
+    const requestedResources: Array<{ attachmentId: string; mimeType?: string }> = [];
+    let nextId = 0;
+    const result = await buildComposerAttachmentsFromMessage({
+      attachments: [
+        {
+          type: "image",
+          id: "img-1",
+          name: "shot.png",
+          mimeType: "image/png",
+          sizeBytes: 3,
+          source,
+        },
+        { type: "file", id: "file-1", name: "notes.txt", mimeType: "text/plain", sizeBytes: 5 },
+        { type: "sticker", id: "odd-1", name: "odd", mimeType: "x/y", sizeBytes: 1 },
+      ],
+      environmentId,
+      httpBaseUrl: "http://localhost:3000",
+      createAssetUrl: async ({ input }) => {
+        if (input.resource._tag === "attachment") {
+          requestedResources.push({
+            attachmentId: input.resource.attachmentId,
+            ...(input.resource.mimeType ? { mimeType: input.resource.mimeType } : {}),
+          });
+        }
+        return {
+          _tag: "Success",
+          value: {
+            relativeUrl:
+              input.resource._tag === "attachment"
+                ? `/api/assets/${input.resource.attachmentId}`
+                : "",
+          },
+        } as never;
+      },
+      createId: () => `draft-${++nextId}`,
+      fetchBlob: async (url) => new Blob([url.endsWith("img-1") ? "png" : "hello"]),
+      createPreviewUrl: (file) => `blob:${file.name}`,
+    });
+
+    expect(requestedResources).toEqual([
+      { attachmentId: "img-1", mimeType: "image/png" },
+      { attachmentId: "file-1", mimeType: "text/plain" },
+    ]);
+    expect(result.failed).toEqual([]);
+    expect(result.images).toHaveLength(1);
+    expect(result.images[0]).toMatchObject({
+      type: "image",
+      id: "draft-1",
+      name: "shot.png",
+      mimeType: "image/png",
+      sizeBytes: 3,
+      previewUrl: "blob:shot.png",
+      source,
+    });
+    expect(result.images[0]!.file.type).toBe("image/png");
+    expect(result.files).toHaveLength(1);
+    expect(result.files[0]).toMatchObject({
+      type: "file",
+      id: "draft-2",
+      name: "notes.txt",
+      mimeType: "text/plain",
+      sizeBytes: 5,
+    });
+    expect(result.files[0]!.file).not.toBeNull();
+  });
+
+  it("reports attachments whose bytes could not be fetched and keeps the rest", async () => {
+    const result = await buildComposerAttachmentsFromMessage({
+      attachments: [
+        { type: "image", id: "img-1", name: "ok.png", mimeType: "image/png", sizeBytes: 1 },
+        { type: "file", id: "file-1", name: "gone.pdf", mimeType: "application/pdf", sizeBytes: 1 },
+      ],
+      environmentId,
+      httpBaseUrl: "http://localhost:3000",
+      createAssetUrl: async ({ input }) =>
+        ({
+          _tag: "Success",
+          value: {
+            relativeUrl:
+              input.resource._tag === "attachment"
+                ? `/api/assets/${input.resource.attachmentId}`
+                : "",
+          },
+        }) as never,
+      createId: () => "id",
+      fetchBlob: async (url) => {
+        if (url.endsWith("file-1")) throw new Error("missing");
+        return new Blob(["x"]);
+      },
+      createPreviewUrl: () => "blob:ok",
+    });
+
+    expect(result.images.map((image) => image.name)).toEqual(["ok.png"]);
+    expect(result.files).toEqual([]);
+    expect(result.failed).toEqual(["gone.pdf"]);
   });
 });

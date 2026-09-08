@@ -24,6 +24,7 @@ import {
 const EMPTY_AGENT_PANEL_MODEL = emptyAgentPanelModel();
 const NOOP_OPEN_AGENTS = () => {};
 const NOOP_USE_ARTIFACT_TEMPLATE = () => {};
+const NOOP_MOVE_MESSAGE_TO_NEW_THREAD = () => {};
 const NOOP_OPEN_ATTACHMENT = (_attachment: ChatFileAttachment) => {};
 import { resolveChatListAnchoredEndSpace } from "@t3tools/shared/chatList";
 import { toolActivityFaviconUrl } from "@t3tools/shared/favicon";
@@ -91,6 +92,7 @@ import {
   GlobeIcon,
   HammerIcon,
   MessageCircleIcon,
+  MessageSquarePlusIcon,
   Minimize2Icon,
   MousePointerClickIcon,
   PaintbrushIcon,
@@ -211,6 +213,7 @@ interface TimelineRowSharedState {
   skills: ReadonlyArray<Pick<ServerProviderSkill, "name" | "displayName">>;
   activeThreadEnvironmentId: EnvironmentId;
   onRevertToTurnCount: (targetTurnCount: number) => void;
+  onMoveMessageToNewThread: (message: ChatMessage) => void;
   onUseArtifactTemplate: (template: CodexArtifactTemplate) => void;
   onImageExpand: (preview: ExpandedImagePreview) => void;
   onFileOpen: (attachment: ChatFileAttachment) => void;
@@ -323,6 +326,7 @@ interface MessagesTimelineProps {
   onOpenTurnDiff: (turnId: TurnId, filePath?: string) => void;
   supportsConversationRollback: boolean;
   onRevertToTurnCount: (targetTurnCount: number) => void;
+  onMoveMessageToNewThread?: (message: ChatMessage) => void;
   onUseArtifactTemplate?: (template: CodexArtifactTemplate) => void;
   isRevertingCheckpoint: boolean;
   onImageExpand: (preview: ExpandedImagePreview) => void;
@@ -381,6 +385,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   onOpenTurnDiff,
   supportsConversationRollback,
   onRevertToTurnCount,
+  onMoveMessageToNewThread = NOOP_MOVE_MESSAGE_TO_NEW_THREAD,
   onUseArtifactTemplate = NOOP_USE_ARTIFACT_TEMPLATE,
   isRevertingCheckpoint,
   onImageExpand,
@@ -737,6 +742,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
       skills,
       activeThreadEnvironmentId,
       onRevertToTurnCount,
+      onMoveMessageToNewThread,
       onUseArtifactTemplate,
       onImageExpand,
       onFileOpen,
@@ -761,6 +767,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
       skills,
       activeThreadEnvironmentId,
       onRevertToTurnCount,
+      onMoveMessageToNewThread,
       onUseArtifactTemplate,
       onImageExpand,
       onFileOpen,
@@ -1522,6 +1529,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
             {typeof revertTurnCount === "number" && (
               <RevertUserMessageButton turnCount={revertTurnCount} />
             )}
+            <MoveMessageToNewThreadButton message={row.message} />
             {displayedUserMessage.copyText && (
               <MessageCopyButton text={displayedUserMessage.copyText} variant="ghost" />
             )}
@@ -1553,6 +1561,29 @@ function RevertUserMessageButton({ turnCount }: { turnCount: number }) {
         <Undo2Icon className="size-3" />
       </TooltipTrigger>
       <TooltipPopup side="top">Revert to this message</TooltipPopup>
+    </Tooltip>
+  );
+}
+
+function MoveMessageToNewThreadButton({ message }: { message: ChatMessage }) {
+  const ctx = use(TimelineRowCtx);
+
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            type="button"
+            size="xs"
+            variant="ghost"
+            onClick={() => ctx.onMoveMessageToNewThread(message)}
+            aria-label="Move to new chat"
+          />
+        }
+      >
+        <MessageSquarePlusIcon className="size-3" />
+      </TooltipTrigger>
+      <TooltipPopup side="top">Move to new chat</TooltipPopup>
     </Tooltip>
   );
 }
