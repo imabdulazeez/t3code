@@ -107,6 +107,7 @@ export function UsagePage({ initialMetric }: { readonly initialMetric?: UsageMet
   const metric = deepLinkMetric ?? preferences.metric;
   const showingLimits = metric === "limits";
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [limitsNow, setLimitsNow] = useState(() => Date.now());
   const refreshingRef = useRef(false);
   const [breakdown, setBreakdown] = useState<"model" | "time">("model");
   const [selectedEnvironmentIds, setSelectedEnvironmentIds] =
@@ -162,6 +163,7 @@ export function UsagePage({ initialMetric }: { readonly initialMetric?: UsageMet
     });
   };
   const selectMetric = (nextMetric: UsageMetric) => {
+    if (nextMetric === "limits") setLimitsNow(Date.now());
     const nextPreferences = { metric: nextMetric, windowDays };
     setDeepLinkMetric(undefined);
     setPreferences(nextPreferences);
@@ -181,6 +183,7 @@ export function UsagePage({ initialMetric }: { readonly initialMetric?: UsageMet
           }
         }),
       ).finally(() => {
+        setLimitsNow(Date.now());
         refreshingRef.current = false;
         setIsRefreshing(false);
       });
@@ -354,7 +357,7 @@ export function UsagePage({ initialMetric }: { readonly initialMetric?: UsageMet
                   : `Select an environment to see ${showingLimits ? "limits" : "usage"}.`}
               </p>
             ) : showingLimits ? (
-              <UsageLimitsSection selectedEnvironmentIds={selectedEnvironmentIds} />
+              <UsageLimitsSection selectedEnvironmentIds={selectedEnvironmentIds} now={limitsNow} />
             ) : isPending ? (
               <UsageSkeleton />
             ) : (
