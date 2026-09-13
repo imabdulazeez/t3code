@@ -3,6 +3,7 @@ import {
   GistSyncedServerSettings,
   selectGistSyncedClientSettings,
   selectGistSyncedServerSettings,
+  type ServerSettingsPatch,
   type SettingsGistSyncResult,
 } from "@t3tools/contracts";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
@@ -156,7 +157,7 @@ export function useSettingsGistSyncActions() {
   const recordSuccess = useCallback(
     (
       result: { readonly gistId: string; readonly lastSyncedAt: string },
-      applyServerSettings?: GistSyncedServerSettings,
+      applyServerSettings?: ServerSettingsPatch,
     ) => {
       updatePrimarySettings({
         ...applyServerSettings,
@@ -254,7 +255,9 @@ export function useSettingsGistSyncActions() {
       const changedRemote =
         pulled.value.migrated === true || !Equal.equals(remote, merged.settings);
       if (changedClient) updateClientSettings(merged.settings.client);
-      const applyServerSettings = changedServer ? merged.settings.server : undefined;
+      const applyServerSettings: ServerSettingsPatch | undefined = changedServer
+        ? merged.settings.server
+        : undefined;
       if (changedRemote) {
         const pushed = await pushRemote(normalizedGistId, merged.settings);
         if (!pushed) return null;

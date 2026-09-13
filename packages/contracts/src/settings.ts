@@ -3,6 +3,7 @@ import * as Effect from "effect/Effect";
 import * as Duration from "effect/Duration";
 import * as Schema from "effect/Schema";
 import * as SchemaTransformation from "effect/SchemaTransformation";
+import * as Struct from "effect/Struct";
 import {
   ForwardCompatibleNullable,
   ProjectId,
@@ -501,73 +502,32 @@ export type ClientSettings = typeof ClientSettingsSchema.Type;
 
 export const DEFAULT_CLIENT_SETTINGS: ClientSettings = Schema.decodeSync(ClientSettingsSchema)({});
 
-export const GistSyncedClientSettings = Schema.Struct({
-  appearanceContrast: ClientSettingsSchema.fields.appearanceContrast,
-  autoCreatePrOnPush: ClientSettingsSchema.fields.autoCreatePrOnPush,
-  branchListSortKey: ClientSettingsSchema.fields.branchListSortKey,
-  branchListSortDirection: ClientSettingsSchema.fields.branchListSortDirection,
-  branchRemoteSyncMode: ClientSettingsSchema.fields.branchRemoteSyncMode,
-  changedFilesExpandedByDefault: ClientSettingsSchema.fields.changedFilesExpandedByDefault,
-  composerCollapseOnScroll: ClientSettingsSchema.fields.composerCollapseOnScroll,
-  confirmThreadArchive: ClientSettingsSchema.fields.confirmThreadArchive,
-  confirmThreadDelete: ClientSettingsSchema.fields.confirmThreadDelete,
-  deleteRemoteBranchOnDelete: ClientSettingsSchema.fields.deleteRemoteBranchOnDelete,
-  diffIgnoreWhitespace: ClientSettingsSchema.fields.diffIgnoreWhitespace,
-  environmentIdentificationMode: ClientSettingsSchema.fields.environmentIdentificationMode,
-  fontSizeInterface: ClientSettingsSchema.fields.fontSizeInterface,
-  fontSizePrompt: ClientSettingsSchema.fields.fontSizePrompt,
-  fontSizeCode: ClientSettingsSchema.fields.fontSizeCode,
-  fontSizeTerminal: ClientSettingsSchema.fields.fontSizeTerminal,
-  fontSmoothing: ClientSettingsSchema.fields.fontSmoothing,
-  favorites: ClientSettingsSchema.fields.favorites,
-  providerModelPreferences: ClientSettingsSchema.fields.providerModelPreferences,
-  planModeEnabled: ClientSettingsSchema.fields.planModeEnabled,
-  showSkillsInSlashMenu: ClientSettingsSchema.fields.showSkillsInSlashMenu,
-  legacySidebarEnabled: ClientSettingsSchema.fields.legacySidebarEnabled,
-  sidebarUsageLimitsEnabled: ClientSettingsSchema.fields.sidebarUsageLimitsEnabled,
-  sidebarProjectGroupingMode: ClientSettingsSchema.fields.sidebarProjectGroupingMode,
-  sidebarProjectGroupingOverrides: ClientSettingsSchema.fields.sidebarProjectGroupingOverrides,
-  sidebarProjectSortOrder: ClientSettingsSchema.fields.sidebarProjectSortOrder,
-  sidebarThreadSortOrder: ClientSettingsSchema.fields.sidebarThreadSortOrder,
-  sidebarThreadPreviewCount: ClientSettingsSchema.fields.sidebarThreadPreviewCount,
-  timestampFormat: ClientSettingsSchema.fields.timestampFormat,
-  wordWrap: ClientSettingsSchema.fields.wordWrap,
-});
+export const LOCAL_ONLY_CLIENT_SETTING_KEYS = [
+  "browserDefaultProfileId",
+  "browserDefaultViewport",
+  "browserDefaultZoomFactor",
+  "browserProfiles",
+  "confirmQuit",
+  "dismissedProviderUpdateNotificationKeys",
+  "fontFamilyCode",
+  "fontFamilyComposer",
+  "fontFamilySans",
+  "fontFamilyTerminal",
+  "loadBalancingWeights",
+  "onboardingCompletedAt",
+  "pullRequestMergeMethodOverrides",
+] as const satisfies ReadonlyArray<keyof ClientSettings>;
+export type LocalOnlyClientSettingKey = (typeof LOCAL_ONLY_CLIENT_SETTING_KEYS)[number];
+
+export const GistSyncedClientSettings = ClientSettingsSchema.mapFields(
+  Struct.omit(LOCAL_ONLY_CLIENT_SETTING_KEYS),
+);
 export type GistSyncedClientSettings = typeof GistSyncedClientSettings.Type;
 
+export const GIST_SYNCED_CLIENT_SETTING_KEYS = Struct.keys(GistSyncedClientSettings.fields);
+
 export function selectGistSyncedClientSettings(settings: ClientSettings): GistSyncedClientSettings {
-  return {
-    appearanceContrast: settings.appearanceContrast,
-    autoCreatePrOnPush: settings.autoCreatePrOnPush,
-    branchListSortKey: settings.branchListSortKey,
-    branchListSortDirection: settings.branchListSortDirection,
-    branchRemoteSyncMode: settings.branchRemoteSyncMode,
-    changedFilesExpandedByDefault: settings.changedFilesExpandedByDefault,
-    composerCollapseOnScroll: settings.composerCollapseOnScroll,
-    confirmThreadArchive: settings.confirmThreadArchive,
-    confirmThreadDelete: settings.confirmThreadDelete,
-    deleteRemoteBranchOnDelete: settings.deleteRemoteBranchOnDelete,
-    diffIgnoreWhitespace: settings.diffIgnoreWhitespace,
-    environmentIdentificationMode: settings.environmentIdentificationMode,
-    fontSizeInterface: settings.fontSizeInterface,
-    fontSizePrompt: settings.fontSizePrompt,
-    fontSizeCode: settings.fontSizeCode,
-    fontSizeTerminal: settings.fontSizeTerminal,
-    fontSmoothing: settings.fontSmoothing,
-    favorites: settings.favorites,
-    providerModelPreferences: settings.providerModelPreferences,
-    planModeEnabled: settings.planModeEnabled,
-    showSkillsInSlashMenu: settings.showSkillsInSlashMenu,
-    legacySidebarEnabled: settings.legacySidebarEnabled,
-    sidebarUsageLimitsEnabled: settings.sidebarUsageLimitsEnabled,
-    sidebarProjectGroupingMode: settings.sidebarProjectGroupingMode,
-    sidebarProjectGroupingOverrides: settings.sidebarProjectGroupingOverrides,
-    sidebarProjectSortOrder: settings.sidebarProjectSortOrder,
-    sidebarThreadSortOrder: settings.sidebarThreadSortOrder,
-    sidebarThreadPreviewCount: settings.sidebarThreadPreviewCount,
-    timestampFormat: settings.timestampFormat,
-    wordWrap: settings.wordWrap,
-  };
+  return Struct.pick(settings, GIST_SYNCED_CLIENT_SETTING_KEYS);
 }
 
 // ── Server Settings (server-authoritative) ────────────────────
@@ -1322,25 +1282,46 @@ export type ServerSettings = typeof ServerSettings.Type;
 
 export const DEFAULT_SERVER_SETTINGS: ServerSettings = Schema.decodeSync(ServerSettings)({});
 
-export const GistSyncedServerSettings = Schema.Struct({
-  branchNamePromptInstructions: ServerSettings.fields.branchNamePromptInstructions,
-  commitMessagePromptInstructions: ServerSettings.fields.commitMessagePromptInstructions,
-  prContentPromptInstructions: ServerSettings.fields.prContentPromptInstructions,
-  sidebarAutoSettleAfterDays: ServerSettings.fields.sidebarAutoSettleAfterDays,
-  sidebarAutoSettleOnMerge: ServerSettings.fields.sidebarAutoSettleOnMerge,
-  sourceControlWritingStyle: ServerSettings.fields.sourceControlWritingStyle,
-}).pipe(Schema.withDecodingDefault(Effect.succeed({})));
+export const LOCAL_ONLY_SERVER_SETTING_KEYS = [
+  "addProjectBaseDirectory",
+  "automaticGitFetchInterval",
+  "backgroundActivityProfile",
+  "defaultModelSelection",
+  "defaultTheme",
+  "defaultThemeSetAt",
+  "deviceHosts",
+  "deviceOnboardingCompleted",
+  "enableDeviceSupport",
+  "environmentIcon",
+  "gistSettingsSync",
+  "observability",
+  "projectAgentBrowserAccessOverrides",
+  "projectAutoPullOverrides",
+  "projectScriptOverrides",
+  "projectSettingsFolded",
+  "projectSettingsOverrides",
+  "providerHealthRefreshInterval",
+  "providerInstances",
+  "providers",
+  "sourceControlWriterModelSelection",
+  "textGenerationModelSelection",
+  "usageLimitSources",
+  "usagePriceOverrides",
+] as const satisfies ReadonlyArray<keyof ServerSettings>;
+export type LocalOnlyServerSettingKey = (typeof LOCAL_ONLY_SERVER_SETTING_KEYS)[number];
+
+const GistSyncedServerSettingsStruct = ServerSettings.mapFields(
+  Struct.omit(LOCAL_ONLY_SERVER_SETTING_KEYS),
+);
+export const GistSyncedServerSettings = GistSyncedServerSettingsStruct.pipe(
+  Schema.withDecodingDefault(Effect.succeed({})),
+);
 export type GistSyncedServerSettings = typeof GistSyncedServerSettings.Type;
 
+export const GIST_SYNCED_SERVER_SETTING_KEYS = Struct.keys(GistSyncedServerSettingsStruct.fields);
+
 export function selectGistSyncedServerSettings(settings: ServerSettings): GistSyncedServerSettings {
-  return {
-    branchNamePromptInstructions: settings.branchNamePromptInstructions,
-    commitMessagePromptInstructions: settings.commitMessagePromptInstructions,
-    prContentPromptInstructions: settings.prContentPromptInstructions,
-    sidebarAutoSettleAfterDays: settings.sidebarAutoSettleAfterDays,
-    sidebarAutoSettleOnMerge: settings.sidebarAutoSettleOnMerge,
-    sourceControlWritingStyle: settings.sourceControlWritingStyle,
-  };
+  return Struct.pick(settings, GIST_SYNCED_SERVER_SETTING_KEYS);
 }
 
 /**
