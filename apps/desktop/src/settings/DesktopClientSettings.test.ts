@@ -18,6 +18,7 @@ import * as DesktopClientSettings from "./DesktopClientSettings.ts";
 
 const clientSettings: ClientSettings = {
   ...DEFAULT_CLIENT_SETTINGS,
+  notificationMode: "notifications-and-sound",
   appearanceContrast: 100,
   autoCreatePrOnPush: true,
   branchListSortKey: "lastCommit",
@@ -40,6 +41,7 @@ const clientSettings: ClientSettings = {
   composerCollapseOnScroll: true,
   deleteRemoteBranchOnDelete: true,
   dismissedProviderUpdateNotificationKeys: [],
+  diffFilesCollapsed: true,
   diffIgnoreWhitespace: true,
   diffLayout: "stacked",
   environmentIdentificationMode: "artwork",

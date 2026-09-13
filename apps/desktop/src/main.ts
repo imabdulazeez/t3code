@@ -27,7 +27,6 @@ import * as DesktopIpc from "./ipc/DesktopIpc.ts";
 import * as ElectronApp from "./electron/ElectronApp.ts";
 import * as ElectronDialog from "./electron/ElectronDialog.ts";
 import * as ElectronMenu from "./electron/ElectronMenu.ts";
-import * as ElectronPermissions from "./electron/ElectronPermissions.ts";
 import * as ElectronPowerMonitor from "./electron/ElectronPowerMonitor.ts";
 import * as ElectronProtocol from "./electron/ElectronProtocol.ts";
 import * as ElectronSafeStorage from "./electron/ElectronSafeStorage.ts";
@@ -226,7 +225,6 @@ const desktopApplicationLayer = Layer.mergeAll(
   desktopApplicationMenuLayer,
   DesktopLinuxUrlHandler.layer,
   DesktopShellEnvironment.layer,
-  ElectronPermissions.layer,
   desktopSshLayer,
 ).pipe(
   Layer.provideMerge(desktopSnapShotLayer),

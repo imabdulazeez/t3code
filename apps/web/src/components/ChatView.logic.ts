@@ -848,6 +848,7 @@ export async function buildComposerAttachmentsFromMessage(input: {
         name: attachment.name,
         mimeType: attachment.mimeType,
         sizeBytes: file.size,
+        ...(attachment.source ? { source: attachment.source } : {}),
         file,
       });
     }
@@ -1443,6 +1444,8 @@ export function shouldRefocusComposerOnWindowFocus(
     activeElement.tagName === "INPUT" ||
     activeElement.tagName === "TEXTAREA" ||
     activeElement.tagName === "SELECT" ||
+    activeElement.tagName === "IFRAME" ||
+    activeElement.tagName === "WEBVIEW" ||
     activeElement.isContentEditable === true ||
     activeElement.getAttribute("role") === "textbox"
   ) {

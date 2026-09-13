@@ -2181,6 +2181,10 @@ describe("shouldRefocusComposerOnWindowFocus", () => {
     expect(shouldRefocusComposerOnWindowFocus(element("DIV", { role: "textbox" }))).toBe(false);
   });
 
+  it.each(["IFRAME", "WEBVIEW"])("leaves a focused %s preview alone", (tagName) => {
+    expect(shouldRefocusComposerOnWindowFocus(element(tagName))).toBe(false);
+  });
+
   it("leaves a focused terminal alone in the drawer and the right panel", () => {
     expect(
       shouldRefocusComposerOnWindowFocus(element("BUTTON", { within: "data-terminal-owner" })),
@@ -2468,7 +2472,14 @@ describe("buildComposerAttachmentsFromMessage", () => {
           sizeBytes: 3,
           source,
         },
-        { type: "file", id: "file-1", name: "notes.txt", mimeType: "text/plain", sizeBytes: 5 },
+        {
+          type: "file",
+          id: "file-1",
+          name: "notes.txt",
+          mimeType: "text/plain",
+          sizeBytes: 5,
+          source: { _tag: "pasted-text" },
+        },
         { type: "sticker", id: "odd-1", name: "odd", mimeType: "x/y", sizeBytes: 1 },
       ],
       environmentId,
@@ -2518,6 +2529,7 @@ describe("buildComposerAttachmentsFromMessage", () => {
       name: "notes.txt",
       mimeType: "text/plain",
       sizeBytes: 5,
+      source: { _tag: "pasted-text" },
     });
     expect(result.files[0]!.file).not.toBeNull();
   });
