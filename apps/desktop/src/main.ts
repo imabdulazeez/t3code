@@ -19,7 +19,6 @@ import { formatBuildTimestamp } from "@t3tools/shared/buildTimestamp";
 
 import * as NetService from "@t3tools/shared/Net";
 import { HostProcessArchitecture, HostProcessPlatform } from "@t3tools/shared/hostProcess";
-import { resolveRemoteT3CliPackageSpec } from "@t3tools/ssh/command";
 import type { RemoteT3RunnerOptions } from "@t3tools/ssh/tunnel";
 import serverPackageJson from "../../server/package.json" with { type: "json" };
 
@@ -108,6 +107,9 @@ const desktopEnvironmentLayer = Layer.unwrap(
   }),
 );
 
+// The remote runs the exact release this app is on, from its self-contained
+// archive, so it needs neither Node nor npm. Development points the remote at
+// a source checkout instead so the two sides can be iterated together.
 const resolveDesktopSshCliRunner = (
   environment: DesktopEnvironment.DesktopEnvironment["Service"],
 ): RemoteT3RunnerOptions => {
@@ -118,13 +120,7 @@ const resolveDesktopSshCliRunner = (
       nodeEngineRange: serverPackageJson.engines.node,
     };
   }
-  return {
-    packageSpec: resolveRemoteT3CliPackageSpec({
-      appVersion: environment.appVersion,
-      isDevelopment: environment.isDevelopment,
-    }),
-    nodeEngineRange: serverPackageJson.engines.node,
-  };
+  return { archiveVersion: environment.appVersion };
 };
 
 const desktopSshEnvironmentLayer = Layer.unwrap(

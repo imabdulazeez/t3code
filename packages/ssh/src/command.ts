@@ -14,8 +14,6 @@ import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 import { buildSshChildEnvironment, type SshAuthOptions } from "./auth.ts";
 import { SshCommandError, SshInvalidTargetError } from "./errors.ts";
 
-const PUBLISHABLE_T3_VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u;
-const DEVELOPMENT_T3_VERSION = "0.0.0-dev";
 const DEFAULT_SSH_COMMAND_TIMEOUT_MS = 60_000;
 const MAX_SSH_ERROR_OUTPUT_LENGTH = 4_000;
 
@@ -364,23 +362,3 @@ export const resolveSshTarget = Effect.fn("ssh/command.resolveSshTarget")(functi
     ),
   );
 });
-
-export function resolveRemoteT3CliPackageSpec(input: {
-  readonly appVersion: string;
-  readonly isDevelopment?: boolean;
-}): string {
-  const appVersion = input.appVersion.trim();
-  if (
-    !input.isDevelopment &&
-    appVersion !== DEVELOPMENT_T3_VERSION &&
-    PUBLISHABLE_T3_VERSION_PATTERN.test(appVersion)
-  ) {
-    return `t3@${appVersion}`;
-  }
-
-  if (input.isDevelopment) {
-    return "t3@nightly";
-  }
-
-  return "t3@latest";
-}

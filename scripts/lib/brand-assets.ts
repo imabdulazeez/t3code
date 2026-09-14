@@ -34,7 +34,7 @@ export const BRAND_ASSET_PATHS = {
 export type WebAssetBrand = "development" | "nightly" | "production";
 
 export function resolveWebAssetBrandForPackageVersion(version: string): WebAssetBrand {
-  return version.includes("-nightly.") ? "nightly" : "production";
+  return /^[^-+]+-(?:nightly|preview)\./.test(version) ? "nightly" : "production";
 }
 
 export interface IconOverride {
