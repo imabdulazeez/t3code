@@ -259,6 +259,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["notification toast popup completion input approval failure"],
   },
   {
+    id: "test-notifications",
+    title: "Test notifications",
+    to: "/settings/general",
+    searchTerms: ["notification test permission prompt sound preview"],
+  },
+  {
     id: "time-format",
     title: "Time format",
     to: "/settings/general",

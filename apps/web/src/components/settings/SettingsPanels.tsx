@@ -1,5 +1,5 @@
 import { Spinner } from "~/components/ui/spinner";
-import { NotificationSettings } from "./NotificationSettings";
+import { NotificationSettings, NotificationTestSettings } from "./NotificationSettings";
 import {
   ArchiveIcon,
   ArchiveX,
@@ -2517,6 +2517,7 @@ export function GeneralSettingsPanel() {
             />
           }
         />
+        <NotificationTestSettings />
         <SettingsRow
           {...searchableSetting("time-format")}
           description="System default follows your browser or OS clock preference."

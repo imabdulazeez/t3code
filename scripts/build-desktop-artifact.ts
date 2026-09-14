@@ -2567,7 +2567,14 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
           schemes: ["t3code", "t3code-dev"],
         },
       ],
-      ...(signed ? { sign: path.join(repoRoot, "scripts/sign-macos.ts") } : {}),
+      // macOS drops notifications (and never shows the permission prompt) for
+      // bundles whose signing identifier does not match the bundle identifier.
+      // Unsigned builds keep only Electron's stock linker signature, so
+      // ad-hoc sign them; hardened runtime needs a team identity to load
+      // libraries, so it is off in that mode.
+      ...(signed
+        ? { sign: path.join(repoRoot, "scripts/sign-macos.ts") }
+        : { identity: "-", hardenedRuntime: false, notarize: false }),
       ...(macPasskeySigning
         ? {
             entitlements: macPasskeySigning.entitlementsPath,
