@@ -22,6 +22,7 @@ import {
 import { isValidDistroName } from "../wsl/wslPathParsing.ts";
 
 export interface DesktopSettings {
+  readonly localEnvironmentEnabled: boolean;
   readonly localUpdateCleanupEnabled?: boolean;
   readonly localUpdateFolderPath?: string | null;
   readonly localUpdatePendingCleanup?: LocalUpdatePendingCleanup | null;
@@ -76,6 +77,7 @@ export const DEFAULT_MAIN_WINDOW_SIZE = {
 } as const;
 
 export const DEFAULT_DESKTOP_SETTINGS: DesktopSettings = {
+  localEnvironmentEnabled: true,
   localUpdateCleanupEnabled: false,
   localUpdatePendingCleanup: null,
   linuxPasswordStore: DEFAULT_LINUX_PASSWORD_STORE,
@@ -97,6 +99,7 @@ const DesktopWindowBoundsDocument = Schema.Struct({
 });
 
 const DesktopSettingsDocument = Schema.Struct({
+  localEnvironmentEnabled: Schema.optionalKey(Schema.Boolean),
   localUpdateCleanupEnabled: Schema.optionalKey(Schema.Boolean),
   localUpdateFolderPath: Schema.optionalKey(Schema.NullOr(Schema.String)),
   localUpdatePendingCleanup: Schema.optionalKey(
@@ -163,6 +166,9 @@ export class DesktopAppSettings extends Context.Service<
   {
     readonly load: Effect.Effect<DesktopSettings>;
     readonly get: Effect.Effect<DesktopSettings>;
+    readonly setLocalEnvironmentEnabled: (
+      enabled: boolean,
+    ) => Effect.Effect<DesktopSettingsChange, DesktopSettingsWriteError>;
     readonly setLocalUpdateFolderPath?: (
       folderPath: string | null,
     ) => Effect.Effect<DesktopSettingsChange, DesktopSettingsWriteError>;
@@ -229,6 +235,7 @@ function normalizeDesktopSettingsDocument(parsed: DesktopSettingsDocument): Desk
     (parsed.wslBackendEnabled === undefined && parsed.wslMode === "wsl");
 
   return {
+    localEnvironmentEnabled: parsed.localEnvironmentEnabled !== false,
     localUpdateCleanupEnabled: parsed.localUpdateCleanupEnabled === true,
     ...(typeof parsed.localUpdateFolderPath === "string" &&
     parsed.localUpdateFolderPath.trim().length > 0
@@ -258,6 +265,10 @@ function toDesktopSettingsDocument(
   defaults: DesktopSettings,
 ): DesktopSettingsDocument {
   const document: Mutable<DesktopSettingsDocument> = {};
+
+  if (settings.localEnvironmentEnabled !== defaults.localEnvironmentEnabled) {
+    document.localEnvironmentEnabled = settings.localEnvironmentEnabled;
+  }
 
   if (settings.localUpdateCleanupEnabled === true) {
     document.localUpdateCleanupEnabled = true;
@@ -407,6 +418,12 @@ function setWslOnly(settings: DesktopSettings, enabled: boolean): DesktopSetting
         ...settings,
         wslOnly: enabled,
       };
+}
+
+function setLocalEnvironmentEnabled(settings: DesktopSettings, enabled: boolean): DesktopSettings {
+  return settings.localEnvironmentEnabled === enabled
+    ? settings
+    : { ...settings, localEnvironmentEnabled: enabled };
 }
 
 function applyWslWindowsFallback(settings: DesktopSettings): DesktopSettings {
@@ -587,6 +604,10 @@ export const make = Effect.gen(function* () {
       persist((settings) => setWslOnly(settings, enabled)).pipe(
         Effect.withSpan("desktop.settings.setWslOnly", { attributes: { enabled } }),
       ),
+    setLocalEnvironmentEnabled: (enabled) =>
+      persist((settings) => setLocalEnvironmentEnabled(settings, enabled)).pipe(
+        Effect.withSpan("desktop.settings.setLocalEnvironmentEnabled", { attributes: { enabled } }),
+      ),
     applyWslWindowsFallback: persist(applyWslWindowsFallback).pipe(
       Effect.withSpan("desktop.settings.applyWslWindowsFallback"),
     ),
@@ -633,6 +654,8 @@ export const layerTest = (initialSettings: DesktopSettings = DEFAULT_DESKTOP_SET
           update((settings) => setWslBackendEnabled(settings, enabled)),
         setWslDistro: (distro) => update((settings) => setWslDistro(settings, distro)),
         setWslOnly: (enabled) => update((settings) => setWslOnly(settings, enabled)),
+        setLocalEnvironmentEnabled: (enabled) =>
+          update((settings) => setLocalEnvironmentEnabled(settings, enabled)),
         applyWslWindowsFallback: update(applyWslWindowsFallback),
         applyWslWindowsFallbackInMemory: update(applyWslWindowsFallback),
       });

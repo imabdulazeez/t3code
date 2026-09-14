@@ -18,6 +18,10 @@ import {
   setConnectionCatalog,
 } from "./methods/connectionCatalog.ts";
 import {
+  getLocalEnvironmentEnabled,
+  setLocalEnvironmentEnabled,
+} from "./methods/localEnvironment.ts";
+import {
   getAdvertisedEndpoints,
   getServerExposureState,
   setServerExposureMode,
@@ -81,6 +85,8 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
   yield* ipc.handleSync(getSystemLocale);
   yield* ipc.handleSync(getWindowFullscreenState);
   yield* ipc.handleSync(getLocalEnvironmentBootstraps);
+  yield* ipc.handleSync(getLocalEnvironmentEnabled);
+  yield* ipc.handle(setLocalEnvironmentEnabled);
   yield* ipc.handle(getLocalEnvironmentBearerToken);
 
   yield* ipc.handle(getClientSettings);
