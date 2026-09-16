@@ -127,6 +127,9 @@ export const make = Effect.gen(function* () {
           .listOpenPullRequests({
             cwd: input.cwd,
             headSelector: input.headSelector,
+            ...(input.context === undefined
+              ? {}
+              : { rateLimitHost: new URL(input.context.provider.baseUrl).host }),
             ...(input.limit !== undefined ? { limit: input.limit } : {}),
             ...(input.repository !== undefined ? { repository: input.repository } : {}),
           })
@@ -153,6 +156,9 @@ export const make = Effect.gen(function* () {
       return github
         .execute({
           cwd: input.cwd,
+          ...(input.context === undefined
+            ? {}
+            : { rateLimitHost: new URL(input.context.provider.baseUrl).host }),
           args: [
             "pr",
             "list",
@@ -269,23 +275,30 @@ export const make = Effect.gen(function* () {
     },
     listChangeRequests,
     getChangeRequest: (input) =>
-      github.getPullRequest(input).pipe(
-        Effect.map(toChangeRequest),
-        Effect.mapError(
-          (error) =>
-            new SourceControlProviderError({
-              provider: "github",
-              operation: "getChangeRequest",
-              command: error.command,
-              cwd: input.cwd,
-              reference: SourceControlProvider.transportSafeSourceControlErrorValue(
-                input.reference,
-              ),
-              detail: error.detail,
-              cause: error,
-            }),
+      github
+        .getPullRequest({
+          ...input,
+          ...(input.context === undefined
+            ? {}
+            : { rateLimitHost: new URL(input.context.provider.baseUrl).host }),
+        })
+        .pipe(
+          Effect.map(toChangeRequest),
+          Effect.mapError(
+            (error) =>
+              new SourceControlProviderError({
+                provider: "github",
+                operation: "getChangeRequest",
+                command: error.command,
+                cwd: input.cwd,
+                reference: SourceControlProvider.transportSafeSourceControlErrorValue(
+                  input.reference,
+                ),
+                detail: error.detail,
+                cause: error,
+              }),
+          ),
         ),
-      ),
     createChangeRequest: (input) =>
       github
         .createPullRequest({
@@ -349,8 +362,10 @@ export const make = Effect.gen(function* () {
     getDefaultBranch: (input) =>
       github
         .getDefaultBranch({
-          cwd: input.cwd,
-          ...(input.repository !== undefined ? { repository: input.repository } : {}),
+          ...input,
+          ...(input.context === undefined
+            ? {}
+            : { rateLimitHost: new URL(input.context.provider.baseUrl).host }),
         })
         .pipe(
           Effect.mapError(
