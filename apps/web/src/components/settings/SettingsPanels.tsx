@@ -1,3 +1,4 @@
+import { SettingsGroup } from "./SettingsGroup";
 import { Spinner } from "~/components/ui/spinner";
 import { NotificationSettings, NotificationTestSettings } from "./NotificationSettings";
 import {
@@ -2085,7 +2086,7 @@ function LegacyFeaturesSection() {
           <ChevronRightIcon className="size-4 text-muted-foreground transition-transform duration-200 group-data-panel-open:rotate-90" />
         </CollapsibleTrigger>
         <CollapsiblePanel>
-          <div className="relative overflow-visible rounded-xl border border-border/60 bg-card/40 text-foreground shadow-xs/5 [&>*+*]:border-t [&>*+*]:border-border/50 [&>[data-slot=settings-row]]:rounded-none">
+          <SettingsGroup>
             <SettingsRow
               {...searchableSetting("legacy-plan-mode")}
               description="Restore Build/Plan, /plan, /default, and Shift+Tab. Off uses build mode."
@@ -2125,7 +2126,7 @@ function LegacyFeaturesSection() {
                 />
               }
             />
-          </div>
+          </SettingsGroup>
         </CollapsiblePanel>
       </Collapsible>
     </section>
