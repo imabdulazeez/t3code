@@ -39,6 +39,10 @@ vi.mock("../threadNotifications", async (importOriginal) => ({
   setNotificationBadge: state.badge,
 }));
 
+vi.mock("../threadNotificationPreview", () => ({
+  loadCompletionMessagePreview: vi.fn(async () => "Fixed the login redirect and session handling."),
+}));
+
 import { ThreadNotificationCoordinator } from "./ThreadNotificationCoordinator";
 
 class TestNotification extends EventTarget {

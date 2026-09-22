@@ -20,6 +20,7 @@ import {
   setNotificationBadge,
   unlockNotificationAudio,
 } from "../threadNotifications";
+import { loadCompletionMessagePreview } from "../threadNotificationPreview";
 import { resolveSidebarThreadStatus } from "./Sidebar.logic";
 import { toastManager } from "./ui/toast";
 
@@ -103,6 +104,29 @@ function EnvironmentNotifications({
   const { environmentId: activeEnvironmentId, threadId: activeThreadId } = useParams({
     strict: false,
   });
+  const current = useRef({
+    shell,
+    mode,
+    inAppNotificationsEnabled,
+    activeEnvironmentId,
+    activeThreadId,
+  });
+  useEffect(() => {
+    current.current = {
+      shell,
+      mode,
+      inAppNotificationsEnabled,
+      activeEnvironmentId,
+      activeThreadId,
+    };
+  }, [shell, mode, inAppNotificationsEnabled, activeEnvironmentId, activeThreadId]);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const previous = useRef(
     new Map<ThreadId, { attention: string | null; completion: number | null }>(),
   );
@@ -139,7 +163,7 @@ function EnvironmentNotifications({
       if (!kind) continue;
       const title =
         kind === "completion"
-          ? "Thread completed"
+          ? thread.title
           : status === "approval"
             ? "Approval needed"
             : status === "failed"
@@ -150,76 +174,117 @@ function EnvironmentNotifications({
           hasNotificationSound(getClientSettings().notificationMode),
         );
       }
-      if (
-        inAppNotificationsEnabled &&
-        document.visibilityState === "visible" &&
-        document.hasFocus() &&
-        (activeEnvironmentId !== environmentId || activeThreadId !== thread.id)
-      ) {
-        const toastId = toastManager.add({
-          type: kind === "completion" ? "success" : status === "failed" ? "error" : "warning",
-          title,
-          description: thread.title,
-          data: {
-            hideCopyButton: true,
-            leadingIcon:
-              kind === "completion" ? (
-                <CircleCheckIcon
-                  aria-hidden
-                  className="size-4 text-emerald-700 dark:text-emerald-300"
-                />
-              ) : status === "approval" ? (
-                <ShieldQuestionIcon
-                  aria-hidden
-                  className="size-4 text-amber-700 dark:text-amber-300"
-                />
-              ) : status === "failed" ? (
-                <CircleAlertIcon aria-hidden className="size-4 text-red-700 dark:text-red-300" />
-              ) : (
-                <MessageCircleQuestionIcon
-                  aria-hidden
-                  className="size-4 text-indigo-600 dark:text-indigo-300"
-                />
-              ),
-          },
-          actionProps: {
-            children: "Open thread",
-            onClick: () => {
-              toastManager.close(toastId);
-              void navigate({
-                to: "/$environmentId/$threadId",
-                params: { environmentId, threadId: thread.id },
-              });
+      const showNotification = async () => {
+        const canShowToast =
+          inAppNotificationsEnabled &&
+          document.visibilityState === "visible" &&
+          document.hasFocus() &&
+          (activeEnvironmentId !== environmentId || activeThreadId !== thread.id);
+        const canShowSystem =
+          hasDesktopNotifications(mode) &&
+          !(document.visibilityState === "visible" && document.hasFocus()) &&
+          typeof Notification !== "undefined" &&
+          Notification.permission === "granted";
+        if (!canShowToast && !canShowSystem) return;
+        const body =
+          kind === "completion"
+            ? await loadCompletionMessagePreview(
+                environmentId,
+                thread.id,
+                thread.latestTurn?.turnId ?? null,
+              )
+            : thread.title;
+        if (
+          !mounted.current ||
+          (kind === "completion" && previous.current.get(thread.id)?.completion !== completion)
+        )
+          return;
+        const latest = current.current;
+        if (kind === "completion") {
+          const latestThread = Option.isSome(latest.shell.snapshot)
+            ? latest.shell.snapshot.value.threads.find((candidate) => candidate.id === thread.id)
+            : undefined;
+          if (
+            latest.shell.status !== "live" ||
+            !latestThread ||
+            latestThread.archivedAt !== null ||
+            latestThread.latestTurn?.turnId !== thread.latestTurn?.turnId ||
+            latestThread.latestTurn?.state !== "completed"
+          )
+            return;
+        }
+        if (
+          latest.inAppNotificationsEnabled &&
+          document.visibilityState === "visible" &&
+          document.hasFocus() &&
+          (latest.activeEnvironmentId !== environmentId || latest.activeThreadId !== thread.id)
+        ) {
+          const toastId = toastManager.add({
+            type: kind === "completion" ? "success" : status === "failed" ? "error" : "warning",
+            title,
+            description: body,
+            data: {
+              hideCopyButton: true,
+              leadingIcon:
+                kind === "completion" ? (
+                  <CircleCheckIcon
+                    aria-hidden
+                    className="size-4 text-emerald-700 dark:text-emerald-300"
+                  />
+                ) : status === "approval" ? (
+                  <ShieldQuestionIcon
+                    aria-hidden
+                    className="size-4 text-amber-700 dark:text-amber-300"
+                  />
+                ) : status === "failed" ? (
+                  <CircleAlertIcon aria-hidden className="size-4 text-red-700 dark:text-red-300" />
+                ) : (
+                  <MessageCircleQuestionIcon
+                    aria-hidden
+                    className="size-4 text-indigo-600 dark:text-indigo-300"
+                  />
+                ),
             },
-          },
-        });
-        continue;
-      }
-      if (
-        !hasDesktopNotifications(mode) ||
-        (document.visibilityState === "visible" && document.hasFocus()) ||
-        typeof Notification === "undefined" ||
-        Notification.permission !== "granted"
-      )
-        continue;
-      try {
-        const notification = new Notification(title, {
-          body: thread.title,
-          tag: `${environmentId}:${thread.id}`,
-          silent: true,
-        });
-        onNotification(environmentId, notification);
-        notification.addEventListener("click", () => {
-          notification.close();
-          window.focus();
-          void navigate({
-            to: "/$environmentId/$threadId",
-            params: { environmentId, threadId: thread.id },
+            actionProps: {
+              children: "Open thread",
+              onClick: () => {
+                toastManager.close(toastId);
+                void navigate({
+                  to: "/$environmentId/$threadId",
+                  params: { environmentId, threadId: thread.id },
+                });
+              },
+            },
           });
-        });
-      } catch {
-        // Some browsers expose Notification but reject desktop presentation.
-      }
+          return;
+        }
+        if (
+          !hasDesktopNotifications(latest.mode) ||
+          (document.visibilityState === "visible" && document.hasFocus()) ||
+          typeof Notification === "undefined" ||
+          Notification.permission !== "granted"
+        )
+          return;
+        try {
+          const notification = new Notification(title, {
+            body,
+            tag: `${environmentId}:${thread.id}`,
+            silent: true,
+          });
+          onNotification(environmentId, notification);
+          notification.addEventListener("click", () => {
+            notification.close();
+            window.focus();
+            void navigate({
+              to: "/$environmentId/$threadId",
+              params: { environmentId, threadId: thread.id },
+            });
+          });
+        } catch {
+          // Some browsers expose Notification but reject desktop presentation.
+        }
+      };
+      void showNotification();
     }
     previous.current = next;
   }, [

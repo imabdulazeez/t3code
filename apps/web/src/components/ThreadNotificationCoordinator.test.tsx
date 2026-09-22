@@ -78,6 +78,10 @@ vi.mock("./ui/toast", () => ({
   toastManager: { add: state.add, close: state.close },
 }));
 
+vi.mock("../threadNotificationPreview", () => ({
+  loadCompletionMessagePreview: vi.fn(async () => "Fixed the login redirect and session handling."),
+}));
+
 import { ThreadNotificationCoordinator } from "./ThreadNotificationCoordinator";
 
 let renderer: ReactTestRenderer | undefined;
@@ -136,8 +140,8 @@ describe("thread notifications", () => {
     await render();
     expect(state.add).toHaveBeenCalledTimes(1);
     const toast = state.add.mock.calls[0]?.[0];
-    expect(toast?.title).toBe("Thread completed");
-    expect(toast?.description).toBe("Fix the login form");
+    expect(toast?.title).toBe("Fix the login form");
+    expect(toast?.description).toBe("Fixed the login redirect and session handling.");
     toast?.actionProps.onClick();
     expect(state.close).toHaveBeenCalledWith("toast-1");
     expect(state.navigate).toHaveBeenCalledWith({
@@ -245,8 +249,8 @@ describe("thread notifications", () => {
     await render();
     await complete();
     expect(state.add).not.toHaveBeenCalled();
-    expect(state.notification).toHaveBeenCalledWith("Thread completed", {
-      body: "Fix the login form",
+    expect(state.notification).toHaveBeenCalledWith("Fix the login form", {
+      body: "Fixed the login redirect and session handling.",
       tag: "env-1:thread-1",
       silent: true,
     });
