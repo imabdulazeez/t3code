@@ -28,6 +28,7 @@ const SHARED_SERVER_SETTING_KEYS = [
   "newWorktreesStartFromOrigin",
   "sourceControlWritingStyle",
   "textGenerationModelSelection",
+  "textGenerationFallbackModelSelection",
 ] as const satisfies ReadonlyArray<keyof ServerSettings & keyof ServerSettingsPatch>;
 
 export type SharedServerSettingKey = (typeof SHARED_SERVER_SETTING_KEYS)[number];
@@ -78,6 +79,17 @@ export function filterSharedServerPatch(
       }))
   ) {
     patch = Struct.omit(patch, ["textGenerationModelSelection"]);
+  }
+  const fallback = patch.textGenerationFallbackModelSelection;
+  if (
+    !targetIsSource &&
+    fallback &&
+    (!settings ||
+      (sourceSettings?.providerInstances[fallback.instanceId]?.driver ?? fallback.instanceId) !==
+        (settings.providerInstances[fallback.instanceId]?.driver ?? fallback.instanceId) ||
+      !isModelSelectionProviderEnabled(settings, fallback))
+  ) {
+    patch = Struct.omit(patch, ["textGenerationFallbackModelSelection"]);
   }
   return capabilities?.threadRestartContinuation === true
     ? patch

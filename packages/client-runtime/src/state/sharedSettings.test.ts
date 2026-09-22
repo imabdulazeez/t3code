@@ -128,6 +128,7 @@ describe("pickSharedServerSettings", () => {
       "sidebarAutoSettleAfterDays",
       "sidebarAutoSettleOnMerge",
       "sourceControlWritingStyle",
+      "textGenerationFallbackModelSelection",
       "textGenerationModelSelection",
     ]);
   });
@@ -211,6 +212,41 @@ describe("filterSharedServerPatch", () => {
           ],
         }),
       ).toEqual(availability === "enabled" ? [{ environmentId: boxId, label: "Remote Box" }] : []);
+    },
+  );
+
+  it.each(["missing", "disabled", "enabled"] as const)(
+    "shares the fallback model only when its target provider is enabled (%s)",
+    (availability) => {
+      const instanceId = ProviderInstanceId.make("claude_backup");
+      const selection = { instanceId, model: "claude-sonnet-4-6" };
+      const instance = {
+        driver: ProviderDriverKind.make("claudeAgent"),
+        enabled: availability !== "disabled",
+        config: {},
+      };
+      const settings = {
+        ...DEFAULT_SERVER_SETTINGS,
+        providerInstances: availability === "missing" ? {} : { [instanceId]: instance },
+      };
+      const sourceSettings = {
+        ...settings,
+        providerInstances: { [instanceId]: { ...instance, enabled: true } },
+      };
+      const patch = {
+        sidebarAutoSettleAfterDays: 7,
+        textGenerationFallbackModelSelection: selection,
+      };
+      expect(filterSharedServerPatch(patch, restartCapabilities, settings, sourceSettings)).toEqual(
+        availability === "enabled" ? patch : { sidebarAutoSettleAfterDays: 7 },
+      );
+      const clearing = {
+        sidebarAutoSettleAfterDays: 7,
+        textGenerationFallbackModelSelection: null,
+      };
+      expect(
+        filterSharedServerPatch(clearing, restartCapabilities, settings, sourceSettings),
+      ).toEqual(clearing);
     },
   );
 

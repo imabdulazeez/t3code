@@ -17,6 +17,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   type BackgroundActivityProfile,
+  type ModelSelection,
   ProviderDriverKind,
   type ProviderInstanceId,
   type ScopedThreadRef,
@@ -521,6 +522,7 @@ export function useSettingsRestore(onRestored?: () => void) {
     settings.textGenerationModelSelection ?? null,
     DEFAULT_UNIFIED_SETTINGS.textGenerationModelSelection ?? null,
   );
+  const isTextGenerationFallbackModelDirty = settings.textGenerationFallbackModelSelection !== null;
   const isBackgroundActivityDirty = hasChangedBackgroundActivitySettings(settings);
 
   const changedSettingLabels = useMemo(
@@ -649,6 +651,7 @@ export function useSettingsRestore(onRestored?: () => void) {
         ? ["Branch name instructions"]
         : []),
       ...(isTextGenerationModelDirty ? ["Text generation model"] : []),
+      ...(isTextGenerationFallbackModelDirty ? ["Fallback text generation model"] : []),
       ...getChangedBrowserSettingLabels(settings),
       ...(settings.enableAgentBrowserAccess !== DEFAULT_UNIFIED_SETTINGS.enableAgentBrowserAccess
         ? ["Agent browser access"]
@@ -656,6 +659,7 @@ export function useSettingsRestore(onRestored?: () => void) {
     ],
     [
       isTextGenerationModelDirty,
+      isTextGenerationFallbackModelDirty,
       isBackgroundActivityDirty,
       settings.browserDefaultViewport,
       settings.browserDefaultZoomFactor,
@@ -826,6 +830,8 @@ export function useSettingsRestore(onRestored?: () => void) {
       prContentPromptInstructions: DEFAULT_UNIFIED_SETTINGS.prContentPromptInstructions,
       branchNamePromptInstructions: DEFAULT_UNIFIED_SETTINGS.branchNamePromptInstructions,
       textGenerationModelSelection: DEFAULT_UNIFIED_SETTINGS.textGenerationModelSelection,
+      textGenerationFallbackModelSelection:
+        DEFAULT_UNIFIED_SETTINGS.textGenerationFallbackModelSelection,
       fontFamilySans: DEFAULT_UNIFIED_SETTINGS.fontFamilySans,
       fontFamilyComposer: DEFAULT_UNIFIED_SETTINGS.fontFamilyComposer,
       fontFamilyCode: DEFAULT_UNIFIED_SETTINGS.fontFamilyCode,
@@ -2208,6 +2214,44 @@ export function GeneralSettingsPanel() {
     settings,
     textGenerationModelInstanceEntries,
   );
+  const usesTextGenerationFallback = settings.textGenerationFallbackModelSelection !== null;
+  const textGenerationFallbackSelection = resolveAppModelSelectionState(
+    {
+      ...settings,
+      textGenerationModelSelection:
+        settings.textGenerationFallbackModelSelection ?? textGenerationModelSelection,
+    },
+    textGenerationProviders,
+  );
+  const textGenFallbackInstanceEntry = textGenerationModelInstanceEntries.find(
+    (entry) => entry.instanceId === textGenerationFallbackSelection.instanceId,
+  );
+  const textGenFallbackProvider: ProviderDriverKind =
+    textGenFallbackInstanceEntry?.driverKind ?? DEFAULT_DRIVER_KIND;
+  const textGenerationFallbackOptionsByInstance = getCustomModelOptionsByInstance(
+    settings,
+    textGenerationProviders,
+    textGenerationFallbackSelection.instanceId,
+    textGenerationFallbackSelection.model,
+  );
+  const mixedTextGenerationFallbackModel = useScopedSettingsMixed([
+    "textGenerationFallbackModelSelection",
+  ]);
+  const updateTextGenerationFallback = (
+    instanceId: ProviderInstanceId,
+    model: string,
+    options?: ModelSelection["options"],
+  ) => {
+    updateSettings({
+      textGenerationFallbackModelSelection: resolveAppModelSelectionState(
+        {
+          ...settings,
+          textGenerationModelSelection: createModelSelection(instanceId, model, options),
+        },
+        textGenerationProviders,
+      ),
+    });
+  };
   const resolvedBackgroundActivity = resolveServerBackgroundActivitySettings(settings);
   const activeBackgroundActivityProfile = resolvedBackgroundActivity.profile;
   const backgroundActivityProfileOption = resolveBackgroundActivityProfileOption(settings);
@@ -3486,6 +3530,109 @@ export function GeneralSettingsPanel() {
                     }}
                   />
                 ) : null}
+              </div>
+            )
+          }
+        />
+
+        <SettingsRow
+          serverScoped
+          settingKeys={["textGenerationFallbackModelSelection"]}
+          {...searchableSetting("text-generation-fallback-model")}
+          description="Used when the text generation model fails, including when it has hit its usage limits."
+          resetAction={
+            hasServerTargets && usesTextGenerationFallback ? (
+              <SettingResetButton
+                label="fallback text generation model"
+                onClick={() => updateSettings({ textGenerationFallbackModelSelection: null })}
+              />
+            ) : null
+          }
+          control={
+            !hasServerTargets ? (
+              <span className="text-sm text-muted-foreground">
+                Connect an environment to choose its fallback text generation model.
+              </span>
+            ) : (
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                {usesTextGenerationFallback && !hasTextGenerationProvider ? (
+                  <span className="text-sm text-muted-foreground">
+                    No text generation providers available.
+                  </span>
+                ) : null}
+                {usesTextGenerationFallback && hasTextGenerationProvider ? (
+                  <>
+                    <ProviderModelPicker
+                      activeInstanceId={textGenerationFallbackSelection.instanceId}
+                      model={textGenerationFallbackSelection.model}
+                      lockedProvider={null}
+                      instanceEntries={textGenerationModelInstanceEntries}
+                      modelOptionsByInstance={textGenerationFallbackOptionsByInstance}
+                      triggerVariant="outline"
+                      triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
+                      triggerAriaLabel="Fallback text generation model"
+                      {...(mixedTextGenerationFallbackModel ? { triggerLabel: "Mixed" } : {})}
+                      getModelDisabledReason={textGenerationModelDisabledReason}
+                      {...(environmentId
+                        ? {
+                            onOpenProviderSetup: (instanceId: ProviderInstanceId) => {
+                              void navigate({
+                                to: "/settings/providers",
+                                search: { environmentId, instanceId },
+                              });
+                            },
+                          }
+                        : {})}
+                      onInstanceModelChange={(instanceId, model) => {
+                        const reason = textGenerationModelDisabledReason(instanceId, model);
+                        if (reason) {
+                          toastManager.add({
+                            type: "error",
+                            title: "Fallback text generation model not saved",
+                            description: reason,
+                          });
+                          return;
+                        }
+                        updateTextGenerationFallback(instanceId, model);
+                      }}
+                    />
+                    {textGenFallbackInstanceEntry ? (
+                      <TraitsPicker
+                        provider={textGenFallbackProvider}
+                        models={textGenFallbackInstanceEntry.models ?? []}
+                        model={textGenerationFallbackSelection.model}
+                        prompt=""
+                        onPromptChange={() => {}}
+                        modelOptions={textGenerationFallbackSelection.options}
+                        allowPromptInjectedEffort={false}
+                        planModeEnabled={settings.planModeEnabled}
+                        triggerVariant="outline"
+                        triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
+                        onModelOptionsChange={(nextOptions) =>
+                          updateTextGenerationFallback(
+                            textGenerationFallbackSelection.instanceId,
+                            textGenerationFallbackSelection.model,
+                            nextOptions,
+                          )
+                        }
+                      />
+                    ) : null}
+                  </>
+                ) : null}
+                <Switch
+                  checked={usesTextGenerationFallback}
+                  disabled={!usesTextGenerationFallback && !hasTextGenerationProvider}
+                  onCheckedChange={(checked) =>
+                    checked
+                      ? updateTextGenerationFallback(
+                          textGenInstanceId,
+                          textGenModel,
+                          textGenModelOptions,
+                        )
+                      : updateSettings({ textGenerationFallbackModelSelection: null })
+                  }
+                  aria-label="Use a fallback text generation model"
+                />
               </div>
             )
           }

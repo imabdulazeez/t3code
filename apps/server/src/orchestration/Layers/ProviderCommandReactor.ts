@@ -60,6 +60,7 @@ import {
 import { canReplaceThreadTitle, DEFAULT_THREAD_TITLE } from "../threadTitles.ts";
 import {
   resolveSourceControlWriterModelSelection,
+  resolveTextGenerationFallbackModelSelection,
   ServerSettingsService,
 } from "../../serverSettings.ts";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
@@ -911,19 +912,22 @@ const make = Effect.gen(function* () {
     const attachments = input.attachments ?? [];
     yield* Effect.gen(function* () {
       const settings = yield* projectSettingsForThread(input.threadId);
+      const providers = yield* providerRegistry.getProviders;
       const modelSelection =
         settings.sourceControlWriterModelSelection === null
           ? settings.textGenerationModelSelection
-          : resolveSourceControlWriterModelSelection(
-              settings,
-              yield* providerRegistry.getProviders,
-            );
+          : resolveSourceControlWriterModelSelection(settings, providers);
 
       const generated = yield* textGeneration.generateBranchName({
         cwd,
         message: input.messageText,
         ...(attachments.length > 0 ? { attachments } : {}),
         modelSelection,
+        fallbackModelSelection: resolveTextGenerationFallbackModelSelection(
+          settings,
+          modelSelection,
+          providers,
+        ),
       });
       if (!generated) return;
 
@@ -963,9 +967,8 @@ const make = Effect.gen(function* () {
     }) {
       const attachments = input.attachments ?? [];
       yield* Effect.gen(function* () {
-        const { textGenerationModelSelection: modelSelection } = yield* projectSettingsForThread(
-          input.threadId,
-        );
+        const settings = yield* projectSettingsForThread(input.threadId);
+        const modelSelection = settings.textGenerationModelSelection;
 
         const generated = yield* textGeneration
           .generateThreadTitle({
@@ -973,6 +976,10 @@ const make = Effect.gen(function* () {
             message: input.messageText,
             ...(attachments.length > 0 ? { attachments } : {}),
             modelSelection,
+            fallbackModelSelection: resolveTextGenerationFallbackModelSelection(
+              settings,
+              modelSelection,
+            ),
           })
           .pipe(
             Effect.retry({
@@ -1061,16 +1068,18 @@ const make = Effect.gen(function* () {
         thread,
         projects: project ? [project] : [],
       }) ?? process.cwd();
-    const { textGenerationModelSelection: modelSelection } = resolveProjectSettings(
+    const settings = resolveProjectSettings(
       yield* serverSettingsService.getSettings,
       thread.projectId,
     ).settings;
+    const modelSelection = settings.textGenerationModelSelection;
     const generated = yield* textGeneration.generateThreadTitle({
       cwd,
       message,
       previousTitle,
       ...(attachments.length > 0 ? { attachments } : {}),
       modelSelection,
+      fallbackModelSelection: resolveTextGenerationFallbackModelSelection(settings, modelSelection),
     });
     if (generated.title === DEFAULT_THREAD_TITLE || generated.title === previousTitle) {
       return { _tag: "Completed", title: undefined } as const;

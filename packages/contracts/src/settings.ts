@@ -1092,6 +1092,7 @@ export const PROJECT_SCOPED_SERVER_SETTING_KEYS = [
   "enableAgentBrowserAccess",
   "enableAgentDeviceAccess",
   "textGenerationModelSelection",
+  "textGenerationFallbackModelSelection",
   "sourceControlWriterModelSelection",
   "sourceControlWritingStyle",
   "pullRequestMergeMethod",
@@ -1119,6 +1120,7 @@ export const ProjectSettingsOverrides = Schema.Struct({
   enableAgentBrowserAccess: Schema.optionalKey(Schema.Boolean),
   enableAgentDeviceAccess: Schema.optionalKey(Schema.Boolean),
   textGenerationModelSelection: Schema.optionalKey(ModelSelection),
+  textGenerationFallbackModelSelection: Schema.optionalKey(Schema.NullOr(ModelSelection)),
   sourceControlWriterModelSelection: Schema.optionalKey(Schema.NullOr(ModelSelection)),
   sourceControlWritingStyle: Schema.optionalKey(SourceControlWritingStyleSettings),
   pullRequestMergeMethod: Schema.optionalKey(Schema.NullOr(PullRequestMergeMethod)),
@@ -1144,6 +1146,7 @@ const NULLABLE_PROJECT_SETTINGS_OVERRIDES: ReadonlySet<ProjectScopedServerSettin
   }[ProjectScopedServerSettingKey]
 >([
   "defaultModelSelection",
+  "textGenerationFallbackModelSelection",
   "sourceControlWriterModelSelection",
   "pullRequestMergeMethod",
   "sidebarAutoSettleAfterDays",
@@ -1339,6 +1342,9 @@ export const ServerSettings = Schema.Struct({
   sourceControlWriterModelSelection: Schema.NullOr(ModelSelection).pipe(
     Schema.withDecodingDefault(Effect.succeed(null)),
   ),
+  textGenerationFallbackModelSelection: Schema.NullOr(ModelSelection).pipe(
+    Schema.withDecodingDefault(Effect.succeed(null)),
+  ),
   /**
    * The merge method pull requests start with; `null` reuses the method
    * last chosen on this device. Server-side so a project can override it
@@ -1407,6 +1413,7 @@ export const LOCAL_ONLY_SERVER_SETTING_KEYS = [
   "providerInstances",
   "providers",
   "sourceControlWriterModelSelection",
+  "textGenerationFallbackModelSelection",
   "textGenerationModelSelection",
   "usageLimitSources",
   "usagePriceOverrides",
@@ -1672,6 +1679,7 @@ export const ServerSettingsPatch = Schema.Struct({
     }),
   ),
   sourceControlWriterModelSelection: Schema.optionalKey(Schema.NullOr(ModelSelection)),
+  textGenerationFallbackModelSelection: Schema.optionalKey(Schema.NullOr(ModelSelection)),
   pullRequestMergeMethod: Schema.optionalKey(Schema.NullOr(PullRequestMergeMethod)),
   observability: Schema.optionalKey(
     Schema.Struct({

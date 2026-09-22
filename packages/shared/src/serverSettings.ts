@@ -99,6 +99,26 @@ export function resolveSourceControlWriterModelSelection(
     : settings.textGenerationModelSelection;
 }
 
+export function resolveTextGenerationFallbackModelSelection(
+  settings: ServerSettings,
+  primary: ModelSelection,
+  providers?: ReadonlyArray<ServerProvider>,
+): ModelSelection | null {
+  const selection = settings.textGenerationFallbackModelSelection;
+  if (!selection || !isModelSelectionProviderEnabled(settings, selection)) {
+    return null;
+  }
+  if (selection.instanceId === primary.instanceId && selection.model === primary.model) {
+    return null;
+  }
+  if (providers === undefined) {
+    return selection;
+  }
+
+  const provider = providers.find((candidate) => candidate.instanceId === selection.instanceId);
+  return provider?.enabled === true && isProviderAvailable(provider) ? selection : null;
+}
+
 export interface PersistedServerObservabilitySettings {
   readonly otlpTracesUrl: string | undefined;
   readonly otlpMetricsUrl: string | undefined;
@@ -393,6 +413,9 @@ export function applyServerSettingsPatch(
       : {}),
     ...(patch.sourceControlWriterModelSelection !== undefined
       ? { sourceControlWriterModelSelection: patch.sourceControlWriterModelSelection }
+      : {}),
+    ...(patch.textGenerationFallbackModelSelection !== undefined
+      ? { textGenerationFallbackModelSelection: patch.textGenerationFallbackModelSelection }
       : {}),
     ...(automaticGitFetchInterval !== undefined ? { automaticGitFetchInterval } : {}),
     ...(providerHealthRefreshInterval !== undefined ? { providerHealthRefreshInterval } : {}),

@@ -487,6 +487,13 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["generated thread titles source control content default provider"],
   },
   {
+    id: "text-generation-fallback-model",
+    title: "Fallback text generation model",
+    to: "/settings/general",
+    scope: "project-defaults",
+    searchTerms: ["backup secondary model usage limit rate limit outage generated text"],
+  },
+  {
     id: "diagnostics",
     title: "Diagnostics",
     to: "/settings/general",

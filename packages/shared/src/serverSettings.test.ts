@@ -16,6 +16,7 @@ import {
   isModelSelectionProviderEnabled,
   parsePersistedServerObservabilitySettings,
   resolveSourceControlWriterModelSelection,
+  resolveTextGenerationFallbackModelSelection,
   resolveProjectAgentBrowserAccess,
   resolveProjectAutoPull,
 } from "./serverSettings.ts";
@@ -464,6 +465,64 @@ describe("serverSettings helpers", () => {
       settings.textGenerationModelSelection,
     );
     expect(settings.sourceControlWriterModelSelection).toBe(sourceControlWriterModelSelection);
+  });
+
+  it("resolves the text generation fallback only when it is usable and distinct", () => {
+    const primary = DEFAULT_SERVER_SETTINGS.textGenerationModelSelection;
+    const fallbackId = ProviderInstanceId.make("claudeAgent");
+    const fallback = createModelSelection(fallbackId, "claude-sonnet-4-6");
+    const enabled = {
+      ...DEFAULT_SERVER_SETTINGS,
+      providerInstances: {
+        [fallbackId]: { driver: ProviderDriverKind.make("claudeAgent"), enabled: true, config: {} },
+      },
+      textGenerationFallbackModelSelection: fallback,
+    };
+
+    expect(
+      resolveTextGenerationFallbackModelSelection(DEFAULT_SERVER_SETTINGS, primary),
+    ).toBeNull();
+    expect(resolveTextGenerationFallbackModelSelection(enabled, primary)).toBe(fallback);
+    expect(
+      resolveTextGenerationFallbackModelSelection(
+        { ...enabled, textGenerationFallbackModelSelection: { ...primary } },
+        primary,
+      ),
+    ).toBeNull();
+    expect(
+      resolveTextGenerationFallbackModelSelection(
+        {
+          ...enabled,
+          providerInstances: {
+            [fallbackId]: {
+              driver: ProviderDriverKind.make("claudeAgent"),
+              enabled: false,
+              config: {},
+            },
+          },
+        },
+        primary,
+      ),
+    ).toBeNull();
+
+    const unavailableProvider = {
+      instanceId: fallbackId,
+      driver: ProviderDriverKind.make("claudeAgent"),
+      enabled: true,
+      installed: false,
+      version: null,
+      status: "error",
+      auth: { status: "unknown" },
+      checkedAt: "2026-07-27T00:00:00.000Z",
+      availability: "unavailable",
+      unavailableReason: "Claude CLI is not installed.",
+      models: [],
+      slashCommands: [],
+      skills: [],
+    } satisfies ServerProvider;
+    expect(
+      resolveTextGenerationFallbackModelSelection(enabled, primary, [unavailableProvider]),
+    ).toBeNull();
   });
 
   it("replaces providerInstances maps so omitted instance fields are cleared", () => {

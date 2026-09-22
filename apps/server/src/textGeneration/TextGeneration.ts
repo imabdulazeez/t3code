@@ -20,6 +20,7 @@ export interface CommitMessageGenerationInput {
   policy?: TextGenerationPolicy | undefined;
   /** What model and provider to use for generation. */
   modelSelection: ModelSelection;
+  fallbackModelSelection?: ModelSelection | null | undefined;
   /** Custom prompt instructions to replace the built-in ones. */
   instructionsOverride?: string | undefined;
   /** Custom branch-name instructions, applied only when `includeBranch` is set. */
@@ -44,6 +45,7 @@ export interface PrContentGenerationInput {
   policy?: TextGenerationPolicy | undefined;
   /** What model and provider to use for generation. */
   modelSelection: ModelSelection;
+  fallbackModelSelection?: ModelSelection | null | undefined;
   /** Custom prompt instructions to replace the built-in ones. */
   instructionsOverride?: string | undefined;
 }
@@ -59,6 +61,7 @@ export interface BranchNameGenerationInput {
   attachments?: ReadonlyArray<ChatAttachment> | undefined;
   /** What model and provider to use for generation. */
   modelSelection: ModelSelection;
+  fallbackModelSelection?: ModelSelection | null | undefined;
   /** Custom prompt instructions to replace the built-in ones. */
   instructionsOverride?: string | undefined;
 }
@@ -76,6 +79,7 @@ export interface ThreadTitleGenerationInput {
   attachments?: ReadonlyArray<ChatAttachment> | undefined;
   /** What model and provider to use for generation. */
   modelSelection: ModelSelection;
+  fallbackModelSelection?: ModelSelection | null | undefined;
 }
 
 export interface ThreadTitleGenerationResult {
@@ -141,39 +145,87 @@ const resolveInstance = (
     ),
   );
 
+const withFallback = <
+  Input extends {
+    modelSelection: ModelSelection;
+    fallbackModelSelection?: ModelSelection | null | undefined;
+  },
+  Output,
+>(
+  operation: TextGenerationOp,
+  input: Input,
+  run: (input: Input) => Effect.Effect<Output, TextGenerationError>,
+): Effect.Effect<Output, TextGenerationError> => {
+  const fallback = input.fallbackModelSelection;
+  if (!fallback) {
+    return run(input);
+  }
+  return run(input).pipe(
+    Effect.catchTag("TextGenerationError", (primaryError) =>
+      Effect.logWarning("text generation falling back to secondary model", {
+        operation,
+        primary: `${input.modelSelection.instanceId}/${input.modelSelection.model}`,
+        fallback: `${fallback.instanceId}/${fallback.model}`,
+        detail: primaryError.detail,
+      }).pipe(
+        Effect.andThen(
+          run({ ...input, modelSelection: fallback, fallbackModelSelection: null }).pipe(
+            Effect.mapError(
+              (fallbackError) =>
+                new TextGenerationError({
+                  operation,
+                  detail: `${fallbackError.detail} (primary model failed: ${primaryError.detail})`,
+                  cause: primaryError,
+                }),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+};
+
 /** @public Service construction is part of the canonical Effect module API. */
 export const make = Effect.gen(function* () {
   const registry = yield* ProviderInstanceRegistry.ProviderInstanceRegistry;
   const sourceControl = yield* SourceControlProviderRegistry.SourceControlProviderRegistry;
+  const runCommitMessage = (input: CommitMessageGenerationInput) =>
+    resolveInstance(registry, "generateCommitMessage", input.modelSelection.instanceId).pipe(
+      Effect.flatMap((textGeneration) => textGeneration.generateCommitMessage(input)),
+    );
+  const runPrContent = (input: PrContentGenerationInput) =>
+    resolveInstance(registry, "generatePrContent", input.modelSelection.instanceId).pipe(
+      Effect.flatMap((textGeneration) => textGeneration.generatePrContent(input)),
+    );
+  const runBranchName = (input: BranchNameGenerationInput) =>
+    resolveInstance(registry, "generateBranchName", input.modelSelection.instanceId).pipe(
+      Effect.flatMap((textGeneration) => textGeneration.generateBranchName(input)),
+    );
+  const runThreadTitle = (input: ThreadTitleGenerationInput) =>
+    resolveInstance(registry, "generateThreadTitle", input.modelSelection.instanceId).pipe(
+      Effect.flatMap((textGeneration) => textGeneration.generateThreadTitle(input)),
+    );
   return TextGeneration.of({
     generateCommitMessage: (input) =>
-      resolveInstance(registry, "generateCommitMessage", input.modelSelection.instanceId).pipe(
-        Effect.flatMap((textGeneration) => textGeneration.generateCommitMessage(input)),
-      ),
-    generatePrContent: (input) =>
-      resolveInstance(registry, "generatePrContent", input.modelSelection.instanceId).pipe(
-        Effect.flatMap((textGeneration) => textGeneration.generatePrContent(input)),
-      ),
-    generateBranchName: (input) =>
-      resolveInstance(registry, "generateBranchName", input.modelSelection.instanceId).pipe(
-        Effect.flatMap((textGeneration) => textGeneration.generateBranchName(input)),
-      ),
+      withFallback("generateCommitMessage", input, runCommitMessage),
+    generatePrContent: (input) => withFallback("generatePrContent", input, runPrContent),
+    generateBranchName: (input) => withFallback("generateBranchName", input, runBranchName),
     generateThreadTitle: (input) =>
-      resolveInstance(registry, "generateThreadTitle", input.modelSelection.instanceId).pipe(
-        Effect.flatMap((textGeneration) =>
-          Effect.gen(function* () {
-            const linkedContext =
-              input.linkedContext ??
-              (yield* ThreadTitleLinks.resolveThreadTitleLinks(input).pipe(
-                Effect.provideService(
-                  SourceControlProviderRegistry.SourceControlProviderRegistry,
-                  sourceControl,
-                ),
-              ));
-            return yield* textGeneration.generateThreadTitle({ ...input, linkedContext });
-          }),
-        ),
-      ),
+      Effect.gen(function* () {
+        const linkedContext =
+          input.linkedContext ??
+          (yield* ThreadTitleLinks.resolveThreadTitleLinks(input).pipe(
+            Effect.provideService(
+              SourceControlProviderRegistry.SourceControlProviderRegistry,
+              sourceControl,
+            ),
+          ));
+        return yield* withFallback(
+          "generateThreadTitle",
+          { ...input, linkedContext },
+          runThreadTitle,
+        );
+      }),
   });
 });
 

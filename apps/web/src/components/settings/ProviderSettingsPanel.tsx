@@ -611,6 +611,8 @@ export function EnvironmentProviderSettings({
   );
   const textGenerationModelSelection = resolveAppModelSelectionState(settings, serverProviders);
   const textGenInstanceId = textGenerationModelSelection.instanceId;
+  const textGenFallbackInstanceId =
+    settings.textGenerationFallbackModelSelection?.instanceId ?? null;
   const resolvedBackgroundActivity = resolveServerBackgroundActivitySettings(settings);
   const providerHealthPreset = getBackgroundActivityPresetSettings(
     resolvedBackgroundActivity.profile,
@@ -798,6 +800,9 @@ export function EnvironmentProviderSettings({
       readonly textGenerationModelSelection?: Parameters<
         typeof buildProviderInstanceUpdatePatch
       >[0]["textGenerationModelSelection"];
+      readonly textGenerationFallbackModelSelection?: Parameters<
+        typeof buildProviderInstanceUpdatePatch
+      >[0]["textGenerationFallbackModelSelection"];
     },
   ) => {
     updateSettings(
@@ -808,6 +813,7 @@ export function EnvironmentProviderSettings({
         driver: row.driver,
         isDefault: row.isDefault,
         textGenerationModelSelection: options?.textGenerationModelSelection,
+        textGenerationFallbackModelSelection: options?.textGenerationFallbackModelSelection,
       }),
     );
   };
@@ -931,13 +937,22 @@ export function EnvironmentProviderSettings({
           const wasEnabled = resolveProviderInstanceEnabled(row.instance);
           const isDisabling = next.enabled === false && wasEnabled;
           const shouldClearTextGen = isDisabling && textGenInstanceId === row.instanceId;
+          const shouldClearTextGenFallback =
+            isDisabling && textGenFallbackInstanceId === row.instanceId;
           updateProviderInstance(
             row,
             next,
-            shouldClearTextGen
+            shouldClearTextGen || shouldClearTextGenFallback
               ? {
-                  textGenerationModelSelection:
-                    DEFAULT_UNIFIED_SETTINGS.textGenerationModelSelection,
+                  ...(shouldClearTextGen
+                    ? {
+                        textGenerationModelSelection:
+                          DEFAULT_UNIFIED_SETTINGS.textGenerationModelSelection,
+                      }
+                    : {}),
+                  ...(shouldClearTextGenFallback
+                    ? { textGenerationFallbackModelSelection: null }
+                    : {}),
                 }
               : undefined,
           );
