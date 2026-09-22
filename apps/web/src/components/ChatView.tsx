@@ -3362,6 +3362,11 @@ export default function ChatView(props: ChatViewProps) {
         toastManager.add({ type: "error", title: "The environment is not connected." });
         return;
       }
+      const sourceDraft = useComposerDraftStore.getState().getComposerDraft(composerDraftTarget);
+      const sourceModelSelection =
+        (sourceDraft?.activeProvider
+          ? sourceDraft.modelSelectionByProvider[sourceDraft.activeProvider]
+          : null) ?? activeThread?.modelSelection;
       const attachments = await buildComposerAttachmentsFromMessage({
         attachments: message.attachments,
         environmentId,
@@ -3377,6 +3382,15 @@ export default function ChatView(props: ChatViewProps) {
         return;
       }
       const draftStore = useComposerDraftStore.getState();
+      if (sourceModelSelection) {
+        draftStore.setModelSelection(nextDraft.draftId, sourceModelSelection, {
+          replaceOptions: true,
+          explicit: true,
+        });
+      }
+      draftStore.setRuntimeMode(nextDraft.draftId, runtimeMode);
+      draftStore.setInteractionMode(nextDraft.draftId, interactionMode);
+      draftStore.setDraftThreadContext(nextDraft.draftId, { runtimeMode, interactionMode });
       const prompt = resendableComposerPrompt(message.text);
       if (prompt.length > 0) {
         draftStore.setPrompt(nextDraft.draftId, prompt);
@@ -3395,7 +3409,16 @@ export default function ChatView(props: ChatViewProps) {
         });
       }
     },
-    [activeProjectRef, createAttachmentAssetUrl, environmentId, handleNewThread],
+    [
+      activeProjectRef,
+      activeThread?.modelSelection,
+      composerDraftTarget,
+      createAttachmentAssetUrl,
+      environmentId,
+      handleNewThread,
+      interactionMode,
+      runtimeMode,
+    ],
   );
   const openFileAttachment = useCallback(
     (attachment: ChatFileAttachment) => {
