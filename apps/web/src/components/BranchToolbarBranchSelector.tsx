@@ -1255,7 +1255,7 @@ export function BranchToolbarBranchSelector({
             <ComboboxEmpty>No refs found.</ComboboxEmpty>
             {shouldVirtualizeBranchList ? (
               <div className="relative min-h-0 w-full max-h-56 flex-1 overflow-hidden">
-                <ComboboxListVirtualized className="size-full min-w-0 p-0">
+                <ComboboxListVirtualized>
                   <LegendList<string>
                     ref={branchListRef}
                     data={filteredBranchPickerItems}
@@ -1306,7 +1306,7 @@ export function BranchToolbarBranchSelector({
                       className="flex cursor-pointer items-center justify-between gap-3 border-t border-border/60 px-3 py-2 text-xs"
                     >
                       <span className="flex min-w-0 items-center gap-1.5 font-medium text-muted-foreground">
-                        <RefreshIcon aria-hidden="true" className="size-3 shrink-0 opacity-70" />
+                        <RefreshIcon aria-hidden="true" size="xs" className="shrink-0" />
                         <span className="truncate">Start from origin</span>
                       </span>
                       <Switch
