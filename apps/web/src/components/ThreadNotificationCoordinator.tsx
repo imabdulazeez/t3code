@@ -225,6 +225,8 @@ function EnvironmentNotifications({
             description: body,
             data: {
               hideCopyButton: true,
+              clampDescription: true,
+              actionLayout: "stacked-end",
               leadingIcon:
                 kind === "completion" ? (
                   <CircleCheckIcon

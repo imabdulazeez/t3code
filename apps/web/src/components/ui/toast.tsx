@@ -47,6 +47,7 @@ export type ThreadToastData = {
   onClose?: (() => void) | undefined;
   dismissAfterVisibleMs?: number;
   hideCopyButton?: boolean;
+  clampDescription?: boolean;
   additionalActions?: ReadonlyArray<{
     id: string;
     props: ComponentPropsWithoutRef<"button">;
@@ -211,7 +212,9 @@ function ToastDescriptionAndExpandable({
   const descriptionTrigger = toastData?.expandableDescriptionTrigger ?? false;
   const descriptionClassName = cn(
     "min-w-0 select-text wrap-break-word text-muted-foreground",
-    errorDescriptionClampClass(toastType, toastDescription),
+    toastData?.clampDescription
+      ? "line-clamp-2"
+      : errorDescriptionClampClass(toastType, toastDescription),
   );
   const [open, setOpen] = useState(false);
 
