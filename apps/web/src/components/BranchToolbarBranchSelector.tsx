@@ -18,7 +18,6 @@ import {
   DownloadCloud,
   GitBranchIcon,
   Scissors,
-  SearchIcon,
   Trash2,
 } from "lucide-react";
 import {
@@ -81,6 +80,7 @@ import {
   AlertDialogTitle,
 } from "./ui/alert-dialog";
 import { Button } from "./ui/button";
+import { ComposerControl } from "./chat/ComposerControl";
 import { Group, GroupSeparator } from "./ui/group";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "./ui/menu";
 import { Switch } from "./ui/switch";
@@ -88,7 +88,7 @@ import { getVirtualizedScrollFadeClassName } from "./ui/scroll-area";
 import {
   Combobox,
   ComboboxEmpty,
-  ComboboxInput,
+  ComboboxSearchInput,
   ComboboxItem,
   ComboboxList,
   ComboboxListVirtualized,
@@ -915,7 +915,6 @@ export function BranchToolbarBranchSelector({
           key={itemValue}
           index={index}
           value={itemValue}
-          className="pe-2"
           onClick={() => selectPickerItem(itemValue)}
         >
           <div className="flex min-w-0 items-center gap-2 py-1">
@@ -937,7 +936,6 @@ export function BranchToolbarBranchSelector({
           key={itemValue}
           index={index}
           value={itemValue}
-          className="pe-1.5"
           onClick={() => selectPickerItem(itemValue)}
         >
           <span className="flex min-w-0 flex-col items-start">
@@ -967,7 +965,7 @@ export function BranchToolbarBranchSelector({
     return (
       <ComboboxItem
         hideIndicator
-        className="group pe-1.5"
+        className="group"
         key={itemValue}
         index={index}
         value={itemValue}
@@ -985,22 +983,23 @@ export function BranchToolbarBranchSelector({
             {refName.current ? (
               <span className="size-7 sm:size-6" aria-hidden />
             ) : (
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                className="opacity-0 group-hover:opacity-100"
-                aria-label={`Delete branch ${refName.name}`}
-                onPointerDown={(event) => event.stopPropagation()}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  event.preventDefault();
-                  setIsBranchMenuOpen(false);
-                  setForceDeleteTarget(null);
-                  setPendingDelete(refName);
-                }}
-              >
-                <Trash2 />
-              </Button>
+              <span className="flex opacity-0 group-hover:opacity-100">
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label={`Delete branch ${refName.name}`}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    event.preventDefault();
+                    setIsBranchMenuOpen(false);
+                    setForceDeleteTarget(null);
+                    setPendingDelete(refName);
+                  }}
+                >
+                  <Trash2 />
+                </Button>
+              </span>
             )}
           </div>
         </div>
@@ -1034,7 +1033,7 @@ export function BranchToolbarBranchSelector({
           data-composer-context-control
         >
           <ThreadPullRequestBadgeControl
-            variant="ghost"
+            render={<ComposerControl size="xs" />}
             badge={prBadge}
             number={prNumber}
             url={prUrl}
@@ -1052,10 +1051,10 @@ export function BranchToolbarBranchSelector({
             onContextMenu={(event) => handleBranchContextMenu(event, resolvedActiveBranch)}
           >
             <ComboboxTrigger
-              render={<Button variant="ghost" size="xs" />}
+              render={<ComposerControl size="xs" />}
               // No press-scale: the popup aligns live to this trigger, so a
               // momentary 0.97 shrink would drag the open popup ~3px sideways.
-              className="min-w-0 max-w-full font-normal text-muted-foreground/70 text-xs! hover:text-foreground/80 active:scale-100"
+              className="min-w-0 max-w-full active:scale-100"
               disabled={isInitialBranchesLoadPending || isBranchActionPending}
             >
               <GitBranchIcon className="size-3 shrink-0 opacity-70" />
@@ -1063,11 +1062,12 @@ export function BranchToolbarBranchSelector({
                 data-composer-label
                 className="min-w-0 max-w-[240px] group-data-[compact]/composer-context:max-w-0"
               >
-                <MiddleTruncate
-                  value={triggerLabel}
+                <span
                   data-composer-label-motion
                   className="flex w-full max-w-[240px] transition-opacity duration-180 ease-[cubic-bezier(0.32,0.72,0,1)] group-data-[compact]/composer-context:opacity-0 motion-reduce:transition-none"
-                />
+                >
+                  <MiddleTruncate value={triggerLabel} />
+                </span>
               </span>
               <ChevronDownIcon className="size-3 shrink-0 opacity-50" />
             </ComboboxTrigger>
@@ -1079,19 +1079,10 @@ export function BranchToolbarBranchSelector({
           className="flex w-80 flex-col"
           {...composerFloatingLayerProps}
         >
-          <div className="flex shrink-0 items-center gap-1 px-3 pt-2.5 pb-1.5">
-            <div className="relative -translate-y-px min-w-0 flex-1 border-b border-border/70 pb-1.5 transition-colors focus-within:border-ring">
-              <SearchIcon
-                aria-hidden="true"
-                className="pointer-events-none absolute top-1.5 left-0 size-4 shrink-0 text-muted-foreground/55"
-              />
-              <ComboboxInput
-                className="[&_input]:h-6.5 [&_input]:ps-5 [&_input]:font-sans [&_input]:leading-6.5"
-                inputClassName="rounded-none bg-transparent text-sm"
+          <div className="flex shrink-0 items-end gap-1 pe-3 pb-1.5">
+            <div className="min-w-0 flex-1">
+              <ComboboxSearchInput
                 placeholder="Search refs..."
-                showTrigger={false}
-                size="sm"
-                unstyled
                 value={branchQuery}
                 onChange={(event) => setBranchQuery(event.target.value)}
                 onKeyDown={(event) => {

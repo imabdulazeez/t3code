@@ -364,7 +364,7 @@ export const ChatFindBar = memo(function ChatFindBar({
         autoCorrect="off"
         autoCapitalize="off"
         spellCheck={false}
-        className="min-w-0 flex-1 text-sm [&_input]:px-1.5"
+        className="min-w-0 flex-1"
       />
       <span
         className={cn(
@@ -375,28 +375,28 @@ export const ChatFindBar = memo(function ChatFindBar({
       >
         {countLabel}
       </span>
-      <Separator orientation="vertical" className="mx-0.5 h-4 bg-border/70" />
+      <Separator orientation="vertical" className="mx-0.5 h-4" />
       <Toggle
-        variant="ghost"
+        variant="segmented"
         size="xs"
         aria-label="Match case"
         title="Match case"
         pressed={options.caseSensitive}
         onPressedChange={() => toggleOption("caseSensitive")}
-        className="size-7 min-w-0 px-0 font-mono text-xs text-muted-foreground data-pressed:text-foreground sm:size-6"
+        className="size-7 min-w-0 sm:size-6"
       >
-        Aa
+        <span className="font-mono text-xs">Aa</span>
       </Toggle>
       <Toggle
-        variant="ghost"
+        variant="segmented"
         size="xs"
         aria-label="Match whole word"
         title="Match whole word"
         pressed={options.wholeWord}
         onPressedChange={() => toggleOption("wholeWord")}
-        className="size-7 min-w-0 px-0 font-mono text-xs text-muted-foreground data-pressed:text-foreground sm:size-6"
+        className="size-7 min-w-0 sm:size-6"
       >
-        <span className="underline decoration-2 underline-offset-2">ab</span>
+        <span className="font-mono text-xs underline decoration-2 underline-offset-2">ab</span>
       </Toggle>
       <Button
         variant="ghost-muted"
