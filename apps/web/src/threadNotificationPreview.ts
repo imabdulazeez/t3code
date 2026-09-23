@@ -7,6 +7,8 @@ import { runtime } from "./lib/runtime";
 import { appAtomRegistry } from "./rpc/atomRegistry";
 import { environmentSession, readPreparedConnection } from "./state/session";
 
+const PREVIEW_LENGTH = 140;
+
 export function completionMessagePreview(
   messages: ReadonlyArray<OrchestrationMessage>,
   turnId: TurnId | null,
@@ -19,13 +21,19 @@ export function completionMessagePreview(
       message.text.trim().length > 0,
   );
   const text = message?.text
+    .replace(/```[\s\S]*?(?:```|$)/g, " ")
     .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
     .replace(/(^|\n)\s{0,3}(?:#{1,6}\s+|>\s*|[-*+]\s+)/g, "$1")
     .replace(/[*`_~]/g, "")
     .replace(/\s+/g, " ")
     .trim();
   if (!text) return "Thread completed";
-  return text.length > 200 ? `${text.slice(0, 199).trimEnd()}…` : text;
+  if (text.length <= PREVIEW_LENGTH) return text;
+  const window = text.slice(0, PREVIEW_LENGTH);
+  const sentenceEnd = Math.max(...[...window.matchAll(/[.!?](?=\s)/g)].map((match) => match.index));
+  if (sentenceEnd >= PREVIEW_LENGTH / 3) return window.slice(0, sentenceEnd + 1);
+  const wordEnd = window.lastIndexOf(" ");
+  return `${(wordEnd > 0 ? window.slice(0, wordEnd) : window.slice(0, -1)).trimEnd()}…`;
 }
 
 export async function loadCompletionMessagePreview(

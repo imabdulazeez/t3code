@@ -46,8 +46,36 @@ describe("completion message previews", () => {
     expect(completionMessagePreview([message("   ")], turnId)).toBe("Thread completed");
   });
 
-  it("caps a long response at 200 characters", () => {
-    const preview = completionMessagePreview([message("a".repeat(300))], turnId);
-    expect(preview).toBe(`${"a".repeat(199)}…`);
+  it("ends a long response at the last complete sentence", () => {
+    expect(
+      completionMessagePreview(
+        [
+          message(
+            "The other agent is correct on the main point, and my previous answer was wrong about the write endpoint. I described PUT /v2/companies as the route.",
+          ),
+        ],
+        turnId,
+      ),
+    ).toBe(
+      "The other agent is correct on the main point, and my previous answer was wrong about the write endpoint.",
+    );
+  });
+
+  it("cuts a long response without a sentence break at a word boundary", () => {
+    expect(completionMessagePreview([message("word ".repeat(40))], turnId)).toBe(
+      `${"word ".repeat(28).trimEnd()}…`,
+    );
+    expect(completionMessagePreview([message("a".repeat(300))], turnId)).toBe(
+      `${"a".repeat(139)}…`,
+    );
+  });
+
+  it("drops fenced code blocks", () => {
+    expect(
+      completionMessagePreview(
+        [message("Run this:\n\n```sh\nvp test\n```\n\nThen retry.")],
+        turnId,
+      ),
+    ).toBe("Run this: Then retry.");
   });
 });
