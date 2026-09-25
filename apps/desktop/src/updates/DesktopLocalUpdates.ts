@@ -390,7 +390,7 @@ export const make = Effect.gen(function* () {
         folderPath: settings.localUpdateFolderPath ?? null,
         cleanupEnabled: settings.localUpdateCleanupEnabled === true,
       });
-      yield* cleanupAppliedUpdate().pipe(Effect.catch(() => Effect.void));
+      yield* cleanupAppliedUpdate().pipe(Effect.ignore);
       yield* Effect.sleep(STARTUP_DELAY);
       yield* check;
       return yield* Effect.sleep(POLL_INTERVAL).pipe(Effect.andThen(check), Effect.forever);

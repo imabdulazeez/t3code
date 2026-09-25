@@ -975,9 +975,7 @@ export function BranchToolbarBranchSelector({
         <div className="flex w-full min-w-0 items-center justify-between gap-2">
           <span className="flex min-w-0 flex-1 items-center gap-2">
             <MiddleTruncate value={itemValue} className="flex-1" />
-            {badge && (
-              <span className="shrink-0 text-[10px] text-muted-foreground/45">{badge}</span>
-            )}
+            {badge && <span className="shrink-0 text-3xs text-muted-foreground/45">{badge}</span>}
           </span>
           <div className="flex shrink-0 items-center gap-1.5">
             {refName.current ? (
@@ -1064,7 +1062,7 @@ export function BranchToolbarBranchSelector({
               >
                 <span
                   data-composer-label-motion
-                  className="flex w-full max-w-[240px] transition-opacity duration-180 ease-[cubic-bezier(0.32,0.72,0,1)] group-data-[compact]/composer-context:opacity-0 motion-reduce:transition-none"
+                  className="flex w-full max-w-[240px] transition-opacity duration-180 ease-drawer group-data-[compact]/composer-context:opacity-0 motion-reduce:transition-none"
                 >
                   <MiddleTruncate value={triggerLabel} />
                 </span>
@@ -1135,9 +1133,7 @@ export function BranchToolbarBranchSelector({
                   >
                     <span className="flex-1">Alphabetical</span>
                     {branchSortKey === "alphabetical" && (
-                      <span className="ms-2 text-[10px] uppercase text-muted-foreground">
-                        Active
-                      </span>
+                      <span className="ms-2 text-3xs uppercase text-muted-foreground">Active</span>
                     )}
                   </MenuItem>
                   <MenuItem
@@ -1150,9 +1146,7 @@ export function BranchToolbarBranchSelector({
                   >
                     <span className="flex-1">Last commit</span>
                     {branchSortKey === "lastCommit" && (
-                      <span className="ms-2 text-[10px] uppercase text-muted-foreground">
-                        Active
-                      </span>
+                      <span className="ms-2 text-3xs uppercase text-muted-foreground">Active</span>
                     )}
                   </MenuItem>
                 </MenuPopup>
@@ -1219,9 +1213,7 @@ export function BranchToolbarBranchSelector({
                     <DownloadCloud className="size-3.5" />
                     <span className="flex-1">Fetch</span>
                     {branchRemoteSyncMode === "fetch" && (
-                      <span className="ms-2 text-[10px] uppercase text-muted-foreground">
-                        Active
-                      </span>
+                      <span className="ms-2 text-3xs uppercase text-muted-foreground">Active</span>
                     )}
                   </MenuItem>
                   <MenuItem
@@ -1233,9 +1225,7 @@ export function BranchToolbarBranchSelector({
                     <Scissors className="size-3.5" />
                     <span className="flex-1">Prune</span>
                     {branchRemoteSyncMode === "prune" && (
-                      <span className="ms-2 text-[10px] uppercase text-muted-foreground">
-                        Active
-                      </span>
+                      <span className="ms-2 text-3xs uppercase text-muted-foreground">Active</span>
                     )}
                   </MenuItem>
                 </MenuPopup>

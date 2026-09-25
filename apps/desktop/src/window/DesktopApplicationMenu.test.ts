@@ -3,7 +3,6 @@ import { assert, describe, it } from "@effect/vitest";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
 
 import type * as Electron from "electron";
 
@@ -77,7 +76,7 @@ const makeElectronMenuLayer = (
     setApplicationMenu: (template) =>
       Deferred.succeed(applicationMenuTemplate, template).pipe(Effect.asVoid),
     popupTemplate: () => Effect.void,
-    showContextMenu: () => Effect.succeed(Option.none()),
+    showContextMenu: () => Effect.succeedNone,
   } satisfies ElectronMenu.ElectronMenu["Service"]);
 
 const desktopAppIdentityLayer = Layer.succeed(DesktopAppIdentity.DesktopAppIdentity, {
