@@ -117,8 +117,12 @@ function decodedRelayClientError(message: string) {
   return (cause: ManagedRelay.ManagedRelayClientError) => {
     const relayError =
       cause._tag === "ManagedRelayRequestFailedError" ? cause.relayError : undefined;
-    const traceId = cause._tag === "ManagedRelayRequestFailedError" ? cause.traceId : undefined;
-    const detail = relayError ? relayProtectedErrorMessage(relayError) : null;
+    const traceId =
+      cause._tag === "ManagedRelayRequestFailedError" ||
+      cause._tag === "ManagedRelayRequestTimeoutError"
+        ? cause.traceId
+        : undefined;
+    const detail = relayError ? relayProtectedErrorMessage(relayError) : cause.message;
     return new CloudEnvironmentLinkError({
       message: detail ? `${message}: ${detail}` : message,
       cause,

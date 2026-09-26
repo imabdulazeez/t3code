@@ -154,7 +154,18 @@ export class ManagedRelayRequestFailedError extends Schema.TaggedError<ManagedRe
 ) {
   override get message(): string {
     const message = `Could not ${this.action}.`;
-    return this.transportFailed ? `${message} ${NETWORK_BLOCKING_HINT}` : message;
+    if (this.transportFailed) return `${message} ${NETWORK_BLOCKING_HINT}`;
+    if (HttpClientError.isHttpClientError(this.cause)) {
+      const reason = this.cause.reason;
+      if (
+        reason._tag === "StatusCodeError" ||
+        reason._tag === "DecodeError" ||
+        reason._tag === "EmptyBodyError"
+      ) {
+        return `${message} Relay returned HTTP ${reason.response.status} (${reason._tag}).`;
+      }
+    }
+    return message;
   }
 }
 
@@ -223,6 +234,7 @@ export class ManagedRelayDpopSigner extends Context.Service<
 >()("@t3tools/client-runtime/relay/managedRelay/ManagedRelayDpopSigner") {}
 
 export const MANAGED_RELAY_REQUEST_TIMEOUT_MS = 10_000;
+export const MANAGED_RELAY_LINK_TIMEOUT_MS = 120_000;
 
 export interface ManagedRelayAccessTokenCacheEntry {
   readonly accountId: string;
@@ -333,12 +345,15 @@ function isRejectedDpopAccessToken(error: ManagedRelayClientError): boolean {
   );
 }
 
-function timeoutRelayRequest(activity: ManagedRelayRequestActivity) {
+function timeoutRelayRequest(
+  activity: ManagedRelayRequestActivity,
+  timeoutMs = MANAGED_RELAY_REQUEST_TIMEOUT_MS,
+) {
   return <A, E, R>(
     effect: Effect.Effect<A, E, R>,
   ): Effect.Effect<A, E | ManagedRelayClientError, R> =>
     effect.pipe(
-      Effect.timeoutOption(Duration.millis(MANAGED_RELAY_REQUEST_TIMEOUT_MS)),
+      Effect.timeoutOption(Duration.millis(timeoutMs)),
       Effect.flatMap(
         Option.match({
           onNone: () =>
@@ -349,7 +364,7 @@ function timeoutRelayRequest(activity: ManagedRelayRequestActivity) {
                 Effect.fail(
                   new ManagedRelayRequestTimeoutError({
                     activity,
-                    timeoutMs: MANAGED_RELAY_REQUEST_TIMEOUT_MS,
+                    timeoutMs,
                     traceId,
                   }),
                 ),
@@ -762,7 +777,7 @@ export const make = Effect.fn("ManagedRelayClient.make")(function* (
           })
           .pipe(
             Effect.mapError(relayRequestError("link relay environment")),
-            timeoutRelayRequest("Relay environment linking"),
+            timeoutRelayRequest("Relay environment linking", MANAGED_RELAY_LINK_TIMEOUT_MS),
           );
       },
       Effect.withSpan("clientRuntime.managedRelay.linkEnvironment"),

@@ -516,6 +516,41 @@ describe("ManagedRelayClient", () => {
     }).pipe(Effect.provide(managedRelayTestLayer(fetchFn, undefined, accessTokenStore)));
   });
 
+  it.effect("allows environment provisioning beyond the ordinary request timeout", () => {
+    const fetchFn = (() =>
+      new Promise<Response>(() => undefined)) satisfies typeof globalThis.fetch;
+
+    return Effect.gen(function* () {
+      const relayClient = yield* ManagedRelay.ManagedRelayClient;
+      const errorFiber = yield* relayClient
+        .linkEnvironment({
+          clerkToken: "clerk-token",
+          payload: {
+            proof: "signed-proof",
+            notificationsEnabled: true,
+            liveActivitiesEnabled: true,
+            managedTunnelsEnabled: true,
+          },
+        })
+        .pipe(Effect.flip, Effect.forkScoped);
+
+      yield* Effect.yieldNow;
+      yield* TestClock.adjust(Duration.millis(ManagedRelay.MANAGED_RELAY_REQUEST_TIMEOUT_MS));
+      expect(errorFiber.pollUnsafe()).toBeUndefined();
+      yield* TestClock.adjust(
+        Duration.millis(
+          ManagedRelay.MANAGED_RELAY_LINK_TIMEOUT_MS -
+            ManagedRelay.MANAGED_RELAY_REQUEST_TIMEOUT_MS,
+        ),
+      );
+      expect(yield* Fiber.join(errorFiber)).toMatchObject({
+        _tag: "ManagedRelayRequestTimeoutError",
+        activity: "Relay environment linking",
+        timeoutMs: ManagedRelay.MANAGED_RELAY_LINK_TIMEOUT_MS,
+      });
+    }).pipe(Effect.provide(Layer.merge(TestClock.layer(), managedRelayTestLayer(fetchFn))));
+  });
+
   it.effect("times out stalled relay environment listing requests", () => {
     const fetchFn = (() =>
       new Promise<Response>(() => undefined)) satisfies typeof globalThis.fetch;

@@ -152,6 +152,27 @@ afterEach(() => {
 });
 
 describe("web cloud link environment client", () => {
+  it.effect("shows network diagnostics when the environment link request fails", () =>
+    Effect.gen(function* () {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(
+          Response.json({ challenge: "challenge", expiresAt: "2026-06-06T00:05:00.000Z" }),
+        )
+        .mockResolvedValueOnce(Response.json("signed-proof"))
+        .mockRejectedValueOnce(new TypeError("Failed to fetch"));
+      vi.stubGlobal("fetch", fetchMock);
+
+      const error = yield* withServices(
+        linkPrimaryEnvironmentToCloud({ target: TARGET, clerkToken: "clerk-token" }),
+      ).pipe(Effect.flip);
+
+      expect(error.message).toContain("environment-links failed:");
+      expect(error.message).toContain("DNS or firewall");
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    }),
+  );
+
   it.effect("reads primary cloud link state from the explicit target", () =>
     Effect.gen(function* () {
       const fetchMock = vi.fn().mockResolvedValue(
