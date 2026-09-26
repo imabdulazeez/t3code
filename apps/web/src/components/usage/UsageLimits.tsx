@@ -17,7 +17,7 @@ import {
   remainingPercent,
 } from "@t3tools/shared/usageLimits";
 import { GaugeIcon, TrendingDownIcon, TrendingUpIcon } from "lucide-react";
-import { Fragment, useState } from "react";
+import { Fragment, type ReactNode, useState } from "react";
 
 import {
   useClientSettings,
@@ -343,9 +343,11 @@ function SidebarLimitsToggle() {
 export function UsageLimitsSection({
   selectedEnvironmentIds,
   now,
+  cursorPrompt,
 }: {
   readonly selectedEnvironmentIds: ReadonlySet<EnvironmentId> | null;
   readonly now: number;
+  readonly cursorPrompt?: ReactNode;
 }) {
   const presentations = useAtomValue(environmentPresentations.presentationsAtom);
   const selected =
@@ -357,7 +359,7 @@ export function UsageLimitsSection({
       <div className="flex items-center justify-end gap-2">
         <SidebarLimitsToggle />
       </div>
-      <UsageLimitsPooled presentations={selected} now={now} />
+      <UsageLimitsPooled presentations={selected} now={now} cursorPrompt={cursorPrompt} />
     </div>
   );
 }
