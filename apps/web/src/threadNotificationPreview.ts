@@ -1,22 +1,28 @@
 import { ManagedRelay } from "@t3tools/client-runtime/relay";
 import { fetchEnvironmentThreadSnapshot } from "@t3tools/client-runtime/state/threads";
-import type { EnvironmentId, OrchestrationMessage, ThreadId, TurnId } from "@t3tools/contracts";
+import type {
+  EnvironmentId,
+  OrchestrationV2ConversationMessage,
+  RunId,
+  ThreadId,
+} from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 
 import { runtime } from "./lib/runtime";
-import { appAtomRegistry } from "./rpc/atomRegistry";
-import { environmentSession, readPreparedConnection } from "./state/session";
+import { readPreparedConnection } from "./state/session";
 
 const PREVIEW_LENGTH = 140;
 
 export function completionMessagePreview(
-  messages: ReadonlyArray<OrchestrationMessage>,
-  turnId: TurnId | null,
+  messages: ReadonlyArray<
+    Pick<OrchestrationV2ConversationMessage, "role" | "runId" | "streaming" | "text">
+  >,
+  runId: RunId | null,
 ): string {
   const message = messages.findLast(
     (message) =>
       message.role === "assistant" &&
-      message.turnId === turnId &&
+      message.runId === runId &&
       !message.streaming &&
       message.text.trim().length > 0,
   );
@@ -39,12 +45,11 @@ export function completionMessagePreview(
 export async function loadCompletionMessagePreview(
   environmentId: EnvironmentId,
   threadId: ThreadId,
-  turnId: TurnId | null,
+  runId: RunId | null,
 ): Promise<string> {
   try {
     const prepared = readPreparedConnection(environmentId);
     if (!prepared) return "Thread completed";
-    const config = appAtomRegistry.get(environmentSession.initialConfigValueAtom(environmentId));
     const snapshot = await runtime.runPromise(
       Effect.gen(function* () {
         const signer = yield* Effect.serviceOption(ManagedRelay.ManagedRelayDpopSigner);
@@ -53,11 +58,10 @@ export async function loadCompletionMessagePreview(
           threadId,
           signer,
           timeoutMs: 3_000,
-          ...(config?.threadSnapshotPagination ? { window: { turnLimit: 1 } } : {}),
         });
       }),
     );
-    return completionMessagePreview(snapshot.thread.messages, turnId);
+    return completionMessagePreview(snapshot.projection.messages, runId);
   } catch {
     return "Thread completed";
   }

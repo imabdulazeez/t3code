@@ -603,7 +603,10 @@ describe("ManagedRelayClient", () => {
       const error = yield* relayClient
         .listEnvironments({ clerkToken: "clerk-token" })
         .pipe(Effect.flip);
-      expect(error.message).toBe("Could not list relay-managed environments.");
+      expect(error.message).toBe(
+        "Could not list relay-managed environments. Relay returned HTTP 503 (DecodeError).",
+      );
+      expect(error.message).not.toContain(NETWORK_BLOCKING_HINT);
     }).pipe(Effect.provide(managedRelayTestLayer(fetchFn)));
   });
 

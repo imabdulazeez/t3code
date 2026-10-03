@@ -18,7 +18,7 @@ function messageRow(id: string, role: "user" | "assistant", text: string): Messa
       id: id as never,
       role,
       text,
-      turnId: null,
+      runId: null,
       createdAt: "2026-01-01T00:00:00Z",
       updatedAt: "2026-01-01T00:00:00Z",
       streaming: false,
@@ -34,7 +34,7 @@ const foldRow: MessagesTimelineRow = {
   kind: "turn-fold",
   id: "turn-fold:turn-1",
   createdAt: "2026-01-01T00:00:00Z",
-  turnId: "turn-1" as never,
+  runId: "turn-1" as never,
   label: "Worked for 3s on error handling",
   expanded: false,
 };

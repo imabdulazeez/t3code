@@ -44,6 +44,7 @@ import {
   SettingsRow,
   SettingsSection,
 } from "./settingsLayout";
+import { BranchNamingSettings } from "./BranchNamingSettings";
 import { searchableSetting } from "./settingsSearch";
 
 const MODE_OPTIONS: Record<SourceControlWritingStyleMode, { label: string; description: string }> =
@@ -135,6 +136,7 @@ export function SourceControlWritingSettingsSection() {
 
   return (
     <SettingsSection id="source-control-text-generation" title="Text generation">
+      <BranchNamingSettings />
       <SettingsRow
         serverScoped
         settingKeys={["sourceControlWritingStyle"]}
@@ -371,7 +373,7 @@ export function SourceControlWritingSettingsSection() {
       />
 
       <div className="border-t border-border/60 px-4 pt-4 pb-2 sm:px-5">
-        <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-foreground/60">
+        <h3 className="text-2xs font-semibold uppercase tracking-wider text-foreground/60">
           Version control prompts
         </h3>
         <p className="mt-1 text-xs text-muted-foreground/80">
@@ -457,7 +459,7 @@ function PromptInstructionsRow({
     <div className="border-t border-border/60 px-4 py-3.5 sm:px-5">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-h-5 items-center gap-1.5">
-          <h3 className="text-[13px] font-semibold tracking-[-0.01em] text-foreground">{title}</h3>
+          <h3 className="text-sm font-semibold tracking-tight text-foreground">{title}</h3>
           <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center">
             {isCustom ? (
               <SettingResetButton label={ariaLabel} onClick={() => onChange("")} />

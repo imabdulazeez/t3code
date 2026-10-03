@@ -13,7 +13,7 @@ import { useCallback, useMemo } from "react";
 
 import { useComposerDraftStore } from "../../composerDraftStore";
 import { useClientSettings } from "../../hooks/useSettings";
-import { useServerConfigs, useThread } from "../../state/entities";
+import { useServerConfigs, useThreadShell } from "../../state/entities";
 import { resolveActiveThreadRouteRef, resolveThreadRouteTarget } from "../../threadRoutes";
 import { ProviderInstanceIcon } from "../chat/ProviderInstanceIcon";
 import { getDriverOption } from "../settings/providerDriverMeta";
@@ -106,7 +106,7 @@ function UsageWindowBar({
   const reset = formatResetsIn(window, now);
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="flex min-w-0 items-center gap-2 text-[11px] leading-none">
+      <div className="flex min-w-0 items-center gap-2 text-2xs leading-none">
         <span className="min-w-0 flex-1 truncate text-sidebar-muted-foreground">
           {windowLabel(window)}
         </span>
@@ -121,7 +121,7 @@ function UsageWindowBar({
         />
       </div>
       {reset ? (
-        <span className="text-[10px] leading-none text-sidebar-muted-foreground/70 tabular-nums">
+        <span className="text-3xs leading-none text-sidebar-muted-foreground/70 tabular-nums">
           {reset}
         </span>
       ) : null}
@@ -148,7 +148,7 @@ export function SidebarUsageLimits() {
     () => resolveActiveThreadRouteRef(routeTarget, draftSession),
     [draftSession, routeTarget],
   );
-  const activeThread = useThread(routeThreadRef);
+  const activeThread = useThreadShell(routeThreadRef);
   const composerDraft = useComposerDraftStore((store) => {
     if (routeTarget?.kind === "draft") return store.getComposerDraft(routeTarget.draftId);
     if (routeTarget?.kind === "server") return store.getComposerDraft(routeTarget.threadRef);
@@ -161,7 +161,7 @@ export function SidebarUsageLimits() {
       : (draftSession?.environmentId ?? null);
   const instanceId =
     composerDraft?.activeProvider ??
-    activeThread?.session?.providerInstanceId ??
+    activeThread?.providerInstanceId ??
     activeThread?.modelSelection.instanceId ??
     null;
   const config = environmentId === null ? undefined : serverConfigs.get(environmentId);
@@ -191,7 +191,7 @@ export function SidebarUsageLimits() {
         tabIndex={0}
         className="flex cursor-default flex-col gap-1.5 rounded-md px-2 py-1.5 outline-none hover:bg-sidebar-row-hover/50 focus-visible:bg-sidebar-row-hover/50 focus-visible:ring-1 focus-visible:ring-sidebar-border"
       >
-        <div className="flex min-w-0 items-center gap-1.5 text-[11px] leading-none">
+        <div className="flex min-w-0 items-center gap-1.5 text-2xs leading-none">
           <ProviderInstanceIcon
             driverKind={provider.driver}
             displayName={providerLabel}
