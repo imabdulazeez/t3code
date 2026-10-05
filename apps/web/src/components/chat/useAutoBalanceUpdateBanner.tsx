@@ -62,6 +62,7 @@ export function useAutoBalanceUpdateBanner(
         environmentId: environment.environmentId,
         serverLabel: environment.label,
         selfUpdate,
+        installation: environment.serverConfig?.environment.capabilities.serverInstallation,
         threadContinuation: supportsServerUpdateThreadContinuation(environment.serverConfig),
         continueThreadsAfterServerUpdate:
           environment.serverConfig?.settings.continueThreadsAfterServerUpdate ?? false,

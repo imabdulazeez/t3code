@@ -40,11 +40,12 @@ Update the side the notice names, then reconnect.
 
 The offered action depends on how the server runs:
 
-| Action                     | What to do                                                                                                            |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| **Update server**          | Available for supported background services. Keep the client open while it prepares, tests, restarts, and reconnects. |
-| **Update the desktop app** | Shown for desktop-hosted servers. Update the desktop app on the machine running the server, then reopen it if needed. |
-| **Copy update command**    | Stop the command-line server on its host and relaunch with the copied command, keeping your usual startup options.    |
+| Action                     | What to do                                                                                                                                                                |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Update server**          | Available for supported background services. Keep the client open while it prepares, tests, restarts, and reconnects.                                                     |
+| **Update the desktop app** | Shown for desktop-hosted servers. Update the desktop app on the machine running the server, then reopen it if needed.                                                     |
+| **Copy update command**    | Run the command on the named host to update the detected global npm install, then restart the server with your usual options.                                             |
+| **Copy relaunch command**  | Stop the command-line server on its host and relaunch with the copied command, keeping your usual subcommand and options. This does not update an installed `t3` command. |
 
 On the host, run:
 
