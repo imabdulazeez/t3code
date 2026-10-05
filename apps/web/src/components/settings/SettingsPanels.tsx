@@ -62,6 +62,7 @@ import * as Duration from "effect/Duration";
 import * as Equal from "effect/Equal";
 import * as Schema from "effect/Schema";
 import { APP_VERSION } from "../../branding";
+import { IS_NIGHTLY_BUILD, NightlyMobileBetaRow } from "../NightlyMobileBeta";
 import { ProviderModelPicker } from "../chat/ProviderModelPicker";
 import { TraitsPicker } from "../chat/TraitsPicker";
 import {
@@ -3776,6 +3777,7 @@ export function GeneralSettingsPanel() {
       <SettingsSection id="about" title="About">
         <AboutVersionSection />
         <DesktopLocalUpdateSettingsRow />
+        {IS_NIGHTLY_BUILD ? <NightlyMobileBetaRow /> : null}
       </SettingsSection>
       <SettingsSection title="Diagnostics">
         <SettingsRow
