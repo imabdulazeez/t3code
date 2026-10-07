@@ -19,8 +19,8 @@ import * as Sink from "effect/Sink";
 import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
-import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http";
-import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
+import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
+import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import * as DesktopBackendManager from "./DesktopBackendManager.ts";
 import * as DesktopApp from "../app/DesktopApp.ts";
@@ -98,7 +98,7 @@ function responseForRequest(
   return HttpClientResponse.fromWeb(request, new Response(null, { status }));
 }
 
-function httpClientLayer(
+function layerHttpClient(
   handler: (
     request: HttpClientRequest.HttpClientRequest,
   ) => Effect.Effect<HttpClientResponse.HttpClientResponse>,
@@ -109,7 +109,7 @@ function httpClientLayer(
   );
 }
 
-const healthyHttpClientLayer = httpClientLayer((request) =>
+const layerHealthyHttpClient = layerHttpClient((request) =>
   Effect.succeed(responseForRequest(request, 200)),
 );
 
@@ -152,12 +152,12 @@ function makeTestInstance(input: MakeInstanceInput) {
     discardSession: Effect.void,
     ...input.backendOutputLog,
   };
-  const servicesLayer = Layer.mergeAll(
+  const layerServices = Layer.mergeAll(
     FileSystem.layerNoop({
       exists: () => Effect.succeed(true),
     }),
     input.spawnerLayer,
-    input.httpClientLayer ?? healthyHttpClientLayer,
+    input.httpClientLayer ?? layerHealthyHttpClient,
     Layer.succeed(DesktopObservability.DesktopBackendOutputLogFactory, {
       forInstance: () => Effect.succeed(stubLog),
     } satisfies DesktopObservability.DesktopBackendOutputLogFactory["Service"]),
@@ -183,7 +183,7 @@ function makeTestInstance(input: MakeInstanceInput) {
     ...(input.onPreflightFailed ? { onPreflightFailed: input.onPreflightFailed } : {}),
   });
 
-  return instance.pipe(Effect.provide(servicesLayer));
+  return instance.pipe(Effect.provide(layerServices));
 }
 
 describe("DesktopBackendManager", () => {
@@ -197,7 +197,7 @@ describe("DesktopBackendManager", () => {
         const ready = yield* Deferred.make<void>();
         const exited = yield* Queue.unbounded<void>();
 
-        const spawnerLayer = Layer.succeed(
+        const layerSpawner = Layer.succeed(
           ChildProcessSpawner.ChildProcessSpawner,
           ChildProcessSpawner.make((command) =>
             Effect.gen(function* () {
@@ -225,7 +225,7 @@ describe("DesktopBackendManager", () => {
             ...baseConfig,
             bootstrap: configWithObservability,
           },
-          spawnerLayer,
+          spawnerLayer: layerSpawner,
           desktopTelemetryStream: Stream.encodeText(
             Stream.make('{"version":1,"type":"desktopTelemetryHello","electronPid":123}\n'),
           ),
@@ -275,7 +275,7 @@ describe("DesktopBackendManager", () => {
       const requested = yield* Deferred.make<HttpClientRequest.HttpClientRequest>();
       const layer = Layer.merge(
         TestClock.layer(),
-        httpClientLayer((request) =>
+        layerHttpClient((request) =>
           Deferred.succeed(requested, request).pipe(Effect.andThen(Effect.never)),
         ),
       );
@@ -313,7 +313,7 @@ describe("DesktopBackendManager", () => {
 
   it.effect("reports bootstrap encoding failures with stable process context", () =>
     Effect.gen(function* () {
-      const spawnerLayer = Layer.succeed(
+      const layerSpawner = Layer.succeed(
         ChildProcessSpawner.ChildProcessSpawner,
         ChildProcessSpawner.make(() => Effect.die("unexpected backend spawn")),
       );
@@ -327,7 +327,7 @@ describe("DesktopBackendManager", () => {
       }).pipe(
         Effect.flip,
         Effect.scoped,
-        Effect.provide(Layer.merge(spawnerLayer, healthyHttpClientLayer)),
+        Effect.provide(Layer.merge(layerSpawner, layerHealthyHttpClient)),
       );
 
       if (error._tag !== "BackendProcessBootstrapEncodeError") {
@@ -355,7 +355,7 @@ describe("DesktopBackendManager", () => {
         pathOrDescriptor: baseConfig.executablePath,
         description: "low-level detail that must not become the public message",
       });
-      const spawnerLayer = Layer.succeed(
+      const layerSpawner = Layer.succeed(
         ChildProcessSpawner.ChildProcessSpawner,
         ChildProcessSpawner.make(() => Effect.fail(spawnCause)),
       );
@@ -365,7 +365,7 @@ describe("DesktopBackendManager", () => {
       }).pipe(
         Effect.flip,
         Effect.scoped,
-        Effect.provide(Layer.merge(spawnerLayer, healthyHttpClientLayer)),
+        Effect.provide(Layer.merge(layerSpawner, layerHealthyHttpClient)),
       );
 
       if (error._tag !== "BackendProcessSpawnError") {
@@ -393,7 +393,7 @@ describe("DesktopBackendManager", () => {
         method: "exitCode",
         description: "exit-status-secret-sentinel",
       });
-      const spawnerLayer = Layer.succeed(
+      const layerSpawner = Layer.succeed(
         ChildProcessSpawner.ChildProcessSpawner,
         ChildProcessSpawner.make(() =>
           Effect.succeed(
@@ -409,7 +409,7 @@ describe("DesktopBackendManager", () => {
       }).pipe(
         Effect.flip,
         Effect.scoped,
-        Effect.provide(Layer.merge(spawnerLayer, healthyHttpClientLayer)),
+        Effect.provide(Layer.merge(layerSpawner, layerHealthyHttpClient)),
       );
 
       if (error._tag !== "BackendProcessExitStatusError") {
@@ -436,7 +436,7 @@ describe("DesktopBackendManager", () => {
         description: "output-stream-secret-sentinel",
       });
       const reported = yield* Deferred.make<DesktopBackendManager.BackendProcessOutputError>();
-      const spawnerLayer = Layer.succeed(
+      const layerSpawner = Layer.succeed(
         ChildProcessSpawner.ChildProcessSpawner,
         ChildProcessSpawner.make(() =>
           Effect.succeed(
@@ -452,7 +452,7 @@ describe("DesktopBackendManager", () => {
         ...baseConfig,
         desktopTelemetryStream: Stream.empty,
         onOutputFailure: (error) => Deferred.succeed(reported, error).pipe(Effect.asVoid),
-      }).pipe(Effect.scoped, Effect.provide(Layer.merge(spawnerLayer, healthyHttpClientLayer)));
+      }).pipe(Effect.scoped, Effect.provide(Layer.merge(layerSpawner, layerHealthyHttpClient)));
       const error = yield* Deferred.await(reported);
 
       assert.equal(exit.code.pipe(Option.getOrUndefined), 0);
@@ -479,7 +479,7 @@ describe("DesktopBackendManager", () => {
       const reported = yield* Deferred.make<DesktopBackendManager.BackendProcessOutputError>();
       const drained = yield* Deferred.make<void>();
       let outputCount = 0;
-      const spawnerLayer = Layer.succeed(
+      const layerSpawner = Layer.succeed(
         ChildProcessSpawner.ChildProcessSpawner,
         ChildProcessSpawner.make(() =>
           Effect.succeed(
@@ -501,7 +501,7 @@ describe("DesktopBackendManager", () => {
             : Deferred.succeed(drained, void 0).pipe(Effect.asVoid);
         },
         onOutputFailure: (error) => Deferred.succeed(reported, error).pipe(Effect.asVoid),
-      }).pipe(Effect.scoped, Effect.provide(Layer.merge(spawnerLayer, healthyHttpClientLayer)));
+      }).pipe(Effect.scoped, Effect.provide(Layer.merge(layerSpawner, layerHealthyHttpClient)));
       const error = yield* Deferred.await(reported);
 
       assert.equal(exit.code.pipe(Option.getOrUndefined), 0);
@@ -530,7 +530,7 @@ describe("DesktopBackendManager", () => {
       Effect.gen(function* () {
         const exitObserved = yield* Deferred.make<void>();
         const finishOutputDrain = yield* Deferred.make<void>();
-        const spawnerLayer = Layer.succeed(
+        const layerSpawner = Layer.succeed(
           ChildProcessSpawner.ChildProcessSpawner,
           ChildProcessSpawner.make(() =>
             Effect.succeed(
@@ -551,7 +551,7 @@ describe("DesktopBackendManager", () => {
           desktopTelemetryStream: Stream.empty,
           onExitObserved: () => Deferred.succeed(exitObserved, void 0).pipe(Effect.asVoid),
         }).pipe(
-          Effect.provide(Layer.merge(spawnerLayer, healthyHttpClientLayer)),
+          Effect.provide(Layer.merge(layerSpawner, layerHealthyHttpClient)),
           Effect.forkChild,
         );
 
@@ -573,7 +573,7 @@ describe("DesktopBackendManager", () => {
           type: "setDiagnosticsDemand",
           enabled: true,
         });
-        const spawnerLayer = Layer.succeed(
+        const layerSpawner = Layer.succeed(
           ChildProcessSpawner.ChildProcessSpawner,
           ChildProcessSpawner.make(() =>
             Effect.succeed(
@@ -588,7 +588,7 @@ describe("DesktopBackendManager", () => {
           ),
         );
         const instance = yield* makeTestInstance({
-          spawnerLayer,
+          spawnerLayer: layerSpawner,
           desktopTelemetryPublisher: {
             handleControlForSource: (_sourceId, message) =>
               message.type === "setDiagnosticsDemand"
@@ -609,7 +609,7 @@ describe("DesktopBackendManager", () => {
         const persistedOutput = yield* Deferred.make<ReadonlyArray<string>>();
         const outputDrainStarted = yield* Deferred.make<void>();
         const outputChunks = yield* Ref.make<Array<string>>([]);
-        const spawnerLayer = Layer.succeed(
+        const layerSpawner = Layer.succeed(
           ChildProcessSpawner.ChildProcessSpawner,
           ChildProcessSpawner.make(() =>
             Effect.succeed(
@@ -626,8 +626,8 @@ describe("DesktopBackendManager", () => {
           ),
         );
         const instance = yield* makeTestInstance({
-          spawnerLayer,
-          httpClientLayer: httpClientLayer(() => Effect.never),
+          spawnerLayer: layerSpawner,
+          httpClientLayer: layerHttpClient(() => Effect.never),
           backendOutputLog: {
             writeOutputChunk: (_streamName, chunk) =>
               Ref.update(outputChunks, (current) => [...current, new TextDecoder().decode(chunk)]),
@@ -661,7 +661,7 @@ describe("DesktopBackendManager", () => {
         const pruneComplete = yield* Deferred.make<void>();
         const exited = yield* Queue.unbounded<void>();
 
-        const spawnerLayer = Layer.succeed(
+        const layerSpawner = Layer.succeed(
           ChildProcessSpawner.ChildProcessSpawner,
           ChildProcessSpawner.make(() =>
             Effect.succeed(
@@ -675,7 +675,7 @@ describe("DesktopBackendManager", () => {
         );
 
         const instance = yield* makeTestInstance({
-          spawnerLayer,
+          spawnerLayer: layerSpawner,
           config: {
             ...baseConfig,
             runningDistro: "Ubuntu",
@@ -685,7 +685,7 @@ describe("DesktopBackendManager", () => {
             Effect.sync(() => {
               prunedRuntimes.push([distro, runtimeId]);
             }).pipe(Effect.andThen(Deferred.succeed(pruneComplete, void 0)), Effect.asVoid),
-          httpClientLayer: httpClientLayer((request) =>
+          httpClientLayer: layerHttpClient((request) =>
             Effect.gen(function* () {
               const status = statuses.shift();
               assert.isDefined(status);
@@ -737,7 +737,7 @@ describe("DesktopBackendManager", () => {
           const firstProbe = yield* Deferred.make<void>();
           const childExit = yield* Deferred.make<void>();
 
-          const spawnerLayer = Layer.succeed(
+          const layerSpawner = Layer.succeed(
             ChildProcessSpawner.ChildProcessSpawner,
             ChildProcessSpawner.make(() =>
               Effect.succeed(
@@ -753,7 +753,7 @@ describe("DesktopBackendManager", () => {
           // The backend stays 503 through the first *two* readiness budgets
           // and only becomes healthy (200) for the third round, i.e. it comes
           // up well after the initial 50ms budget has expired.
-          const httpLayer = httpClientLayer((request) =>
+          const layerHttp = layerHttpClient((request) =>
             Effect.gen(function* () {
               requestCount += 1;
               requestUrls.push(request.url);
@@ -774,7 +774,7 @@ describe("DesktopBackendManager", () => {
               Effect.sync(() => {
                 readinessTimeoutCount += 1;
               }),
-          }).pipe(Effect.provide(Layer.merge(spawnerLayer, httpLayer)), Effect.forkChild);
+          }).pipe(Effect.provide(Layer.merge(layerSpawner, layerHttp)), Effect.forkChild);
 
           yield* Deferred.await(firstProbe);
           assert.equal(readyCount, 0);
@@ -819,7 +819,7 @@ describe("DesktopBackendManager", () => {
         let discardedSessionCount = 0;
         let removedTelemetrySources = 0;
 
-        const spawnerLayer = Layer.succeed(
+        const layerSpawner = Layer.succeed(
           ChildProcessSpawner.ChildProcessSpawner,
           ChildProcessSpawner.make(() =>
             Effect.gen(function* () {
@@ -848,7 +848,7 @@ describe("DesktopBackendManager", () => {
         );
 
         const instance = yield* makeTestInstance({
-          spawnerLayer,
+          spawnerLayer: layerSpawner,
           onReady: Ref.set(backendReadyFlag, true).pipe(
             Effect.andThen(Deferred.succeed(ready, void 0)),
             Effect.asVoid,
@@ -918,7 +918,7 @@ describe("DesktopBackendManager", () => {
         const finishTeardown = yield* Deferred.make<void>();
         let startCount = 0;
 
-        const spawnerLayer = Layer.succeed(
+        const layerSpawner = Layer.succeed(
           ChildProcessSpawner.ChildProcessSpawner,
           ChildProcessSpawner.make(() =>
             Effect.gen(function* () {
@@ -949,8 +949,8 @@ describe("DesktopBackendManager", () => {
         );
 
         const instance = yield* makeTestInstance({
-          spawnerLayer,
-          httpClientLayer: httpClientLayer(() => Effect.never),
+          spawnerLayer: layerSpawner,
+          httpClientLayer: layerHttpClient(() => Effect.never),
         });
 
         yield* instance.start;
@@ -988,7 +988,7 @@ describe("DesktopBackendManager", () => {
           method: "configResolve",
           description: "transient configuration failure",
         });
-        const spawnerLayer = Layer.succeed(
+        const layerSpawner = Layer.succeed(
           ChildProcessSpawner.ChildProcessSpawner,
           ChildProcessSpawner.make(() =>
             Effect.gen(function* () {
@@ -1023,9 +1023,9 @@ describe("DesktopBackendManager", () => {
           ),
         );
         const instance = yield* makeTestInstance({
-          spawnerLayer,
+          spawnerLayer: layerSpawner,
           configResolve,
-          httpClientLayer: httpClientLayer(() => Effect.never),
+          httpClientLayer: layerHttpClient(() => Effect.never),
         });
 
         yield* instance.start;
@@ -1058,7 +1058,7 @@ describe("DesktopBackendManager", () => {
         const finishTeardown = yield* Deferred.make<void>();
         let startCount = 0;
 
-        const spawnerLayer = Layer.succeed(
+        const layerSpawner = Layer.succeed(
           ChildProcessSpawner.ChildProcessSpawner,
           ChildProcessSpawner.make(() =>
             Effect.gen(function* () {
@@ -1089,8 +1089,8 @@ describe("DesktopBackendManager", () => {
         );
 
         const instance = yield* makeTestInstance({
-          spawnerLayer,
-          httpClientLayer: httpClientLayer(() => Effect.never),
+          spawnerLayer: layerSpawner,
+          httpClientLayer: layerHttpClient(() => Effect.never),
         });
 
         yield* instance.start;
@@ -1124,7 +1124,7 @@ describe("DesktopBackendManager", () => {
         const closed = yield* Deferred.make<void>();
         const startedPids = yield* Queue.unbounded<number>();
 
-        const spawnerLayer = Layer.succeed(
+        const layerSpawner = Layer.succeed(
           ChildProcessSpawner.ChildProcessSpawner,
           ChildProcessSpawner.make(() =>
             Effect.gen(function* () {
@@ -1139,8 +1139,8 @@ describe("DesktopBackendManager", () => {
         );
 
         const instance = yield* makeTestInstance({
-          spawnerLayer,
-          httpClientLayer: httpClientLayer(() => Effect.never),
+          spawnerLayer: layerSpawner,
+          httpClientLayer: layerHttpClient(() => Effect.never),
           onShutdown: Effect.sync(() => {
             shutdownCount += 1;
           }),
@@ -1160,7 +1160,7 @@ describe("DesktopBackendManager", () => {
         const failures = yield* Queue.unbounded<string>();
         let startCount = 0;
 
-        const spawnerLayer = Layer.succeed(
+        const layerSpawner = Layer.succeed(
           ChildProcessSpawner.ChildProcessSpawner,
           ChildProcessSpawner.make(() =>
             Effect.sync(() => {
@@ -1175,8 +1175,8 @@ describe("DesktopBackendManager", () => {
         );
 
         const instance = yield* makeTestInstance({
-          spawnerLayer,
-          httpClientLayer: httpClientLayer(() => Effect.never),
+          spawnerLayer: layerSpawner,
+          httpClientLayer: layerHttpClient(() => Effect.never),
           backendOutputLog: {
             persistFailure: ({ details }) => Queue.offer(failures, details).pipe(Effect.asVoid),
           },
@@ -1205,13 +1205,13 @@ describe("DesktopBackendManager", () => {
       Effect.gen(function* () {
         let shutdownCount = 0;
 
-        const spawnerLayer = Layer.succeed(
+        const layerSpawner = Layer.succeed(
           ChildProcessSpawner.ChildProcessSpawner,
           ChildProcessSpawner.make(() => Effect.die("unexpected backend spawn")),
         );
 
         const instance = yield* makeTestInstance({
-          spawnerLayer,
+          spawnerLayer: layerSpawner,
           config: {
             ...baseConfig,
             preflightFailure: Option.some({ reason: "preflight failed", fatal: false }),
@@ -1234,13 +1234,13 @@ describe("DesktopBackendManager", () => {
     Effect.scoped(
       Effect.gen(function* () {
         const failures: string[] = [];
-        const spawnerLayer = Layer.succeed(
+        const layerSpawner = Layer.succeed(
           ChildProcessSpawner.ChildProcessSpawner,
           ChildProcessSpawner.make(() => Effect.die("unexpected backend spawn")),
         );
 
         const instance = yield* makeTestInstance({
-          spawnerLayer,
+          spawnerLayer: layerSpawner,
           config: {
             ...baseConfig,
             preflightFailure: Option.some({ reason: "Node.js not found", fatal: true }),
@@ -1275,7 +1275,7 @@ describe("DesktopBackendManager", () => {
       Effect.gen(function* () {
         const failing = yield* Ref.make(true);
         const starts = yield* Queue.unbounded<number>();
-        const spawnerLayer = Layer.succeed(
+        const layerSpawner = Layer.succeed(
           ChildProcessSpawner.ChildProcessSpawner,
           ChildProcessSpawner.make(() =>
             Queue.offer(starts, 123).pipe(
@@ -1289,7 +1289,7 @@ describe("DesktopBackendManager", () => {
         );
 
         const instance = yield* makeTestInstance({
-          spawnerLayer,
+          spawnerLayer: layerSpawner,
           configResolve: Ref.get(failing).pipe(
             Effect.map((isFailing) =>
               isFailing
@@ -1334,13 +1334,13 @@ describe("DesktopBackendManager", () => {
     Effect.scoped(
       Effect.gen(function* () {
         const failures: string[] = [];
-        const spawnerLayer = Layer.succeed(
+        const layerSpawner = Layer.succeed(
           ChildProcessSpawner.ChildProcessSpawner,
           ChildProcessSpawner.make(() => Effect.die("unexpected backend spawn")),
         );
 
         const instance = yield* makeTestInstance({
-          spawnerLayer,
+          spawnerLayer: layerSpawner,
           config: {
             ...baseConfig,
             preflightFailure: Option.some({ reason: "wslpath conversion failed", fatal: false }),
@@ -1364,13 +1364,13 @@ describe("DesktopBackendManager", () => {
     Effect.scoped(
       Effect.gen(function* () {
         const failures: string[] = [];
-        const spawnerLayer = Layer.succeed(
+        const layerSpawner = Layer.succeed(
           ChildProcessSpawner.ChildProcessSpawner,
           ChildProcessSpawner.make(() => Effect.die("unexpected backend spawn")),
         );
 
         const instance = yield* makeTestInstance({
-          spawnerLayer,
+          spawnerLayer: layerSpawner,
           config: {
             ...baseConfig,
             preflightFailure: Option.some({
@@ -1402,7 +1402,7 @@ describe("DesktopBackendManager", () => {
         const secondClosed = yield* Deferred.make<void>();
         let startCount = 0;
 
-        const spawnerLayer = Layer.succeed(
+        const layerSpawner = Layer.succeed(
           ChildProcessSpawner.ChildProcessSpawner,
           ChildProcessSpawner.make(() =>
             Effect.gen(function* () {
@@ -1429,8 +1429,8 @@ describe("DesktopBackendManager", () => {
         );
 
         const instance = yield* makeTestInstance({
-          spawnerLayer,
-          httpClientLayer: httpClientLayer(() => Effect.never),
+          spawnerLayer: layerSpawner,
+          httpClientLayer: layerHttpClient(() => Effect.never),
         });
 
         yield* instance.start;
@@ -1461,7 +1461,7 @@ describe("DesktopBackendManager", () => {
         const starts = yield* Queue.unbounded<number>();
         let startCount = 0;
 
-        const spawnerLayer = Layer.succeed(
+        const layerSpawner = Layer.succeed(
           ChildProcessSpawner.ChildProcessSpawner,
           ChildProcessSpawner.make(() =>
             Effect.sync(() => {
@@ -1476,8 +1476,8 @@ describe("DesktopBackendManager", () => {
         );
 
         const instance = yield* makeTestInstance({
-          spawnerLayer,
-          httpClientLayer: httpClientLayer(() => Effect.never),
+          spawnerLayer: layerSpawner,
+          httpClientLayer: layerHttpClient(() => Effect.never),
         });
 
         yield* instance.start;
@@ -1530,7 +1530,7 @@ describe("DesktopBackendManager", () => {
                 }),
               ),
             ),
-            httpClientLayer: httpClientLayer(() => Effect.never),
+            httpClientLayer: layerHttpClient(() => Effect.never),
           });
 
         const instance1 = yield* makeInstance("instance1");
@@ -1539,7 +1539,7 @@ describe("DesktopBackendManager", () => {
         yield* instance1.start;
         yield* instance2.start;
 
-        const mockPool = Layer.succeed(DesktopBackendPool.DesktopBackendPool, {
+        const layerMockPool = Layer.succeed(DesktopBackendPool.DesktopBackendPool, {
           list: Effect.succeed([instance1, instance2]),
           get: () => Effect.succeedNone,
           primary: Effect.die(new Error("primary not implemented")),
@@ -1552,7 +1552,7 @@ describe("DesktopBackendManager", () => {
         // as an ordinary interruptible effect.
         const quitFiber = yield* Effect.scoped(
           Effect.addFinalizer(() => DesktopApp.stopAllPoolInstances()),
-        ).pipe(Effect.provide(mockPool), Effect.forkChild);
+        ).pipe(Effect.provide(layerMockPool), Effect.forkChild);
 
         const started = yield* Queue.takeN(teardownStarted, 2);
         assert.deepEqual(started.toSorted(), ["instance1", "instance2"]);

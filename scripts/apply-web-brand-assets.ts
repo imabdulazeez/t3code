@@ -6,7 +6,7 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
-import { Argument, Command } from "effect/unstable/cli";
+import { Argument, Command } from "effect/cli";
 import { resolveWebIconOverrides, type WebAssetBrand } from "./lib/brand-assets.ts";
 
 const WEB_ASSET_BRANDS = [

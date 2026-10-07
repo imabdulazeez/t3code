@@ -3,8 +3,8 @@ import type { DesktopBridge, DesktopLocalUpdateState } from "@t3tools/contracts"
 import * as Effect from "effect/Effect";
 import * as Queue from "effect/Queue";
 import * as Stream from "effect/Stream";
-import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
-import { Atom } from "effect/unstable/reactivity";
+import * as AsyncResult from "effect/reactivity/AsyncResult";
+import { Atom } from "effect/reactivity";
 
 type DesktopLocalUpdateBridge = Pick<DesktopBridge, "getLocalUpdateState" | "onLocalUpdateState">;
 

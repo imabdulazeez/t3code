@@ -29,7 +29,7 @@ const environmentInput = {
   buildTimestamp: "20260508-1430",
 } satisfies DesktopEnvironment.MakeDesktopEnvironmentInput;
 
-const electronAppLayer = Layer.succeed(ElectronApp.ElectronApp, {
+const layerElectronApp = Layer.succeed(ElectronApp.ElectronApp, {
   metadata: Effect.die("unexpected metadata read"),
   name: Effect.succeed("T3 Code"),
   systemLocale: Effect.succeed("en-US"),
@@ -50,7 +50,7 @@ const electronAppLayer = Layer.succeed(ElectronApp.ElectronApp, {
   on: () => Effect.void,
 } satisfies ElectronApp.ElectronApp["Service"]);
 
-const makeDesktopWindowLayer = (selectedAction: Deferred.Deferred<string>) =>
+const layerDesktopWindow = (selectedAction: Deferred.Deferred<string>) =>
   Layer.succeed(DesktopWindow.DesktopWindow, {
     createMain: Effect.die("unexpected createMain"),
     ensureMain: Effect.die("unexpected ensureMain"),
@@ -69,7 +69,7 @@ const makeDesktopWindowLayer = (selectedAction: Deferred.Deferred<string>) =>
     syncAppearance: Effect.void,
   } satisfies DesktopWindow.DesktopWindow["Service"]);
 
-const makeElectronMenuLayer = (
+const layerElectronMenu = (
   applicationMenuTemplate: Deferred.Deferred<readonly Electron.MenuItemConstructorOptions[]>,
 ) =>
   Layer.succeed(ElectronMenu.ElectronMenu, {
@@ -79,13 +79,13 @@ const makeElectronMenuLayer = (
     showContextMenu: () => Effect.succeedNone,
   } satisfies ElectronMenu.ElectronMenu["Service"]);
 
-const desktopAppIdentityLayer = Layer.succeed(DesktopAppIdentity.DesktopAppIdentity, {
+const layerDesktopAppIdentity = Layer.succeed(DesktopAppIdentity.DesktopAppIdentity, {
   resolveUserDataPath: Effect.die("unexpected user data path resolution"),
   resolveCommitHash: Effect.die("unexpected commit hash resolution"),
   configure: Effect.die("unexpected app identity configuration"),
 } satisfies DesktopAppIdentity.DesktopAppIdentity["Service"]);
 
-const desktopLocalUpdatesLayer = Layer.succeed(DesktopLocalUpdates.DesktopLocalUpdates, {
+const layerDesktopLocalUpdates = Layer.succeed(DesktopLocalUpdates.DesktopLocalUpdates, {
   getState: Effect.die("unexpected local update state read"),
   configure: Effect.die("unexpected local update configuration"),
   setFolder: () => Effect.die("unexpected local update folder change"),
@@ -96,7 +96,7 @@ const desktopLocalUpdatesLayer = Layer.succeed(DesktopLocalUpdates.DesktopLocalU
   revealFolder: Effect.die("unexpected local update folder reveal"),
 } satisfies DesktopLocalUpdates.DesktopLocalUpdates["Service"]);
 
-const electronDialogLayer = Layer.succeed(ElectronDialog.ElectronDialog, {
+const layerElectronDialog = Layer.succeed(ElectronDialog.ElectronDialog, {
   pickFolder: () => Effect.die("unexpected folder picker"),
   pickFiles: () => Effect.die("unexpected file picker"),
   showMessageBox: () => Effect.die("unexpected message box"),
@@ -113,12 +113,12 @@ const configureMenu = (
   }).pipe(
     Effect.provide(
       DesktopApplicationMenu.layer.pipe(
-        Layer.provideMerge(makeElectronMenuLayer(applicationMenuTemplate)),
-        Layer.provideMerge(makeDesktopWindowLayer(selectedAction)),
-        Layer.provideMerge(electronAppLayer),
-        Layer.provideMerge(desktopAppIdentityLayer),
-        Layer.provideMerge(desktopLocalUpdatesLayer),
-        Layer.provideMerge(electronDialogLayer),
+        Layer.provideMerge(layerElectronMenu(applicationMenuTemplate)),
+        Layer.provideMerge(layerDesktopWindow(selectedAction)),
+        Layer.provideMerge(layerElectronApp),
+        Layer.provideMerge(layerDesktopAppIdentity),
+        Layer.provideMerge(layerDesktopLocalUpdates),
+        Layer.provideMerge(layerElectronDialog),
         Layer.provideMerge(
           DesktopEnvironment.layer(environmentInput).pipe(
             Layer.provide(Layer.mergeAll(NodeServices.layer, DesktopConfig.layerTest({}))),

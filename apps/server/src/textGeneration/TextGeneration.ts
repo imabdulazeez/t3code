@@ -9,7 +9,7 @@ import type {
 } from "@t3tools/contracts";
 import { TextGenerationError } from "@t3tools/contracts";
 
-import * as ProviderInstanceRegistry from "../provider/Services/ProviderInstanceRegistry.ts";
+import * as ProviderInstanceRegistry from "../provider/ProviderInstanceRegistry.ts";
 import type { ProviderInstance } from "../provider/ProviderDriver.ts";
 import * as SourceControlProviderRegistry from "../sourceControl/SourceControlProviderRegistry.ts";
 import * as ThreadTitleLinks from "./ThreadTitleLinks.ts";
@@ -167,27 +167,28 @@ const withFallback = <
     return run(input);
   }
   return run(input).pipe(
-    Effect.catchTag("TextGenerationError", (primaryError) =>
-      Effect.logWarning("text generation falling back to secondary model", {
-        operation,
-        primary: `${input.modelSelection.instanceId}/${input.modelSelection.model}`,
-        fallback: `${fallback.instanceId}/${fallback.model}`,
-        detail: primaryError.detail,
-      }).pipe(
-        Effect.andThen(
-          run({ ...input, modelSelection: fallback, fallbackModelSelection: null }).pipe(
-            Effect.mapError(
-              (fallbackError) =>
-                new TextGenerationError({
-                  operation,
-                  detail: `${fallbackError.detail} (primary model failed: ${primaryError.detail})`,
-                  cause: primaryError,
-                }),
+    Effect.catchTags({
+      TextGenerationError: (primaryError) =>
+        Effect.logWarning("text generation falling back to secondary model", {
+          operation,
+          primary: `${input.modelSelection.instanceId}/${input.modelSelection.model}`,
+          fallback: `${fallback.instanceId}/${fallback.model}`,
+          detail: primaryError.detail,
+        }).pipe(
+          Effect.andThen(
+            run({ ...input, modelSelection: fallback, fallbackModelSelection: null }).pipe(
+              Effect.mapError(
+                (fallbackError) =>
+                  new TextGenerationError({
+                    operation,
+                    detail: `${fallbackError.detail} (primary model failed: ${primaryError.detail})`,
+                    cause: primaryError,
+                  }),
+              ),
             ),
           ),
         ),
-      ),
-    ),
+    }),
   );
 };
 
