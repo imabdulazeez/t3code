@@ -249,6 +249,7 @@ export const make = Effect.gen(function* () {
       // V2 restart recovery uses the environment-owned opt-in. The old
       // per-update request flag is not wired into the V2 update RPC path.
       ...(serverSelfUpdate === "boot-service" ? { serverSelfUpdateProgress: true } : {}),
+      serverBrowser: true,
     },
   };
 

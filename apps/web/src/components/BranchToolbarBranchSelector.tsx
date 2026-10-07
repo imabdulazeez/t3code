@@ -8,7 +8,14 @@ import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
-import type { ContextMenuItem, EnvironmentId, VcsRef, ThreadId } from "@t3tools/contracts";
+import {
+  AuthOrchestrationOperateScope,
+  AuthSourceControlWriteScope,
+  type ContextMenuItem,
+  type EnvironmentId,
+  type VcsRef,
+  type ThreadId,
+} from "@t3tools/contracts";
 import { validateGitBranchName } from "@t3tools/shared/git";
 import {
   ArrowDownIcon,
@@ -41,6 +48,7 @@ import { useOpenPrLink } from "../lib/openPullRequestLink";
 import { usePaginatedBranches } from "../state/queries";
 import { useProject, useThreadShell } from "../state/entities";
 import { useEnvironmentQuery } from "../state/query";
+import { readEnvironmentScope, useEnvironmentScope } from "~/state/session";
 import { threadEnvironment } from "../state/threads";
 import { useAtomCommand } from "../state/use-atom-command";
 import { vcsEnvironment } from "../state/vcs";
@@ -152,6 +160,8 @@ export function BranchToolbarBranchSelector({
   onComposerFocusRequest,
 }: BranchToolbarBranchSelectorProps) {
   const composerFloatingLayerProps = useComposerMenuProps();
+  const canWriteSourceControl = useEnvironmentScope(environmentId, AuthSourceControlWriteScope);
+  const canOperateThread = useEnvironmentScope(environmentId, AuthOrchestrationOperateScope);
   const stopThreadSession = useAtomCommand(threadEnvironment.stopSession, "thread session stop");
   const updateThreadMetadata = useAtomCommand(
     threadEnvironment.updateMetadata,
@@ -201,6 +211,8 @@ export function BranchToolbarBranchSelector({
   const activeProjectCwd = activeProject?.workspaceRoot ?? null;
   const branchCwd = activeWorktreePath ?? activeProjectCwd;
   const hasServerThread = serverThread !== null;
+  const canUpdateThreadBranch = !hasServerThread || canOperateThread;
+  const canChangeThreadBranch = canWriteSourceControl && canUpdateThreadBranch;
   const effectiveEnvMode =
     effectiveEnvModeOverride ??
     resolveEffectiveEnvMode({
@@ -214,7 +226,12 @@ export function BranchToolbarBranchSelector({
   // ---------------------------------------------------------------------------
   const setThreadBranch = useCallback(
     (branch: string | null, worktreePath: string | null, automatic = false) => {
-      if (!activeThreadId || !activeProject) return;
+      if (
+        !activeThreadId ||
+        !activeProject ||
+        (hasServerThread && !readEnvironmentScope(environmentId, AuthOrchestrationOperateScope))
+      )
+        return;
       if (serverSession && worktreePath !== activeWorktreePath) {
         void stopThreadSession({
           environmentId,
@@ -351,8 +368,11 @@ export function BranchToolbarBranchSelector({
   const isSelectingWorktreeBase =
     effectiveEnvMode === "worktree" && !envLocked && !activeWorktreePath;
   const checkoutPullRequestItemValue =
-    prReference && onCheckoutPullRequestRequest ? `__checkout_pull_request__:${prReference}` : null;
-  const canCreateBranch = !isSelectingWorktreeBase && trimmedBranchQuery.length > 0;
+    canChangeThreadBranch && prReference && onCheckoutPullRequestRequest
+      ? `__checkout_pull_request__:${prReference}`
+      : null;
+  const canCreateBranch =
+    canChangeThreadBranch && !isSelectingWorktreeBase && trimmedBranchQuery.length > 0;
   // The branch is created under its sanitized name, so both the collision check
   // and the validation have to use that name. Matching on the raw query would
   // offer to create a branch that already exists, and validating it would
@@ -472,6 +492,20 @@ export function BranchToolbarBranchSelector({
   );
 
   const runBranchAction = (action: () => Promise<void>) => {
+    if (
+      !readEnvironmentScope(environmentId, AuthSourceControlWriteScope) ||
+      (hasServerThread && !readEnvironmentScope(environmentId, AuthOrchestrationOperateScope))
+    ) {
+      // The menu already closed when the item was chosen; explain the no-op.
+      toastManager.add(
+        stackedThreadToast({
+          type: "error",
+          title: "Action unavailable",
+          description: "This connection cannot change the thread's branch.",
+        }),
+      );
+      return;
+    }
     startBranchActionTransition(async () => {
       await action();
       branchRefState.refresh();
@@ -480,7 +514,7 @@ export function BranchToolbarBranchSelector({
   };
 
   const selectBranch = (refName: VcsRef) => {
-    if (!branchCwd || !activeProjectCwd || isBranchActionPending) return;
+    if (!canUpdateThreadBranch || !branchCwd || !activeProjectCwd || isBranchActionPending) return;
 
     if (isSelectingWorktreeBase) {
       setThreadBranch(refName.name, null);
@@ -541,6 +575,7 @@ export function BranchToolbarBranchSelector({
   };
 
   const createRef = (rawName: string) => {
+    if (!canChangeThreadBranch) return;
     const name = sanitizeNewRefName(rawName);
     if (!branchCwd || !name || isBranchActionPending) return;
 
@@ -592,7 +627,7 @@ export function BranchToolbarBranchSelector({
     ref: VcsRef,
     options: { force: boolean; forceRemoveWorktree?: boolean },
   ) => {
-    if (!branchCwd) return;
+    if (!branchCwd || !canWriteSourceControl) return;
 
     const { force, forceRemoveWorktree = false } = options;
     setPendingDelete(null);
@@ -671,7 +706,7 @@ export function BranchToolbarBranchSelector({
   };
 
   const runRemoteSync = (mode: "fetch" | "prune") => {
-    if (!branchCwd || isBranchActionPending) return;
+    if (!branchCwd || !canWriteSourceControl || isBranchActionPending) return;
 
     runBranchAction(async () => {
       const fetchResult = await fetchMutation({
@@ -859,10 +894,21 @@ export function BranchToolbarBranchSelector({
         projectCwd={activeProjectCwd}
         index={index}
         value={itemValue}
+        disabled={
+          !canUpdateThreadBranch ||
+          (!canWriteSourceControl &&
+            !isSelectingWorktreeBase &&
+            (!activeProjectCwd ||
+              !resolveBranchSelectionTarget({
+                activeProjectCwd,
+                activeWorktreePath,
+                refName,
+              }).reuseExistingWorktree))
+        }
         onClick={() => selectPickerItem(itemValue)}
         onContextMenu={(event) => handleBranchContextMenu(event, itemValue)}
         actions={
-          refName.current ? (
+          refName.current || !canWriteSourceControl ? (
             <span className="size-7 sm:size-6" aria-hidden />
           ) : (
             <span className="flex opacity-0 group-hover:opacity-100">
@@ -987,7 +1033,7 @@ export function BranchToolbarBranchSelector({
                 size="icon-xs"
                 variant="outline"
                 aria-label={branchRemoteSyncMode === "prune" ? "Prune remote" : "Fetch from remote"}
-                disabled={isBranchActionPending}
+                disabled={!canWriteSourceControl || isBranchActionPending}
                 onPointerDown={(event) => event.stopPropagation()}
                 onClick={() => runRemoteSync(branchRemoteSyncMode)}
               >
@@ -1010,7 +1056,7 @@ export function BranchToolbarBranchSelector({
                   render={
                     <Button size="icon-xs" variant="outline" aria-label="Choose remote sync mode" />
                   }
-                  disabled={isBranchActionPending}
+                  disabled={!canWriteSourceControl || isBranchActionPending}
                   onPointerDown={(event) => event.stopPropagation()}
                 >
                   <ChevronDownIcon className="size-3" />

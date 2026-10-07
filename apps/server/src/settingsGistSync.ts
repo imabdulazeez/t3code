@@ -11,7 +11,7 @@ import {
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
-import * as GitHubCli from "./sourceControl/GitHubCli.ts";
+import * as GitHubApi from "./sourceControl/GitHubApi.ts";
 
 const GistFile = Schema.Struct({
   content: Schema.String,
@@ -29,12 +29,6 @@ const GistResponse = Schema.Struct({
   ),
 });
 
-const GistWritePayload = Schema.Struct({
-  description: Schema.optionalKey(Schema.String),
-  public: Schema.optionalKey(Schema.Boolean),
-  files: Schema.Record(Schema.String, GistFile),
-});
-
 const decodeGistResponse = Schema.decodeUnknownEffect(Schema.fromJsonString(GistResponse));
 const decodeSettingsDocument = Schema.decodeUnknownEffect(
   Schema.fromJsonString(SettingsGistDocument),
@@ -43,9 +37,10 @@ const decodeLegacySettingsDocument = Schema.decodeUnknownEffect(
   Schema.fromJsonString(LegacySettingsGistDocument),
 );
 const encodeSettingsDocument = Schema.encodeEffect(Schema.fromJsonString(SettingsGistDocument));
-const encodeGistWritePayload = Schema.encodeEffect(Schema.fromJsonString(GistWritePayload));
 
-function commandError(operation: "pull" | "create" | "update", error: GitHubCli.GitHubCliError) {
+const GIST_HOST = "github.com";
+
+function commandError(operation: "pull" | "create" | "update", error: GitHubApi.GitHubApiError) {
   return new SettingsGistSyncError({ operation, message: error.message });
 }
 
@@ -54,14 +49,17 @@ function invalidGistError(message: string) {
 }
 
 export const pullSettingsGist = Effect.fn("settingsGistSync.pull")(function* (input: {
-  readonly github: GitHubCli.GitHubCli["Service"];
-  readonly cwd: string;
+  readonly api: GitHubApi.GitHubApi["Service"];
   readonly gistId: string;
 }) {
-  const output = yield* input.github
-    .execute({ cwd: input.cwd, args: ["api", `gists/${input.gistId}`] })
+  const output = yield* input.api
+    .rest({
+      host: GIST_HOST,
+      operation: "pullSettingsGist",
+      path: `gists/${encodeURIComponent(input.gistId)}`,
+    })
     .pipe(Effect.mapError((error) => commandError("pull", error)));
-  const response = yield* decodeGistResponse(output.stdout).pipe(
+  const response = yield* decodeGistResponse(output.body).pipe(
     Effect.mapError(() => invalidGistError("GitHub returned an invalid Gist response.")),
   );
   const file = response.files[SETTINGS_GIST_FILENAME];
@@ -87,8 +85,7 @@ export const pullSettingsGist = Effect.fn("settingsGistSync.pull")(function* (in
 });
 
 export const pushSettingsGist = Effect.fn("settingsGistSync.push")(function* (input: {
-  readonly github: GitHubCli.GitHubCli["Service"];
-  readonly cwd: string;
+  readonly api: GitHubApi.GitHubApi["Service"];
   readonly gistId: string;
   readonly settings: GistSyncedClientSettings;
   readonly serverSettings: GistSyncedServerSettings;
@@ -109,33 +106,19 @@ export const pushSettingsGist = Effect.fn("settingsGistSync.push")(function* (in
     ),
   );
   const operation = input.gistId ? "update" : "create";
-  const payload = yield* encodeGistWritePayload({
-    ...(input.gistId ? {} : { description: "T3 Code settings sync", public: false }),
-    files: { [SETTINGS_GIST_FILENAME]: { content } },
-  }).pipe(
-    Effect.mapError(
-      () =>
-        new SettingsGistSyncError({
-          operation,
-          message: "Could not encode the GitHub Gist request.",
-        }),
-    ),
-  );
-  const output = yield* input.github
-    .execute({
-      cwd: input.cwd,
-      args: [
-        "api",
-        "--method",
-        input.gistId ? "PATCH" : "POST",
-        input.gistId ? `gists/${input.gistId}` : "gists",
-        "--input",
-        "-",
-      ],
-      stdin: payload,
+  const output = yield* input.api
+    .rest({
+      host: GIST_HOST,
+      operation: input.gistId ? "updateSettingsGist" : "createSettingsGist",
+      method: input.gistId ? "PATCH" : "POST",
+      path: input.gistId ? `gists/${encodeURIComponent(input.gistId)}` : "gists",
+      body: {
+        ...(input.gistId ? {} : { description: "T3 Code settings sync", public: false }),
+        files: { [SETTINGS_GIST_FILENAME]: { content } },
+      },
     })
     .pipe(Effect.mapError((error) => commandError(operation, error)));
-  const response = yield* decodeGistResponse(output.stdout).pipe(
+  const response = yield* decodeGistResponse(output.body).pipe(
     Effect.mapError(
       () =>
         new SettingsGistSyncError({

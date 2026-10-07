@@ -1,6 +1,8 @@
 import { SettingsGroup } from "./SettingsGroup";
+import { useScopedSettingsWriteAllowed } from "./useScopedSettings";
 import { Spinner } from "~/components/ui/spinner";
 import { NotificationSettings, NotificationTestSettings } from "./NotificationSettings";
+import { PRIVACY_POLICY_URL } from "../../legalLinks";
 import {
   ArchiveIcon,
   ArchiveX,
@@ -915,6 +917,7 @@ function BackgroundActivityAdvancedDialog({
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
 }) {
+  const canWriteSettings = useScopedSettingsWriteAllowed();
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
   const resolvedBackgroundActivity = resolveServerBackgroundActivitySettings(settings);
@@ -933,7 +936,7 @@ function BackgroundActivityAdvancedDialog({
   );
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open && canWriteSettings} onOpenChange={onOpenChange}>
       <DialogPopup className="max-w-xl">
         <DialogHeader>
           <DialogTitle>Background Activity</DialogTitle>
@@ -942,7 +945,10 @@ function BackgroundActivityAdvancedDialog({
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>
-          <div className="overflow-hidden rounded-xl border bg-card text-card-foreground">
+          <fieldset
+            disabled={!canWriteSettings}
+            className="min-w-0 overflow-hidden rounded-xl border bg-card text-card-foreground"
+          >
             <div className="flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0 space-y-1">
                 <div className="text-sm font-medium">Shared policy</div>
@@ -1164,11 +1170,12 @@ function BackgroundActivityAdvancedDialog({
                 </label>
               ))}
             </div>
-          </div>
+          </fieldset>
         </DialogPanel>
         <DialogFooter>
           <Button
             variant="outline"
+            disabled={!canWriteSettings}
             onClick={() => updateSettings(resetBackgroundActivitySettings())}
           >
             Reset all
@@ -2445,8 +2452,8 @@ export function GeneralSettingsPanel() {
           {...searchableSetting("gist-settings-sync")}
           description={
             settings.gistSettingsSync.gistId
-              ? "Uses the host's GitHub CLI authentication."
-              : "Uses the host's GitHub CLI authentication. Enter an existing Gist ID or create a new secret Gist."
+              ? "Uses the host's GitHub account."
+              : "Uses the host's GitHub account. Enter an existing Gist ID or create a new secret Gist."
           }
           status={
             settings.gistSettingsSync.lastSyncedAt
@@ -3778,6 +3785,19 @@ export function GeneralSettingsPanel() {
         <AboutVersionSection />
         <DesktopLocalUpdateSettingsRow />
         {IS_NIGHTLY_BUILD ? <NightlyMobileBetaRow /> : null}
+        <SettingsRow
+          {...searchableSetting("privacy-policy")}
+          description="How we handle your data, including the anonymous usage data T3 Code collects."
+          control={
+            <Button
+              render={<a href={PRIVACY_POLICY_URL} target="_blank" rel="noreferrer noopener" />}
+              size="sm"
+              variant="outline"
+            >
+              View policy
+            </Button>
+          }
+        />
       </SettingsSection>
       <SettingsSection title="Diagnostics">
         <SettingsRow

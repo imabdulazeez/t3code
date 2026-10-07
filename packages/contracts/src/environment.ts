@@ -201,6 +201,10 @@ export const ExecutionEnvironmentCapabilities = Schema.Struct({
       setting. Older servers drop the key on write, so clients show the
       picker inert rather than offering a choice that would never stick. */
   environmentIcon: Schema.optionalKey(Schema.Boolean),
+  /** Server hosts preview tabs in its own headless Chromium (`runtime:
+      "server"`) and streams them over `/api/preview-stream`. Clients
+      without a local browser runtime open server tabs here. */
+  serverBrowser: Schema.optionalKey(Schema.Boolean),
 });
 export type ExecutionEnvironmentCapabilities = typeof ExecutionEnvironmentCapabilities.Type;
 

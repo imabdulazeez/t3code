@@ -274,6 +274,7 @@ export function BranchPickerRefItem({
   projectCwd: activeProjectCwd,
   index,
   value,
+  disabled,
   onClick,
   onContextMenu,
   actions,
@@ -282,6 +283,7 @@ export function BranchPickerRefItem({
   projectCwd: string | null;
   index: number;
   value?: string;
+  disabled?: boolean;
   onClick: ComponentProps<typeof ComboboxItem>["onClick"];
   onContextMenu?: ComponentProps<typeof ComboboxItem>["onContextMenu"];
   actions?: ReactNode;
@@ -300,6 +302,7 @@ export function BranchPickerRefItem({
           : null;
   return (
     <ComboboxItem
+      disabled={disabled}
       hideIndicator
       className={actions ? "group" : undefined}
       key={itemValue}
