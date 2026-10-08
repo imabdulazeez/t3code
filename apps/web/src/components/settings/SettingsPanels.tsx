@@ -65,6 +65,7 @@ import * as Equal from "effect/Equal";
 import * as Schema from "effect/Schema";
 import { APP_VERSION } from "../../branding";
 import { IS_NIGHTLY_BUILD, NightlyMobileBetaRow } from "../NightlyMobileBeta";
+import { CliCommandSettingsRow } from "./CliCommandSettingsRow";
 import { ProviderModelPicker } from "../chat/ProviderModelPicker";
 import { TraitsPicker } from "../chat/TraitsPicker";
 import {
@@ -487,29 +488,32 @@ function AboutVersionSection() {
   }, [bridge, buttonDisabled, state, updateAvailable]);
 
   return (
-    <SettingsRow
-      title={<AboutVersionTitle />}
-      description={updateAvailable ? "Update available." : "Current version of the application."}
-      control={
-        bridge ? (
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  size="xs"
-                  variant={updateAvailable ? "default" : "outline"}
-                  disabled={buttonDisabled}
-                  onClick={() => void handleButtonClick()}
-                >
-                  {buttonLabel}
-                </Button>
-              }
-            />
-            {buttonTooltip ? <TooltipPopup>{buttonTooltip}</TooltipPopup> : null}
-          </Tooltip>
-        ) : null
-      }
-    />
+    <>
+      <SettingsRow
+        title={<AboutVersionTitle />}
+        description={updateAvailable ? "Update available." : "Current version of the application."}
+        control={
+          bridge ? (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    size="xs"
+                    variant={updateAvailable ? "default" : "outline"}
+                    disabled={buttonDisabled}
+                    onClick={() => void handleButtonClick()}
+                  >
+                    {buttonLabel}
+                  </Button>
+                }
+              />
+              {buttonTooltip ? <TooltipPopup>{buttonTooltip}</TooltipPopup> : null}
+            </Tooltip>
+          ) : null
+        }
+      />
+      {bridge ? <CliCommandSettingsRow /> : null}
+    </>
   );
 }
 

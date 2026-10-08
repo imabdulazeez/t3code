@@ -274,8 +274,8 @@ export const ChatFindBar = memo(function ChatFindBar({
       event.stopPropagation();
       openBar();
     };
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => window.removeEventListener("keydown", onKeyDown, true);
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
   }, [keybindings, openBar]);
 
   useEffect(() => onOpenChatFind(openBar), [openBar]);
