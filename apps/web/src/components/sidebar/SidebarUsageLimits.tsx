@@ -16,7 +16,7 @@ import { useClientSettings } from "../../hooks/useSettings";
 import { useServerConfigs, useThreadShell } from "../../state/entities";
 import { resolveActiveThreadRouteRef, resolveThreadRouteTarget } from "../../threadRoutes";
 import { ProviderInstanceIcon } from "../chat/ProviderInstanceIcon";
-import { getDriverOption } from "../settings/providerDriverMeta";
+import { providerClients } from "../settings/providerDriverMeta";
 import { useSidebar } from "../ui/sidebar";
 import { PROVIDER_PRESENTATION } from "../usage/usageProviders";
 
@@ -175,7 +175,7 @@ export function SidebarUsageLimits() {
   const color = providerColor(provider.driver);
   const providerLabel =
     provider.displayName?.trim() ||
-    getDriverOption(provider.driver)?.label ||
+    providerClients.get(provider.driver)?.label ||
     String(provider.driver);
   const shortestUsed = usedPercent(shortestWindow);
   const shortestDuration = compactDuration(shortestWindow.windowDurationMins);

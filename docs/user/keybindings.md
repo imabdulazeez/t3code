@@ -121,6 +121,14 @@ Combine keys with `!` for not, `&&` for and, `||` for or, and parentheses:
 { "key": "mod+j", "command": "terminal.toggle", "when": "terminalOpen && !terminalFocus" }
 ```
 
+## Find in the current thread
+
+`chat.find` searches conversation messages and proposed plans in the active thread. Entering a
+query searches the entire thread, including older messages. Thread search requires server support;
+update an older server to enable it. Select **Retry** if a search fails. It defaults to
+`mod+f` outside terminals and previews. Press **Enter** or **Shift+Enter** to move between matches,
+and **Escape** to close find.
+
 ## Precedence
 
 The last rule whose key and condition both match wins, even if it belongs to a
@@ -146,12 +154,6 @@ through the pages you have visited, like a browser's back and forward buttons.
 `chat.newLocal` skips that chooser. Both use your
 [new-thread defaults](./thread-sidebar.md#start-a-thread). `chat.newWithoutProject`
 (`mod+alt+n`) starts a thread [without a project](./thread-sidebar.md#start-without-a-project).
-
-`chat.find` opens a find bar over the open thread and defaults to `mod+f`. Any text selected when
-you press it becomes the search. Type to highlight every message that contains the text, then press
-`Enter` or `Shift+Enter` to step between matches and `Escape` to close it. The `Aa` and `ab` toggles
-match case and whole words only. On the pull requests page the same shortcut focuses the list
-search instead.
 
 ## Reserved shortcuts
 
