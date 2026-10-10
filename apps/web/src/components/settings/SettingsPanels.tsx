@@ -490,6 +490,7 @@ function AboutVersionSection() {
   return (
     <>
       <SettingsRow
+        id={searchableSetting("app-version").id}
         title={<AboutVersionTitle />}
         description={updateAvailable ? "Update available." : "Current version of the application."}
         control={

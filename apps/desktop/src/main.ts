@@ -20,7 +20,7 @@ import * as Electron from "electron";
 import { formatBuildTimestamp } from "@t3tools/shared/buildTimestamp";
 
 import * as NetService from "@t3tools/shared/Net";
-import { HostProcessArchitecture, HostProcessPlatform } from "@t3tools/shared/hostProcess";
+import * as HostProcess from "@t3tools/shared/HostProcess";
 import type { RemoteT3RunnerOptions } from "@t3tools/ssh/tunnel";
 import serverPackageJson from "../../server/package.json" with { type: "json" };
 
@@ -36,6 +36,7 @@ import * as ElectronTheme from "./electron/ElectronTheme.ts";
 import * as ElectronWindow from "./electron/ElectronWindow.ts";
 import * as DesktopApp from "./app/DesktopApp.ts";
 import * as DesktopAppActivation from "./app/DesktopAppActivation.ts";
+import * as DesktopWebLinks from "./app/DesktopWebLinks.ts";
 import * as DesktopAppIdentity from "./app/DesktopAppIdentity.ts";
 import * as DesktopConnectionCatalogStore from "./app/DesktopConnectionCatalogStore.ts";
 import * as DesktopClerk from "./app/DesktopClerk.ts";
@@ -70,6 +71,7 @@ import * as LinuxBrowserSecret from "./preview/BrowserImport/LinuxBrowserSecret.
 import * as BrowserSession from "./preview/BrowserSession.ts";
 import * as DesktopBrowserHost from "./preview/DesktopBrowserHost.ts";
 import * as PreviewManager from "./preview/Manager.ts";
+import * as PreviewPasskeys from "./preview/Passkeys.ts";
 import * as DesktopWindow from "./window/DesktopWindow.ts";
 import * as DesktopWslBackend from "./wsl/DesktopWslBackend.ts";
 import * as DesktopWslEnvironment from "./wsl/DesktopWslEnvironment.ts";
@@ -89,8 +91,8 @@ const layerDesktopEnvironment = Layer.unwrap(
   Effect.gen(function* () {
     const electronApp = yield* Effect.service(ElectronApp.ElectronApp);
     const metadata = yield* electronApp.metadata;
-    const platform = yield* HostProcessPlatform;
-    const processArch = yield* HostProcessArchitecture;
+    const platform = yield* HostProcess.Platform;
+    const processArch = yield* HostProcess.Architecture;
     let buildTimestamp = process.env.T3CODE_BUILD_TIMESTAMP;
     if (!buildTimestamp && metadata.isPackaged) {
       const path = yield* Path.Path;
@@ -189,6 +191,7 @@ const layerDesktopPreview = PreviewManager.layer.pipe(
   // service alongside the manager; both sit on the same BrowserSession.
   Layer.provideMerge(BrowserImport.layer.pipe(Layer.provide(LinuxBrowserSecret.layer))),
   Layer.provideMerge(BrowserSession.layer),
+  Layer.provideMerge(PreviewPasskeys.layer),
   Layer.provideMerge(layerDesktopFoundation),
 );
 
@@ -237,6 +240,7 @@ const layerDesktopApplicationMenu = DesktopApplicationMenu.layer.pipe(
 const layerDesktopApplication = Layer.mergeAll(
   DesktopLifecycle.layer,
   layerDesktopAppActivation,
+  DesktopWebLinks.layer,
   layerDesktopApplicationMenu,
   DesktopLinuxUrlHandler.layer,
   DesktopCliCommand.layer,

@@ -99,7 +99,7 @@ const toastCornerDismissClass = "absolute z-20 -top-1.5 -right-1.5";
 const toastCornerOrbClass = cn(
   "inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full border border-border/60 bg-popover/92 text-muted-foreground shadow-sm outline-none backdrop-blur-sm",
   "transition-[color,background-color,box-shadow] hover:bg-popover hover:text-foreground",
-  "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background",
+  "focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background",
 );
 
 /** Pill revealed beside the close orb on hover/focus when several toasts are stacked. */
@@ -109,7 +109,7 @@ const toastClearAllClass = cn(
   "group-hover/toast-dismiss:pointer-events-auto group-hover/toast-dismiss:translate-x-0 group-hover/toast-dismiss:opacity-100",
   "group-focus-within/toast-dismiss:pointer-events-auto group-focus-within/toast-dismiss:translate-x-0 group-focus-within/toast-dismiss:opacity-100",
   "hover:bg-popover hover:text-foreground",
-  "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background",
+  "focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background",
 );
 
 function handleToastDismissClick(
@@ -248,7 +248,7 @@ function ToastDescriptionAndExpandable({
               className={cn(
                 "group flex min-w-0 w-full cursor-pointer select-none items-start gap-1.5 rounded-sm text-left outline-none ring-offset-background",
                 "transition-colors hover:bg-muted/40",
-                "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background",
+                "focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background",
               )}
               onClick={toggle}
               onKeyDown={onKeyDown}

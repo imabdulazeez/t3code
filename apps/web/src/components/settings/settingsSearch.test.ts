@@ -128,6 +128,18 @@ describe("searchSettings", () => {
     expect(SETTINGS_SEARCH_ITEMS.some((item) => item.id === "quit-confirmation")).toBe(true);
     expect(searchSettings("hold to quit")).toEqual([]);
     expect(searchSettings("wsl")).toEqual([]);
+    expect(searchSettings("update track")).toEqual([]);
+  });
+
+  it("finds the About update rows", () => {
+    expect(searchSettings("check for updates").map((item) => item.id)).toContain("app-version");
+    expect(SETTINGS_SEARCH_ITEMS.find((item) => item.id === "local-desktop-updates")).toMatchObject(
+      {
+        title: "Local desktop updates",
+        to: "/settings/general",
+        desktopOnly: true,
+      },
+    );
   });
 
   it("hides macOS-only settings on other platforms", () => {
