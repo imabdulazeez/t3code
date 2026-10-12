@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 import { UsagePage, isUsageMetric } from "../components/usage/UsagePage";
 
@@ -8,7 +8,14 @@ function UsageRoute() {
 }
 
 export const Route = createFileRoute("/usage")({
-  // `?metric=limits` opens the page on a tab; the sidebar limit indicator links here.
+  beforeLoad: async ({ context }) => {
+    if (
+      context.authGateState.status !== "authenticated" &&
+      context.authGateState.status !== "hosted-static"
+    ) {
+      throw redirect({ to: "/pair", replace: true });
+    }
+  },
   validateSearch: (raw: Record<string, unknown>) =>
     isUsageMetric(raw.metric) ? { metric: raw.metric } : {},
   component: UsageRoute,

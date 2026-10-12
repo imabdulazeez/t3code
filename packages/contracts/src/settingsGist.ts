@@ -4,6 +4,8 @@ import {
   GistSyncedClientSettings,
   GistSyncedServerSettings,
   SidebarAutoSettleAfterDays,
+  ModelFavorites,
+  ProviderModelPreferences,
 } from "./settings.ts";
 
 export const SETTINGS_GIST_FILENAME = "t3code-settings.json";
@@ -18,16 +20,23 @@ export const SettingsGistDocument = Schema.Struct({
 });
 export type SettingsGistDocument = typeof SettingsGistDocument.Type;
 
-const LEGACY_AUTO_SETTLE_KEYS = ["sidebarAutoSettleAfterDays", "sidebarAutoSettleOnMerge"] as const;
+const LEGACY_SERVER_SETTING_KEYS = [
+  "sidebarAutoSettleAfterDays",
+  "sidebarAutoSettleOnMerge",
+  "favorites",
+  "providerModelPreferences",
+] as const;
 
-const LegacyAutoSettleSettings = Schema.Struct({
+const LegacySyncedSettings = Schema.Struct({
   sidebarAutoSettleAfterDays: Schema.optionalKey(Schema.NullOr(SidebarAutoSettleAfterDays)),
   sidebarAutoSettleOnMerge: Schema.optionalKey(Schema.Boolean),
+  favorites: Schema.optionalKey(Schema.NullOr(ModelFavorites)),
+  providerModelPreferences: Schema.optionalKey(Schema.NullOr(ProviderModelPreferences)),
 });
 
 export const LegacySettingsGistDocument = Schema.Struct({
-  settings: LegacyAutoSettleSettings,
-  serverSettings: Schema.optionalKey(LegacyAutoSettleSettings),
+  settings: LegacySyncedSettings,
+  serverSettings: Schema.optionalKey(LegacySyncedSettings),
 });
 export type LegacySettingsGistDocument = typeof LegacySettingsGistDocument.Type;
 
@@ -37,9 +46,13 @@ export function upgradeSettingsGistDocument(
 ): { readonly document: SettingsGistDocument; readonly migrated: boolean } {
   const serverSettings: Record<string, unknown> = { ...document.serverSettings };
   let migrated = false;
-  for (const key of LEGACY_AUTO_SETTLE_KEYS) {
+  for (const key of LEGACY_SERVER_SETTING_KEYS) {
     const value = legacy.settings[key];
-    if (value === undefined) continue;
+    if (
+      value === undefined ||
+      (value === null && (key === "favorites" || key === "providerModelPreferences"))
+    )
+      continue;
     migrated = true;
     if (legacy.serverSettings?.[key] === undefined) serverSettings[key] = value;
   }

@@ -14,7 +14,11 @@ import {
   selectGistSyncedClientSettings,
   selectGistSyncedServerSettings,
 } from "./settings.ts";
-import { SettingsGistDocument } from "./settingsGist.ts";
+import {
+  LegacySettingsGistDocument,
+  SettingsGistDocument,
+  upgradeSettingsGistDocument,
+} from "./settingsGist.ts";
 
 const decodeSettingsGistDocument = Schema.decodeUnknownSync(SettingsGistDocument);
 
@@ -58,5 +62,52 @@ describe("gist synced settings", () => {
       DEFAULT_SERVER_SETTINGS.sidebarAutoSettleOnMerge,
     );
     expect(decoded.serverSettings).not.toHaveProperty("gistSettingsSync");
+  });
+
+  it("moves legacy client model preferences to the server half", () => {
+    const favorites = [{ provider: "codex", model: "gpt-6.1-sol" }];
+    const providerModelPreferences = {
+      codex: { hiddenModels: ["hidden"], modelOrder: ["first", "second"] },
+    };
+    const input = {
+      schemaVersion: 1,
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      settings: { favorites, providerModelPreferences },
+      serverSettings: {},
+    };
+    const upgraded = upgradeSettingsGistDocument(
+      decodeSettingsGistDocument(input),
+      Schema.decodeUnknownSync(LegacySettingsGistDocument)(input),
+    );
+    expect(upgraded.migrated).toBe(true);
+    expect(upgraded.document.settings).not.toHaveProperty("favorites");
+    expect(upgraded.document.settings).not.toHaveProperty("providerModelPreferences");
+    expect(upgraded.document.serverSettings.favorites).toEqual(favorites);
+    expect(upgraded.document.serverSettings.providerModelPreferences).toEqual(
+      providerModelPreferences,
+    );
+  });
+
+  it("does not resurrect client favorites over cleared server preferences", () => {
+    const input = {
+      schemaVersion: 1,
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      settings: { favorites: [{ provider: "codex", model: "old" }] },
+      serverSettings: { favorites: [] },
+    };
+    const upgraded = upgradeSettingsGistDocument(
+      decodeSettingsGistDocument(input),
+      Schema.decodeUnknownSync(LegacySettingsGistDocument)(input),
+    );
+    expect(upgraded.document.serverSettings.favorites).toEqual([]);
+    expect(upgraded.migrated).toBe(true);
+  });
+
+  it("keeps source-control secrets and environment-bound guide models out of Gists", () => {
+    const portable = selectGistSyncedServerSettings(DEFAULT_SERVER_SETTINGS);
+    expect(portable).not.toHaveProperty("sourceControlHosts");
+    expect(portable).not.toHaveProperty("reviewGuideModelSelection");
+    expect(portable.favorites).toEqual([]);
+    expect(portable.providerModelPreferences).toEqual({});
   });
 });

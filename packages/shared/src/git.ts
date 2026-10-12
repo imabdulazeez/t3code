@@ -66,15 +66,12 @@ export function formatGeneratedBranchName(raw: string, naming?: BranchNamingOpti
 }
 
 /**
- * Sanitize a string into a `feature/…` refName name.
- * Preserves an existing `feature/` prefix or slash-separated namespace.
+ * Sanitize a generated branch name, preserving any slash-separated namespace.
+ * Unprefixed fragments use the `feature/` namespace.
  */
 export function sanitizeFeatureBranchName(raw: string): string {
   const sanitized = sanitizeBranchFragment(raw);
-  if (sanitized.includes("/")) {
-    return sanitized.startsWith("feature/") ? sanitized : `feature/${sanitized}`;
-  }
-  return `feature/${sanitized}`;
+  return sanitized.includes("/") ? sanitized : `feature/${sanitized}`;
 }
 
 // eslint-disable-next-line no-control-regex -- git check-ref-format forbids control characters
@@ -118,8 +115,8 @@ export function validateGitBranchName(rawName: string): string | null {
 const AUTO_FEATURE_BRANCH_FALLBACK = "feature/update";
 
 /**
- * Resolve a unique refName that doesn't collide with any existing refName.
- * Appends a numeric suffix when needed. Falls back to `feature/update`.
+ * Resolve a unique generated refName, suffixing only the path component
+ * blocked by an existing ref or, for the final component, its descendants.
  */
 export function resolveAutoFeatureBranchName(
   existingBranchNames: readonly string[],
@@ -129,18 +126,27 @@ export function resolveAutoFeatureBranchName(
   const resolvedBase = sanitizeBranchFragment(
     preferred && preferred.length > 0 ? preferred : AUTO_FEATURE_BRANCH_FALLBACK,
   );
-  const existingNames = new Set(existingBranchNames.map((refName) => refName.toLowerCase()));
+  const existingNames = existingBranchNames.map((refName) => refName.toLowerCase());
+  const existingRefs = new Set(existingNames);
+  const parts = resolvedBase.split("/");
+  let resolved = "";
 
-  if (!existingNames.has(resolvedBase)) {
-    return resolvedBase;
+  for (const [index, part] of parts.entries()) {
+    const base = resolved ? `${resolved}/${part}` : part;
+    let candidate = base;
+    let suffix = 2;
+    while (
+      existingRefs.has(candidate) ||
+      (index === parts.length - 1 &&
+        existingNames.some((refName) => refName.startsWith(`${candidate}/`)))
+    ) {
+      candidate = `${base}-${suffix}`;
+      suffix += 1;
+    }
+    resolved = candidate;
   }
 
-  let suffix = 2;
-  while (existingNames.has(`${resolvedBase}-${suffix}`)) {
-    suffix += 1;
-  }
-
-  return `${resolvedBase}-${suffix}`;
+  return resolved;
 }
 
 /**

@@ -3,11 +3,14 @@ import {
   GistSyncedServerSettings,
   selectGistSyncedClientSettings,
   selectGistSyncedServerSettings,
+  type ClientSettings,
+  type ServerSettings,
   type ServerSettingsPatch,
   type SettingsGistSyncResult,
 } from "@t3tools/contracts";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import { useAtomValue } from "@effect/atom-react";
+import { resolveModelPreferences } from "@t3tools/shared/serverSettings";
 import * as Equal from "effect/Equal";
 import * as Schema from "effect/Schema";
 import { useCallback, useEffect, useMemo, useRef } from "react";
@@ -26,7 +29,7 @@ import {
 } from "./useSettings";
 
 const SETTINGS_GIST_SYNC_DEBOUNCE_MS = 1_000;
-const SETTINGS_GIST_SYNC_BASELINES_KEY = "t3code:settings-gist-sync-baselines";
+const SETTINGS_GIST_SYNC_BASELINES_KEY = "t3code:settings-gist-sync-baselines:v2";
 
 const SettingsGistSyncBaseline = Schema.Struct({
   revision: Schema.String,
@@ -47,7 +50,7 @@ type ConflictPolicy = "automatic" | "local" | "remote" | "prompt";
  * Both halves travel in the same Gist document and merge independently.
  */
 type PortableSettings = {
-  readonly client: GistSyncedClientSettings;
+  readonly clientPreferences: GistSyncedClientSettings;
   readonly server: GistSyncedServerSettings;
 };
 
@@ -69,6 +72,19 @@ export type SettingsGistSyncOutcome =
       readonly status: "failure";
       readonly failure: unknown;
     };
+
+function selectPortableSettings(
+  clientPreferences: ClientSettings,
+  server: ServerSettings,
+): PortableSettings {
+  return {
+    clientPreferences: selectGistSyncedClientSettings(clientPreferences),
+    server: selectGistSyncedServerSettings({
+      ...server,
+      ...resolveModelPreferences(server, clientPreferences),
+    }),
+  };
+}
 
 function reconcileStore<T extends object>(
   baseline: T | null,
@@ -115,10 +131,15 @@ function reconcileSettings(
   remote: PortableSettings,
   policy: ConflictPolicy,
 ) {
-  const client = reconcileStore(baseline?.client ?? null, local.client, remote.client, policy);
+  const client = reconcileStore(
+    baseline?.clientPreferences ?? null,
+    local.clientPreferences,
+    remote.clientPreferences,
+    policy,
+  );
   const server = reconcileStore(baseline?.server ?? null, local.server, remote.server, policy);
   return {
-    settings: { client: client.settings, server: server.settings },
+    settings: { clientPreferences: client.settings, server: server.settings },
     conflicts: [...client.conflicts, ...server.conflicts],
   };
 }
@@ -147,10 +168,7 @@ export function useSettingsGistSyncActions() {
   });
 
   const readPortableSettings = useCallback(
-    (): PortableSettings => ({
-      client: selectGistSyncedClientSettings(getClientSettings()),
-      server: selectGistSyncedServerSettings(serverSettingsRef.current),
-    }),
+    () => selectPortableSettings(getClientSettings(), serverSettingsRef.current),
     [],
   );
 
@@ -176,7 +194,7 @@ export function useSettingsGistSyncActions() {
         ...current,
         [result.gistId]: {
           revision: result.revision,
-          settings: settings.client,
+          settings: settings.clientPreferences,
           serverSettings: settings.server,
         },
       }));
@@ -199,7 +217,7 @@ export function useSettingsGistSyncActions() {
         environmentId,
         input: {
           gistId: gistId.trim(),
-          settings: settings.client,
+          settings: settings.clientPreferences,
           serverSettings: settings.server,
         },
       });
@@ -232,12 +250,12 @@ export function useSettingsGistSyncActions() {
 
       const local = readPortableSettings();
       const remote: PortableSettings = {
-        client: pulled.value.settings,
+        clientPreferences: pulled.value.settings,
         server: pulled.value.serverSettings,
       };
       const storedBaseline = baselines[normalizedGistId];
       const baseline = storedBaseline
-        ? { client: storedBaseline.settings, server: storedBaseline.serverSettings }
+        ? { clientPreferences: storedBaseline.settings, server: storedBaseline.serverSettings }
         : null;
       const merged = reconcileSettings(baseline, local, remote, policy);
       if (policy === "prompt" && merged.conflicts.length > 0) {
@@ -249,12 +267,15 @@ export function useSettingsGistSyncActions() {
         };
       }
 
-      const changedClient = !Equal.equals(local.client, merged.settings.client);
+      const changedClient = !Equal.equals(
+        local.clientPreferences,
+        merged.settings.clientPreferences,
+      );
       const changedServer = !Equal.equals(local.server, merged.settings.server);
       const changedLocal = changedClient || changedServer;
       const changedRemote =
         pulled.value.migrated === true || !Equal.equals(remote, merged.settings);
-      if (changedClient) updateClientSettings(merged.settings.client);
+      if (changedClient) updateClientSettings(merged.settings.clientPreferences);
       const applyServerSettings: ServerSettingsPatch | undefined = changedServer
         ? merged.settings.server
         : undefined;
@@ -302,10 +323,7 @@ export function SettingsGistSyncController(props: {
   const connected = environment?.connection.phase === "connected";
   const { reconcile } = useSettingsGistSyncActions();
   const portableSettings = useMemo<PortableSettings>(
-    () => ({
-      client: selectGistSyncedClientSettings(clientSettings),
-      server: selectGistSyncedServerSettings(serverSettings),
-    }),
+    () => selectPortableSettings(clientSettings, serverSettings),
     [clientSettings, serverSettings],
   );
   const observedRef = useRef<{
